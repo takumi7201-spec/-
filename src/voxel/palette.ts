@@ -58,9 +58,9 @@ export interface Biome {
 
 const CANYON = buildPalette([
   0x000000,
-  0xd8b483, 0xc09a68, 0x8a6a45, 0xa87f56,
-  0x7d6a5c, 0x5d5049, 0xe8d9a8, 0x7fd7e8,
-  0x86a05a, 0x6f8c4a, 0xc45a3a, 0x9a8a78, 0xf0e2c0,
+  0xc8a271, 0xb08753, 0x7d5e3c, 0x99704a,
+  0x6e5f52, 0x51463f, 0xe8d9a8, 0x7fd7e8,
+  0x75914c, 0x5d7a3e, 0xb14e31, 0x8a7b6a, 0xf0e2c0,
 ]);
 
 const FROST = buildPalette([
@@ -90,9 +90,9 @@ export const BIOMES: Record<BiomeId, Biome> = {
     name: 'ソルト・キャニオン',
     tagline: '乾いた層に浅く眠る、最初の発掘場',
     palette: CANYON,
-    sky: 0xffd9a0, horizon: 0xffb877, fog: 0xe9c89a,
-    sunColor: 0xfff0d0, sunIntensity: 3.1,
-    ambientSky: 0xbfe0ff, ambientGround: 0x8a6a45, ambientIntensity: 0.85,
+    sky: 0x6ba8d8, horizon: 0xf0c48a, fog: 0xc9a880,
+    sunColor: 0xffeec8, sunIntensity: 2.15,
+    ambientSky: 0x9ec8ff, ambientGround: 0x6b5238, ambientIntensity: 0.62,
     relief: 1.0, hardness: 0.28, level: [1, 8],
   },
   frostpeak: {
@@ -100,9 +100,9 @@ export const BIOMES: Record<BiomeId, Biome> = {
     name: 'フロストピーク',
     tagline: '氷漬けの保存状態、ただし岩は硬い',
     palette: FROST,
-    sky: 0xcfe6ff, horizon: 0xa9cbe8, fog: 0xc6dcee,
-    sunColor: 0xe8f2ff, sunIntensity: 2.7,
-    ambientSky: 0xd8ecff, ambientGround: 0x6b7684, ambientIntensity: 1.05,
+    sky: 0x8fbde0, horizon: 0xc8dcec, fog: 0xa8c4d8,
+    sunColor: 0xe8f2ff, sunIntensity: 2.0,
+    ambientSky: 0xc8e4ff, ambientGround: 0x5a6570, ambientIntensity: 0.75,
     relief: 1.35, hardness: 0.52, level: [6, 16],
   },
   emberfield: {
@@ -111,8 +111,8 @@ export const BIOMES: Record<BiomeId, Biome> = {
     tagline: '火山灰の下、レア個体の密度が高い',
     palette: EMBER,
     sky: 0x2a1a24, horizon: 0x6b2a1e, fog: 0x39211f,
-    sunColor: 0xffb070, sunIntensity: 2.2,
-    ambientSky: 0x5a3040, ambientGround: 0xff5a28, ambientIntensity: 0.95,
+    sunColor: 0xffb070, sunIntensity: 1.7,
+    ambientSky: 0x4a2838, ambientGround: 0xc04418, ambientIntensity: 0.7,
     relief: 1.6, hardness: 0.68, level: [12, 26],
   },
   tidehollow: {
@@ -120,9 +120,9 @@ export const BIOMES: Record<BiomeId, Biome> = {
     name: 'タイドホロウ',
     tagline: '干上がった内海。水棲種の墓場',
     palette: TIDE,
-    sky: 0xa8d8d0, horizon: 0x86bdb6, fog: 0x9fcfc6,
-    sunColor: 0xe6fff8, sunIntensity: 2.5,
-    ambientSky: 0xbfeee6, ambientGround: 0x4d6b62, ambientIntensity: 1.0,
+    sky: 0x78b0b8, horizon: 0x9fcabf, fog: 0x86aca2,
+    sunColor: 0xe6fff8, sunIntensity: 1.95,
+    ambientSky: 0xa8dcd4, ambientGround: 0x3d5a52, ambientIntensity: 0.7,
     relief: 0.8, hardness: 0.4, level: [9, 20],
   },
 };

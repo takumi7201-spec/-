@@ -73,7 +73,7 @@ export function button(
   el.addEventListener('pointerdown', (e) => {
     if (el.disabled) return;
     armed = true;
-    el.setPointerCapture?.((e as PointerEvent).pointerId);
+    try { el.setPointerCapture?.((e as PointerEvent).pointerId); } catch { /* 取得済み/無効なID */ }
   });
   el.addEventListener('pointerup', (e) => {
     if (!armed || el.disabled) return;

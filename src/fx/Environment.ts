@@ -30,15 +30,15 @@ export class Environment {
     this.sun.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
     // ボクセルの平坦な面はシャドウアクネが出やすい。normalBias を
     // ボクセル1個分に近づけると、bias を上げずにピーターパンも避けられる
-    this.sun.shadow.bias = -0.0006;
-    this.sun.shadow.normalBias = 0.32;
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.08;
     this.sun.shadow.camera.near = 0.5;
     this.sun.shadow.camera.far = 160;
     this.group.add(this.sun);
     this.group.add(this.sun.target);
 
     // 太陽の反対側からの弱い補助光。影の中が真っ黒に潰れるのを防ぐ
-    this.fill = new THREE.DirectionalLight(0x88b0ff, 0.42);
+    this.fill = new THREE.DirectionalLight(0x7d8798, 0.16);
     this.fill.position.set(-0.4, 0.35, -0.6);
     this.group.add(this.fill);
 
@@ -70,7 +70,7 @@ export class Environment {
     this.fill.position.copy(this.sunDir).multiplyScalar(-1).setY(0.4);
 
     // 指数フォグのほうが地平の溶け方が自然で、遠クリップも隠れる
-    scene.fog = new THREE.FogExp2(biome.fog, 0.0075);
+    scene.fog = new THREE.FogExp2(biome.fog, 0.0135);
   }
 
   /** シャドウカメラをエリアに合わせて固定する（追従不要なサイズ） */

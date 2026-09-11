@@ -1,0 +1,154 @@
+/* =========================================================================
+   画面固有スタイル
+   ========================================================================= */
+
+/* ---- ステータスストリップ ---- */
+.stat-group { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.stat-col { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 54px; }
+.stat-num { font-size: var(--fs-num); font-weight: 800; line-height: 1.1; }
+.status-strip .btn { min-height: 44px; min-width: 44px; padding: 0 10px; }
+
+/* ---- ミニマップ ---- */
+.minimap-wrap { padding: 4px; border-radius: var(--r-sm); line-height: 0; }
+.minimap { width: 88px; height: 88px; display: block; border-radius: 3px; image-rendering: pixelated; }
+@media (min-width: 600px) { .minimap { width: 116px; height: 116px; } }
+
+/* ---- スキャンモード枠 ---- */
+.scan-frame { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity var(--dur) var(--ease); }
+.scan-frame.is-on { opacity: 1; }
+.scan-corner { position: absolute; width: 34px; height: 34px; border: 3px solid var(--sonar); }
+.scan-corner--tl { top: calc(var(--safe-t) + 60px); left: 16px; border-right: 0; border-bottom: 0; }
+.scan-corner--tr { top: calc(var(--safe-t) + 60px); right: 16px; border-left: 0; border-bottom: 0; }
+.scan-corner--bl { bottom: 200px; left: 16px; border-right: 0; border-top: 0; }
+.scan-corner--br { bottom: 200px; right: 16px; border-left: 0; border-top: 0; }
+.scan-label {
+  position: absolute; top: calc(var(--safe-t) + 66px); left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 800; letter-spacing: 0.24em; color: var(--sonar);
+}
+
+/* ---- 仮想スティック（触った場所に出るフローティング式）---- */
+.stick {
+  position: absolute; width: 0; height: 0; pointer-events: none;
+  opacity: 0; transition: opacity 100ms linear;
+}
+.stick.is-on { opacity: 1; }
+.stick-ring {
+  position: absolute; left: -56px; top: -56px; width: 112px; height: 112px;
+  border: 3px solid rgba(248, 242, 228, 0.28); border-radius: 50%;
+  background: rgba(20, 16, 11, 0.35);
+}
+.stick-knob {
+  position: absolute; left: -26px; top: -26px; width: 52px; height: 52px;
+  border-radius: 50%; background: var(--sandstone); border: 3px solid var(--obsidian);
+  box-shadow: 0 3px 0 var(--bedrock);
+}
+
+/* ---- 発掘デッキ ---- */
+.deck--dig { justify-content: space-between; align-items: flex-end; }
+.deck-left { display: flex; flex-direction: column; gap: 8px; }
+.deck-right { display: flex; align-items: flex-end; gap: 12px; }
+
+.btn--echo {
+  width: 72px; height: 72px; min-width: 72px; min-height: 72px;
+  background: var(--sonar); box-shadow: 0 4px 0 #17796a; font-size: 11px; letter-spacing: 0.1em;
+}
+.btn--echo.is-cooling { background: var(--bedrock); color: var(--text-faint); box-shadow: 0 4px 0 #201811; }
+.btn--dig {
+  width: 96px; height: 96px; min-width: 96px; min-height: 96px;
+  background: var(--amber); box-shadow: 0 5px 0 var(--ember); font-size: 15px; letter-spacing: 0.1em;
+}
+.btn--dig:active { transform: translateY(5px); box-shadow: 0 0 0 var(--ember); }
+
+.cd-ring {
+  position: absolute; left: 6px; right: 6px; bottom: 8px; height: 4px;
+  background: rgba(20, 16, 11, 0.45); border-radius: 2px; overflow: hidden;
+}
+.cd-fill {
+  display: block; height: 100%; width: 100%; background: var(--bone);
+  transform-origin: left center; transform: scaleX(1);
+}
+
+/* ---- タイトル ---- */
+.screen--title { justify-content: flex-end; }
+.title-logo {
+  position: absolute; top: 18%; left: 0; right: 0; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.title-logo .main {
+  font-size: clamp(34px, 11vw, 68px); font-weight: 800; letter-spacing: 0.12em;
+  color: var(--bone); text-shadow: 0 4px 0 var(--bedrock), 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+.title-logo .sub {
+  font-size: clamp(10px, 3vw, 14px); font-weight: 700; letter-spacing: 0.5em;
+  color: var(--amber); margin-left: 0.5em;
+}
+.title-logo .jp { font-size: 13px; color: var(--text-dim); letter-spacing: 0.3em; margin-top: 10px; }
+
+.title-actions {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 0 calc(var(--gutter) + var(--safe-l)) var(--deck-bottom) calc(var(--gutter) + var(--safe-r));
+  display: flex; flex-direction: column; gap: 12px;
+  width: min(460px, 100%); margin: 0 auto;
+}
+.title-actions .row { display: flex; gap: 8px; }
+.title-actions .row .btn { flex: 1; }
+.title-ver { text-align: center; font-size: 11px; color: var(--text-faint); letter-spacing: 0.1em; margin-top: 4px; }
+
+/* ---- ホーム ---- */
+.home-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%;
+}
+.home-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; min-height: 84px; padding: 8px 4px;
+}
+.home-tile .btn-icon { font-size: 22px; line-height: 1; }
+.home-tile .btn-label { font-size: 12px; }
+.home-tile .badge {
+  position: absolute; top: -6px; right: -6px; min-width: 24px; height: 24px;
+  display: grid; place-items: center; padding: 0 6px;
+  background: var(--magma-dark); color: var(--bone);
+  border: 2px solid var(--obsidian); border-radius: 12px;
+  font-size: 11px; font-weight: 800;
+}
+.home-head { display: flex; align-items: center; gap: 10px; width: 100%; }
+.home-head .who { flex: 1; min-width: 0; }
+.home-head .coin { font-size: var(--fs-num); font-weight: 800; color: var(--amber); }
+
+/* ---- シート / ダイアログ ---- */
+.sheet-head { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
+.sheet-title { flex: 1; font-size: var(--fs-title); font-weight: 800; margin: 0; }
+.sheet-actions { display: flex; gap: 8px; padding-top: 12px; }
+.sheet-actions .btn { flex: 1; }
+
+.dialog {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -46%) scale(0.96);
+  width: min(400px, calc(100% - 32px)); padding: 20px;
+  opacity: 0; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-back);
+  pointer-events: auto;
+}
+.dialog.is-open { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.dialog-title { font-size: var(--fs-title); font-weight: 800; margin: 0 0 8px; }
+.dialog-msg { color: var(--text-dim); font-size: var(--fs-label); margin: 0 0 18px; line-height: 1.7; }
+.dialog-actions { display: flex; gap: 8px; }
+.dialog-actions .btn { flex: 1; }
+
+/* ---- コンテキストロスト ---- */
+.context-lost { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 8, 5, 0.9); pointer-events: auto; }
+.context-lost-box { padding: 24px; width: min(380px, calc(100% - 32px)); text-align: center; }
+.context-lost-box h2 { font-size: var(--fs-title); margin: 0 0 8px; }
+.dim { color: var(--text-dim); font-size: 13px; line-height: 1.7; }
+
+/* ---- デバッグHUD ---- */
+.debug-hud {
+  position: absolute; left: calc(var(--gutter) + var(--safe-l)); bottom: calc(var(--deck-bottom) + 190px);
+  font-size: 10px; font-family: ui-monospace, monospace; color: var(--text-faint);
+  background: rgba(20, 16, 11, 0.72); padding: 4px 7px; border-radius: 4px;
+  line-height: 1.5; pointer-events: none; white-space: pre;
+}
+
+/* ---- WIDE レイアウト（スマホ横 / PC）---- */
+body[data-layout='wide'] .rail--r { top: 84px; }
+body[data-layout='wide'] .deck--dig { padding-left: 5vw; padding-right: 5vw; }
+body[data-layout='wide'] .title-actions { width: min(520px, 100%); }
+body[data-layout='wide'] .home-grid { grid-template-columns: repeat(6, 1fr); }

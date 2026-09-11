@@ -66,11 +66,13 @@ export class GameRenderer {
     // ACES はボクセルの原色を一律にくすませる。Neutral は中間調の
     // 色相・彩度をほぼ保存したままハイライトだけ丸める
     this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 0.92;
+    // composer は内部で複数回 render するので、自動リセットだと最後のパスの値しか残らない
+    this.renderer.info.autoReset = false;
     this.renderer.shadowMap.enabled = this.quality.shadows;
-    this.renderer.shadowMap.type = this.quality.softShadows
-      ? THREE.PCFSoftShadowMap
-      : THREE.PCFShadowMap;
+    // r186 で PCFSoftShadowMap は削除された。VSM はボクセルの直角な
+    // シルエットで光漏れが直線状に出るので、PCF のまま解像度で稼ぐ
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // 太陽は動かさないので、影は必要なときだけ焼き直す
     this.renderer.shadowMap.autoUpdate = false;
 
@@ -165,9 +167,6 @@ export class GameRenderer {
     if (tier === this.quality.tier) return;
     this.quality = settingsFor(tier);
     this.renderer.shadowMap.enabled = this.quality.shadows;
-    this.renderer.shadowMap.type = this.quality.softShadows
-      ? THREE.PCFSoftShadowMap
-      : THREE.PCFShadowMap;
     this.buildPipeline();
     this.resize();
     this.invalidateShadows();
@@ -221,6 +220,7 @@ export class GameRenderer {
       this.flashAmount = Math.max(0, this.flashAmount - dt * this.flashDecay);
     }
 
+    this.renderer.info.reset();
     if (this.composer && this.gradePass) {
       this.gradePass.uniforms.uTime.value = this.elapsed;
       this.gradePass.uniforms.uFlash.value = this.flashAmount;

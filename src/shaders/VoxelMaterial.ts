@@ -32,6 +32,8 @@ export interface VoxelMaterialOptions {
   skyTint?: THREE.ColorRepresentation;
   groundTint?: THREE.ColorRepresentation;
   tintStrength?: number;
+  /** 暗部の下限。0で完全な黒まで落ちる */
+  floorLight?: number;
   flatShading?: boolean;
   transparent?: boolean;
 }
@@ -72,6 +74,7 @@ export function createVoxelMaterial(opts: VoxelMaterialOptions = {}): VoxelMater
     uGroundTint: { value: new THREE.Color(opts.groundTint ?? 0x4a3a2c) },
     uTintStrength: { value: opts.tintStrength ?? 0.14 },
     uHighlight: { value: 0 },
+    uFloorLight: { value: opts.floorLight ?? 0.07 },
   };
 
   const mat = new THREE.MeshLambertMaterial({
@@ -124,6 +127,7 @@ export function createVoxelMaterial(opts: VoxelMaterialOptions = {}): VoxelMater
         uniform vec3  uGroundTint;
         uniform float uTintStrength;
         uniform float uHighlight;
+        uniform float uFloorLight;
         varying float vVoxAO;
         varying vec2  vVoxUv;
         varying vec3  vVoxWorldPos;
@@ -162,6 +166,9 @@ export function createVoxelMaterial(opts: VoxelMaterialOptions = {}): VoxelMater
         float voxAO = mix(1.0, vVoxAO, uAoIntensity);
         reflectedLight.indirectDiffuse *= voxAO;
         reflectedLight.directDiffuse *= mix(1.0, voxAO, uAoDirect);
+        // 完全な黒は地層が読めなくなるだけで「暗さ」を伝えない。
+        // ベースカラーに比例した下限を敷いて、暗部でも素材が分かるようにする
+        reflectedLight.indirectDiffuse += diffuseColor.rgb * uFloorLight * voxAO;
       `,
     );
     // リムライト＋ハイライト（被弾・選択などのフラッシュ用）
