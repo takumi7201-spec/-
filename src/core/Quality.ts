@@ -8,7 +8,10 @@ export interface QualitySettings {
   bloom: boolean;
   antialias: boolean;
   grain: number;
-  chroma: number;
+  /** ポストプロセスのパス数。0 = EffectComposer を作らない */
+  postPasses: 0 | 1 | 2;
+  /** オフスクリーンRTのMSAAサンプル数。0 は既定フレームバッファのMSAAに任せる */
+  msaaSamples: 0 | 2 | 4;
   /** 発掘エリアの描画距離（ワールド単位） */
   viewDistance: number;
   /** 同時パーティクル上限 */
@@ -33,13 +36,17 @@ export const isIOS = (() => {
 })();
 
 const PRESETS: Record<QualityTier, Omit<QualitySettings, 'tier' | 'pixelRatio'>> = {
+  // モバイルGPUはタイルベースなので、オフスクリーンRTへの切り替えだけで
+  // 1パス 1〜3ms 持っていかれる。low はポスプロを一切作らず、
+  // 既定フレームバッファのMSAAに任せるのが最も得。
   low: {
     shadowMapSize: 1024,
     shadows: true,
     bloom: false,
-    antialias: false,
-    grain: 0.012,
-    chroma: 0.0,
+    antialias: true,
+    grain: 0,
+    postPasses: 0,
+    msaaSamples: 0,
     viewDistance: 90,
     maxParticles: 120,
     softShadows: false,
@@ -47,10 +54,11 @@ const PRESETS: Record<QualityTier, Omit<QualitySettings, 'tier' | 'pixelRatio'>>
   medium: {
     shadowMapSize: 1536,
     shadows: true,
-    bloom: true,
-    antialias: false,
-    grain: 0.018,
-    chroma: 0.0012,
+    bloom: false,
+    antialias: true,
+    grain: 0.016,
+    postPasses: 1,
+    msaaSamples: 2,
     viewDistance: 140,
     maxParticles: 300,
     softShadows: true,
@@ -60,8 +68,9 @@ const PRESETS: Record<QualityTier, Omit<QualitySettings, 'tier' | 'pixelRatio'>>
     shadows: true,
     bloom: true,
     antialias: true,
-    grain: 0.022,
-    chroma: 0.0018,
+    grain: 0.02,
+    postPasses: 2,
+    msaaSamples: 4,
     viewDistance: 220,
     maxParticles: 700,
     softShadows: true,

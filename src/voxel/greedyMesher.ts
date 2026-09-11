@@ -33,7 +33,7 @@ export interface MeshOptions {
   aoStrength?: number;
 }
 
-const AO_LUT = [0.0, 0.6, 0.82, 1.0];
+const AO_LUT = [0.48, 0.7, 0.86, 1.0];
 
 /** 標準的な頂点AO: 両サイドが埋まっていれば角は見えないので最暗値。 */
 function aoLevel(s1: boolean, s2: boolean, c: boolean): number {
