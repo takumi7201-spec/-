@@ -1,0 +1,161 @@
+/* =========================================================================
+   デザイントークン
+   発掘＝「地層・琥珀・計測器」。暗い岩盤の上に琥珀色の計器光を置く方向。
+   ========================================================================= */
+:root {
+  --bg-deep: #0a0d12;
+  --bg-rock: #141a22;
+  --panel: rgba(18, 24, 32, 0.9);
+  --panel-solid: #161d26;
+  --panel-line: rgba(255, 200, 120, 0.16);
+  --panel-line-strong: rgba(255, 200, 120, 0.42);
+
+  --amber: #ffb648;
+  --amber-dim: #b07a24;
+  --teal: #3ddad7;
+  --teal-dim: #1f7f7d;
+  --sand: #e8d9b5;
+  --bone: #f4ecd8;
+  --danger: #ff5c5c;
+  --hp: #55d66b;
+  --gauge: #ffd15c;
+
+  --el-flame: #ff6a3c;
+  --el-aqua: #3cc8ff;
+  --el-terra: #8ad84a;
+  --el-gale: #c8a4ff;
+  --el-null: #dcd2c0;
+
+  --text: #f0eadf;
+  --text-dim: #a49b8d;
+  --text-faint: #6d675e;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  --dur-fast: 120ms;
+  --dur: 220ms;
+  --dur-slow: 420ms;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+
+  --font-ui: ui-sans-serif, system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
+    'Noto Sans JP', 'Yu Gothic UI', Meiryo, sans-serif;
+  /* 数値はタビュラー幅の等幅に寄せる。HPやダメージが揺れないのが重要 */
+  --font-num: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-deep);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+}
+
+#gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* UIレイヤ。既定ではポインタを透過し、実UIだけが受け取る */
+#ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+#ui > * { pointer-events: auto; }
+
+/* =========================================================================
+   ブート画面
+   ========================================================================= */
+#boot {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at 50% 40%, #1b2430 0%, #0a0d12 70%);
+  transition: opacity var(--dur-slow) var(--ease);
+}
+#boot.hidden { opacity: 0; pointer-events: none; }
+
+.boot-inner { text-align: center; width: min(420px, 78vw); }
+
+.boot-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  letter-spacing: 0.22em;
+  margin-bottom: 28px;
+}
+.boot-logo-main {
+  font-size: clamp(28px, 8vw, 46px);
+  font-weight: 800;
+  color: var(--bone);
+  text-shadow: 0 0 24px rgba(255, 182, 72, 0.3);
+}
+.boot-logo-sub {
+  font-size: clamp(12px, 3.4vw, 17px);
+  font-weight: 600;
+  color: var(--amber);
+  letter-spacing: 0.5em;
+  margin-top: 4px;
+  margin-left: 0.5em;
+}
+
+.boot-bar {
+  height: 3px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.boot-bar i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--amber-dim), var(--amber));
+  transition: width var(--dur) var(--ease);
+}
+.boot-status {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-faint);
+  letter-spacing: 0.08em;
+  min-height: 1.2em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

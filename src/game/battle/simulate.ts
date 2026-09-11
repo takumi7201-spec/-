@@ -1,0 +1,684 @@
+import { getRevos } from '../data/revos';
+import {
+  FORMATIONS, elementFactor,
+  type BattleEvent, type Fighter, type FighterSnapshot, type Mod, type ModKind,
+  type Row, type Side, type TeamSetup,
+} from './types';
+
+/**
+ * バトルの純粋シミュレーション。
+ *
+ * 描画から完全に切り離し、「同じシード ＋ 同じ入力列 → 同じイベント列」を保証する。
+ * これにより倍速・スキップ・リプレイ・サーバー検証がすべてタダで手に入る。
+ * レンダラはイベント列を再生するだけで、勝敗の判定には一切関与しない。
+ */
+
+class Prng {
+  private s: number;
+  constructor(seed: number) { this.s = (seed >>> 0) || 0x2545f491; }
+  next(): number {
+    let x = this.s;
+    x ^= x << 13; x >>>= 0;
+    x ^= x >>> 17;
+    x ^= x << 5; x >>>= 0;
+    this.s = x;
+    return x / 0x100000000;
+  }
+  range(a: number, b: number): number { return a + this.next() * (b - a); }
+  chance(p: number): boolean { return this.next() < p; }
+}
+
+const AV_THRESHOLD = 10000;
+const MAX_TURNS = 200;
+
+/** レベル補正。Lv30 でおよそ 2.6 倍 */
+function levelScale(level: number): number {
+  return 1 + 0.055 * (level - 1);
+}
+
+/** クリーン度 → ステータス倍率。SPD には掛けない */
+export function cleanMultiplier(clean: number): number {
+  return 0.88 + 0.0024 * clean;
+}
+
+export function cleanRank(clean: number): 'S' | 'A' | 'B' | 'C' | 'D' {
+  if (clean >= 95) return 'S';
+  if (clean >= 85) return 'A';
+  if (clean >= 70) return 'B';
+  if (clean >= 50) return 'C';
+  return 'D';
+}
+
+function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
+  const out: Fighter[] = [];
+  const form = FORMATIONS[setup.formation];
+  setup.order.forEach((memberIdx, slot) => {
+    const inst = setup.members[memberIdx];
+    const def = getRevos(inst.defId);
+    const ls = levelScale(inst.level);
+    const mc = cleanMultiplier(inst.clean);
+    const row: Row = slot === 0 ? 'front' : 'back';
+    out.push({
+      uid: inst.uid,
+      defId: def.id,
+      name: def.name,
+      element: def.element,
+      side,
+      slot,
+      row,
+      level: inst.level,
+      clean: inst.clean,
+      skillLevel: inst.skillLevel,
+      maxHp: Math.round(def.hp * ls * mc),
+      hp: Math.round(def.hp * ls * mc),
+      atk: Math.round(def.atk * ls * mc),
+      def: Math.round(def.def * ls * mc * form.defMul),
+      spd: Math.round(def.spd * ls * form.spdMul),
+      basicPower: def.basicPower,
+      av: 0,
+      od: 30 + form.startOd,
+      alive: true,
+      mods: [],
+      statuses: [],
+      shield: null,
+      stance: setup.stances?.[slot] ?? 'balanced',
+      targetPref: setup.targetPrefs?.[slot] ?? 'weakest',
+      stacks: {},
+      promoteDelay: 0,
+      draggedTurns: 0,
+      dealt: 0, taken: 0, healed: 0, kills: 0,
+    });
+  });
+  return out;
+}
+
+function snapshot(f: Fighter): FighterSnapshot {
+  return {
+    uid: f.uid, defId: f.defId, name: f.name, element: f.element,
+    side: f.side, row: f.row, maxHp: f.maxHp, hp: f.hp,
+    atk: f.atk, def: f.def, spd: f.spd, od: f.od,
+  };
+}
+
+export interface BattleResult {
+  winner: Side | -1;
+  turns: number;
+  survivors: number;
+  fighters: Fighter[];
+}
+
+export class BattleSim {
+  readonly fighters: Fighter[];
+  private rng: Prng;
+  private formations: [ReturnType<typeof formOf>, ReturnType<typeof formOf>];
+  private turn = 0;
+  private finished = false;
+  private winner: Side | -1 = -1;
+  /** プレイヤーが「このユニットのODを溜めて撃つ」と指示した集合 */
+  private odHold = new Set<string>();
+  private odFire = new Set<string>();
+
+  constructor(seed: number, teamA: TeamSetup, teamB: TeamSetup) {
+    this.rng = new Prng(seed);
+    this.fighters = [...buildFighters(teamA, 0), ...buildFighters(teamB, 1)];
+    this.formations = [formOf(teamA), formOf(teamB)];
+
+    for (const f of this.fighters) {
+      if (passiveOf(f) === 'vanguard') f.av += 3500;
+    }
+  }
+
+  get isOver(): boolean { return this.finished; }
+  get currentWinner(): Side | -1 { return this.winner; }
+  get turnCount(): number { return this.turn; }
+
+  startEvents(): BattleEvent[] {
+    return [{ t: 'start', fighters: this.fighters.map(snapshot) }];
+  }
+
+  /**
+   * OD を自動発動させず溜める指示。プレイヤーがタップした瞬間に呼ぶ。
+   * 溜めている間は AI が撃たないので、150 まで伸ばして最大 ×1.35 にできる。
+   */
+  setOdHold(uid: string, hold: boolean): void {
+    if (hold) this.odHold.add(uid);
+    else this.odHold.delete(uid);
+  }
+
+  /** 溜めた OD を今すぐ撃つ指示 */
+  fireOd(uid: string): void {
+    this.odFire.add(uid);
+    this.odHold.delete(uid);
+  }
+
+  private alive(side?: Side): Fighter[] {
+    return this.fighters.filter((f) => f.alive && (side === undefined || f.side === side));
+  }
+
+  private effSpd(f: Fighter): number {
+    const m = this.modSum(f, 'spd');
+    return Math.max(1, f.spd * clamp(1 + m, 0.4, 2.0));
+  }
+
+  private modSum(f: Fighter, kind: ModKind): number {
+    let s = 0;
+    for (const m of f.mods) if (m.kind === kind) s += m.value;
+    return s;
+  }
+
+  /** 1行動分を進め、その間に起きたイベントを返す */
+  step(): BattleEvent[] {
+    if (this.finished) return [];
+    const ev: BattleEvent[] = [];
+
+    const actor = this.advanceToNextActor();
+    if (!actor) { this.finish(ev); return ev; }
+
+    this.turn++;
+    ev.push({ t: 'turnBegin', uid: actor.uid });
+
+    // --- 行動開始時の持続効果 ---
+    this.tickStatuses(actor, ev);
+    if (!actor.alive) {
+      ev.push({ t: 'turnEnd', uid: actor.uid });
+      this.checkEnd(ev);
+      return ev;
+    }
+
+    this.gainOd(actor, 3, ev);
+
+    // 「堆積」: 行動のたびに DEF が伸びる
+    if (passiveOf(actor) === 'sediment') {
+      const st = actor.stacks.sediment ?? 0;
+      if (st < 5) {
+        actor.stacks.sediment = st + 1;
+        this.addMod(actor, { kind: 'def', value: 0.08, turns: 999, source: 'sediment' }, ev, '堆積');
+      }
+    }
+    // 「共鳴」: 味方全体の OD を押し上げる
+    if (passiveOf(actor) === 'resonance') {
+      ev.push({ t: 'passive', uid: actor.uid, label: '共鳴' });
+      for (const a of this.alive(actor.side)) this.gainOd(a, 8, ev);
+    }
+
+    // --- OD か通常攻撃か ---
+    const wantsOd = this.shouldFireOd(actor);
+    if (wantsOd) {
+      this.performOd(actor, ev);
+      this.odFire.delete(actor.uid);
+    } else {
+      this.performBasic(actor, ev);
+    }
+
+    this.decayMods(actor);
+    if (actor.promoteDelay > 0) actor.promoteDelay--;
+    if (actor.draggedTurns > 0) {
+      actor.draggedTurns--;
+      if (actor.draggedTurns === 0 && actor.slot !== 0) {
+        actor.row = 'back';
+        ev.push({ t: 'promote', uid: actor.uid, from: 'front', to: 'back' });
+      }
+    }
+    if (actor.shield) {
+      actor.shield.turns--;
+      if (actor.shield.turns <= 0) actor.shield = null;
+    }
+
+    ev.push({ t: 'turnEnd', uid: actor.uid });
+    this.checkEnd(ev);
+    if (this.turn >= MAX_TURNS && !this.finished) {
+      // 決着しない編成は HP 割合の合計で判定する（オートバトルを無限にしない）
+      const a = this.teamHpRatio(0);
+      const b = this.teamHpRatio(1);
+      this.winner = a === b ? -1 : a > b ? 0 : 1;
+      this.finished = true;
+      ev.push({ t: 'end', winner: this.winner, turns: this.turn });
+    }
+    return ev;
+  }
+
+  runToEnd(limit = MAX_TURNS + 8): BattleEvent[] {
+    const all: BattleEvent[] = [...this.startEvents()];
+    let guard = 0;
+    while (!this.finished && guard++ < limit) all.push(...this.step());
+    return all;
+  }
+
+  result(): BattleResult {
+    return {
+      winner: this.winner,
+      turns: this.turn,
+      survivors: this.alive(this.winner === -1 ? undefined : (this.winner as Side)).length,
+      fighters: this.fighters,
+    };
+  }
+
+  // ------------------------------------------------------------ 行動順
+
+  /**
+   * t_i = (10000 − AV_i) / SPD_i の解析解で次の行動者を決める。
+   * ティック加算と違い O(n) で厳密、誤差の蓄積もないのでリプレイが完全に一致する。
+   */
+  private advanceToNextActor(): Fighter | null {
+    const living = this.alive();
+    if (living.length === 0) return null;
+    if (this.alive(0).length === 0 || this.alive(1).length === 0) return null;
+
+    let best: Fighter | null = null;
+    let bestT = Infinity;
+    for (const f of living) {
+      const t = (AV_THRESHOLD - f.av) / this.effSpd(f);
+      if (t < bestT - 1e-9) { bestT = t; best = f; }
+      else if (Math.abs(t - bestT) < 1e-9 && best) {
+        // 同値は SPD 優先、それも同じならシード付き乱数で決める
+        if (f.spd > best.spd || (f.spd === best.spd && this.rng.chance(0.5))) best = f;
+      }
+    }
+    if (!best) return null;
+    for (const f of living) f.av += this.effSpd(f) * bestT;
+    best.av -= AV_THRESHOLD;
+    return best;
+  }
+
+  // ------------------------------------------------------------ 行動
+
+  private shouldFireOd(actor: Fighter): boolean {
+    if (actor.od < 100) return false;
+    if (this.odFire.has(actor.uid)) return true;
+    if (this.odHold.has(actor.uid)) return actor.od >= 150; // 上限で自動放出
+    // AI: 敵が2体以上いるか、または一撃で仕留められるなら撃つ
+    const enemies = this.alive(other(actor.side));
+    if (enemies.length >= 2) return true;
+    const target = this.pickTarget(actor);
+    if (target && this.estimateDamage(actor, target, odPower(actor)) >= target.hp) return true;
+    return actor.stance === 'aggressive';
+  }
+
+  private performBasic(actor: Fighter, ev: BattleEvent[]): void {
+    const target = this.pickTarget(actor);
+    if (!target) return;
+    ev.push({ t: 'action', uid: actor.uid, kind: 'basic', name: '通常攻撃', targets: [target.uid] });
+    const dealt = this.dealDamage(actor, target, actor.basicPower, ev);
+    this.gainOd(actor, 12, ev);
+
+    if (dealt > 0) {
+      const p = passiveOf(actor);
+      if (p === 'embers' && this.rng.chance(0.32)) this.applyBurn(target, ev, actor.uid);
+      if (p === 'shearwind') {
+        const st = actor.stacks.shear ?? 0;
+        if (st < 3) {
+          actor.stacks.shear = st + 1;
+          this.addMod(target, { kind: 'def', value: -0.08, turns: 999, source: 'shearwind' }, ev, '削風');
+        }
+      }
+    }
+  }
+
+  private performOd(actor: Fighter, ev: BattleEvent[]): void {
+    const def = getRevos(actor.defId);
+    const mod = 1 + 0.35 * (clamp(actor.od, 100, 150) - 100) / 50;
+    const power = odPower(actor) * mod;
+    const enemies = this.alive(other(actor.side));
+    const allies = this.alive(actor.side);
+    const id = def.od.id;
+
+    const single = (): Fighter | null => this.pickTarget(actor);
+
+    switch (id) {
+      case 'faultcrush': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        t.promoteDelay = 1;
+        break;
+      }
+      case 'flamevolley': {
+        const t = single(); if (!t) break;
+        const hits = t.statuses.some((s) => s.kind === 'burn') ? 3 : 2;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        for (let i = 0; i < hits && t.alive; i++) this.dealDamage(actor, t, power, ev);
+        break;
+      }
+      case 'vortexfang': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        if (t.alive) this.addMod(t, { kind: 'spd', value: -0.2, turns: 3, source: 'vortexfang' }, ev, 'SPD低下');
+        break;
+      }
+      case 'galerend': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
+        for (const e of enemies) this.dealDamage(actor, e, power, ev);
+        actor.av += 5000;
+        break;
+      }
+      case 'rockaegis': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: allies.map((a) => a.uid) });
+        const amount = Math.round(actor.def * 2.2 * (1 + this.modSum(actor, 'def')));
+        for (const a of allies) {
+          a.shield = { amount, turns: 4 };
+          ev.push({ t: 'shield', uid: a.uid, amount });
+        }
+        break;
+      }
+      case 'scorchring': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
+        for (const e of enemies) {
+          this.dealDamage(actor, e, power, ev);
+          if (e.alive && this.rng.chance(0.6)) this.applyBurn(e, ev, actor.uid);
+        }
+        break;
+      }
+      case 'tideheal': {
+        const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.heal(actor, t, Math.round(actor.atk * 1.9 * mod), ev);
+        const i = t.mods.findIndex((m) => m.value < 0);
+        if (i >= 0) t.mods.splice(i, 1);
+        break;
+      }
+      case 'erosionstorm': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
+        for (const e of enemies) {
+          this.dealDamage(actor, e, power, ev);
+          if (e.alive) this.addMod(e, { kind: 'def', value: -0.25, turns: 4, source: 'erosionstorm' }, ev, 'DEF低下');
+        }
+        break;
+      }
+      case 'obsidiancut': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        const p = t.hp / t.maxHp < 0.5 ? power * (230 / 175) : power;
+        this.dealDamage(actor, t, p, ev);
+        break;
+      }
+      case 'resonantlight': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: allies.map((a) => a.uid) });
+        for (const a of allies) {
+          this.addMod(a, { kind: 'atk', value: 0.18, turns: 4, source: 'resonantlight' }, ev, 'ATK上昇');
+          this.gainOd(a, 15, ev);
+        }
+        break;
+      }
+      case 'faulthaul': {
+        const back = enemies.filter((e) => e.row === 'back');
+        const t = back[0] ?? enemies[0];
+        if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        if (t.alive && t.row === 'back') {
+          t.row = 'front';
+          t.draggedTurns = 2;
+          ev.push({ t: 'promote', uid: t.uid, from: 'back', to: 'front' });
+        }
+        break;
+      }
+      case 'greateruption': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
+        for (const e of enemies) {
+          this.dealDamage(actor, e, power, ev);
+          if (e.alive) this.applyBurn(e, ev, actor.uid);
+        }
+        const self = Math.round(actor.maxHp * 0.2);
+        actor.hp = Math.max(1, actor.hp - self);
+        ev.push({ t: 'damage', uid: actor.uid, from: actor.uid, amount: self, crit: false, eff: 1, hp: actor.hp, shielded: 0 });
+        break;
+      }
+    }
+    actor.od = 0;
+    ev.push({ t: 'od', uid: actor.uid, value: 0 });
+  }
+
+  // ------------------------------------------------------------ 計算
+
+  private estimateDamage(atk: Fighter, def: Fighter, power: number): number {
+    return this.computeDamage(atk, def, power, false).amount;
+  }
+
+  private computeDamage(
+    atk: Fighter, def: Fighter, power: number, roll: boolean,
+  ): { amount: number; crit: boolean; eff: 1.5 | 1 | 0.7 } {
+    const atkStat = atk.atk * clamp(1 + this.modSum(atk, 'atk'), 0.3, 3);
+    const defStat = def.def * clamp(1 + this.modSum(def, 'def'), 0.3, 3);
+    // 除算形の防御。減算形だと DEF を伸ばした瞬間ダメージ0になり戦闘が終わらなくなる
+    const dr = 150 / (150 + defStat);
+    let base = 4.15 * (power / 100) * atkStat * dr;
+
+    let eff: 1.5 | 1 | 0.7 = elementFactor(atk.element, def.element);
+    if (passiveOf(atk) === 'immutable' || passiveOf(def) === 'immutable') eff = 1;
+
+    const posAtk = atk.row === 'front' ? 1.15 : 0.9;
+    const posDef = def.row === 'front' ? 1.0 : 0.8;
+
+    let buff = (1 + this.modSum(atk, 'dealt')) * (1 + this.modSum(def, 'taken'));
+    buff *= this.formations[atk.side].allDamageDealt;
+    buff *= this.formations[def.side].allDamageTaken;
+    if (atk.row === 'front') buff *= this.formations[atk.side].frontDamage;
+
+    const pa = passiveOf(atk);
+    if (pa === 'deeppressure' && def.spd >= atk.spd + 20) buff *= 1.14;
+    if (pa === 'traction' && def.row === 'back') buff *= 1.26;
+    if (pa === 'overheat') buff *= 1 + 0.25 * (1 - atk.hp / atk.maxHp);
+    const pd = passiveOf(def);
+    if (pd === 'subsidence' && def.row === 'front') buff *= 0.85;
+
+    buff = clamp(buff, 0.4, 2.5);
+
+    const critRate = clamp(0.05 + (atk.spd - def.spd) * 0.0015, 0.02, 0.35);
+    const crit = roll ? this.rng.chance(critRate) : false;
+    const rnd = roll ? this.rng.range(0.92, 1.08) : 1;
+
+    base *= eff * posAtk * posDef * buff * (crit ? 1.8 : 1) * rnd;
+    return { amount: Math.max(1, Math.round(base)), crit, eff };
+  }
+
+  private dealDamage(atk: Fighter, target: Fighter, power: number, ev: BattleEvent[]): number {
+    if (!target.alive || !atk.alive) return 0;
+    const { amount, crit, eff } = this.computeDamage(atk, target, power, true);
+
+    let remaining = amount;
+    let shielded = 0;
+    if (target.shield) {
+      shielded = Math.min(target.shield.amount, remaining);
+      target.shield.amount -= shielded;
+      remaining -= shielded;
+      if (target.shield.amount <= 0) target.shield = null;
+    }
+    target.hp = Math.max(0, target.hp - remaining);
+    target.taken += remaining;
+    atk.dealt += remaining;
+
+    ev.push({
+      t: 'damage', uid: target.uid, from: atk.uid,
+      amount, crit, eff, hp: target.hp, shielded,
+    });
+
+    // 被弾で OD が溜まる（負けている側が巻き返せる仕組み）
+    if (remaining > 0) this.gainOd(target, 24 * (remaining / target.maxHp), ev);
+    if (eff === 1.5) this.gainOd(atk, 4, ev);
+
+    // 「熱反射」
+    if (passiveOf(target) === 'heatreflect' && remaining > 0 && atk.alive && atk !== target) {
+      const back = Math.max(1, Math.round(remaining * 0.18));
+      atk.hp = Math.max(0, atk.hp - back);
+      ev.push({ t: 'passive', uid: target.uid, label: '熱反射' });
+      ev.push({ t: 'damage', uid: atk.uid, from: target.uid, amount: back, crit: false, eff: 1, hp: atk.hp, shielded: 0 });
+      if (atk.hp === 0) this.kill(atk, target, ev);
+    }
+
+    if (target.hp === 0) this.kill(target, atk, ev);
+    return remaining;
+  }
+
+  private heal(src: Fighter, target: Fighter, amount: number, ev: BattleEvent[]): void {
+    if (!target.alive) return;
+    const before = target.hp;
+    target.hp = Math.min(target.maxHp, target.hp + amount);
+    src.healed += target.hp - before;
+    ev.push({ t: 'heal', uid: target.uid, from: src.uid, amount: target.hp - before, hp: target.hp });
+  }
+
+  private kill(target: Fighter, by: Fighter, ev: BattleEvent[]): void {
+    if (!target.alive) return;
+    target.alive = false;
+    target.hp = 0;
+    if (by !== target) by.kills++;
+    ev.push({ t: 'ko', uid: target.uid, by: by.uid });
+
+    // 「地盤沈下」: 倒れると味方の OD を押し上げる
+    if (passiveOf(target) === 'subsidence') {
+      ev.push({ t: 'passive', uid: target.uid, label: '地盤沈下' });
+      for (const a of this.alive(target.side)) this.gainOd(a, 40, ev);
+    }
+    // 「潮汐」: 味方が倒れると生存者を癒す
+    for (const a of this.alive(target.side)) {
+      if (passiveOf(a) === 'tide') {
+        ev.push({ t: 'passive', uid: a.uid, label: '潮汐' });
+        for (const b of this.alive(target.side)) this.heal(a, b, Math.round(a.atk * 1.2), ev);
+        break;
+      }
+    }
+    // 味方全体の OD（撃破された側）
+    for (const a of this.alive(target.side)) this.gainOd(a, 25, ev);
+
+    if (target.row === 'front') this.promoteNext(target.side, ev);
+  }
+
+  /** 前列が落ちたら、編成順で次の1体を前へ出す */
+  private promoteNext(side: Side, ev: BattleEvent[]): void {
+    const living = this.alive(side).filter((f) => f.promoteDelay === 0);
+    if (living.length === 0) return;
+    if (living.some((f) => f.row === 'front')) return;
+    const next = living.slice().sort((a, b) => a.slot - b.slot)[0];
+    next.row = 'front';
+    ev.push({ t: 'promote', uid: next.uid, from: 'back', to: 'front' });
+  }
+
+  private gainOd(f: Fighter, amount: number, ev: BattleEvent[]): void {
+    if (!f.alive) return;
+    const mul = this.formations[f.side].odGainMul * (f.row === 'front' ? 1.2 : 1);
+    const before = f.od;
+    f.od = clamp(f.od + amount * mul, 0, 150);
+    if (Math.round(f.od) !== Math.round(before)) ev.push({ t: 'od', uid: f.uid, value: f.od });
+    if (before < 100 && f.od >= 100) ev.push({ t: 'odReady', uid: f.uid });
+  }
+
+  private addMod(f: Fighter, mod: Mod, ev: BattleEvent[], label: string): void {
+    f.mods.push(mod);
+    ev.push({ t: 'mod', uid: f.uid, kind: mod.kind, value: mod.value, turns: mod.turns, label });
+  }
+
+  private decayMods(f: Fighter): void {
+    f.mods = f.mods.filter((m) => {
+      if (m.turns >= 999) return true;
+      m.turns--;
+      return m.turns > 0;
+    });
+  }
+
+  private applyBurn(target: Fighter, ev: BattleEvent[], source: string): void {
+    const existing = target.statuses.find((s) => s.kind === 'burn');
+    if (existing) existing.turns = Math.max(existing.turns, 3);
+    else target.statuses.push({ kind: 'burn', turns: 3, value: 0.04, source });
+    ev.push({ t: 'status', uid: target.uid, kind: 'burn', applied: true });
+  }
+
+  private tickStatuses(f: Fighter, ev: BattleEvent[]): void {
+    for (const s of f.statuses) {
+      if (s.kind === 'burn') {
+        const dmg = Math.max(1, Math.round(f.maxHp * s.value));
+        f.hp = Math.max(0, f.hp - dmg);
+        ev.push({ t: 'statusTick', uid: f.uid, kind: 'burn', amount: dmg, hp: f.hp });
+        if (f.hp === 0) {
+          const src = this.fighters.find((x) => x.uid === s.source) ?? f;
+          this.kill(f, src, ev);
+          return;
+        }
+      }
+      s.turns--;
+    }
+    f.statuses = f.statuses.filter((s) => s.turns > 0);
+  }
+
+  private pickTarget(actor: Fighter): Fighter | null {
+    const enemies = this.alive(other(actor.side));
+    if (enemies.length === 0) return null;
+
+    // 被弾率: 前列60% / 後列各20%（前列不在なら均等に再配分）
+    const weights = enemies.map((e) => {
+      let w = e.row === 'front' ? 0.6 : 0.2;
+      if (!enemies.some((x) => x.row === 'front')) w = 1 / enemies.length;
+      if (e.row === 'back') w += this.formations[e.side].backHitRateBonus;
+      return w;
+    });
+
+    // 方針による重み付け。完全なランダムにはしない（観戦していて理不尽に見える）
+    const bias = enemies.map((e, i) => {
+      let b = weights[i];
+      if (actor.targetPref === 'weakest') b *= 1 + (1 - e.hp / e.maxHp) * 1.2;
+      else if (actor.targetPref === 'strongest') b *= 1 + (e.atk / 160) * 0.8;
+      else if (actor.targetPref === 'backline' && e.row === 'back') b *= 2.2;
+      if (actor.stance === 'aggressive') {
+        const est = this.estimateDamage(actor, e, actor.basicPower);
+        if (est >= e.hp) b *= 3;
+      }
+      return b;
+    });
+
+    const total = bias.reduce((s, b) => s + b, 0);
+    let r = this.rng.next() * total;
+    for (let i = 0; i < enemies.length; i++) {
+      r -= bias[i];
+      if (r <= 0) return enemies[i];
+    }
+    return enemies[enemies.length - 1];
+  }
+
+  private teamHpRatio(side: Side): number {
+    const team = this.fighters.filter((f) => f.side === side);
+    return team.reduce((s, f) => s + f.hp / f.maxHp, 0);
+  }
+
+  private checkEnd(ev: BattleEvent[]): void {
+    if (this.finished) return;
+    const a = this.alive(0).length;
+    const b = this.alive(1).length;
+    if (a > 0 && b > 0) return;
+    this.winner = a > 0 ? 0 : b > 0 ? 1 : -1;
+    this.finished = true;
+    ev.push({ t: 'end', winner: this.winner, turns: this.turn });
+  }
+
+  private finish(ev: BattleEvent[]): void {
+    if (this.finished) return;
+    this.finished = true;
+    this.winner = -1;
+    ev.push({ t: 'end', winner: -1, turns: this.turn });
+  }
+}
+
+function formOf(setup: TeamSetup) {
+  return FORMATIONS[setup.formation];
+}
+
+function odPower(f: Fighter): number {
+  return getRevos(f.defId).od.power;
+}
+
+function passiveOf(f: Fighter): string {
+  return getRevos(f.defId).passive.id;
+}
+
+function other(s: Side): Side { return s === 0 ? 1 : 0; }
+function clamp(v: number, a: number, b: number): number { return v < a ? a : v > b ? b : v; }
+
+/** 一括実行（バランス検証・CI用） */
+export function simulate(seed: number, teamA: TeamSetup, teamB: TeamSetup): {
+  events: BattleEvent[];
+  result: BattleResult;
+} {
+  const sim = new BattleSim(seed, teamA, teamB);
+  const events = sim.runToEnd();
+  return { events, result: sim.result() };
+}
