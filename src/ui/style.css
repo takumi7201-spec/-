@@ -1,55 +1,84 @@
 /* =========================================================================
-   デザイントークン
-   発掘＝「地層・琥珀・計測器」。暗い岩盤の上に琥珀色の計器光を置く方向。
+   STRATA CORE — UI レイヤ
+   
+   方針（UI設計より）:
+   - 画面を上下に割らない。L0ステージは常に全画面、UIはその上に浮くだけ
+   - L1（情報）は pointer-events:none、L2（操作）だけが触れる
+   - ボクセルの物理に従う：面は平ら・エッジは立つ・影は単色・角丸は小さい
+   - 彩度の高いアクセント上の文字は必ず暗色（白抜きは1.9:1で読めない）
+   - 日本語Webフォントは読み込まない（初回DL予算を3Dに回す）
    ========================================================================= */
+
 :root {
-  --bg-deep: #0a0d12;
-  --bg-rock: #141a22;
-  --panel: rgba(18, 24, 32, 0.9);
-  --panel-solid: #161d26;
-  --panel-line: rgba(255, 200, 120, 0.16);
-  --panel-line-strong: rgba(255, 200, 120, 0.42);
+  /* --- 地層の明度軸 --- */
+  --obsidian: #14100b;
+  --strata: #2a1f16;
+  --bedrock: #473424;
+  --clay: #6f5237;
+  --sandstone: #e5d2ae;
+  --bone: #f8f2e4;
 
-  --amber: #ffb648;
-  --amber-dim: #b07a24;
-  --teal: #3ddad7;
-  --teal-dim: #1f7f7d;
-  --sand: #e8d9b5;
-  --bone: #f4ecd8;
-  --danger: #ff5c5c;
-  --hp: #55d66b;
-  --gauge: #ffd15c;
+  /* --- アクセント（面積比5%以下で使う） --- */
+  --amber: #f4a23c;
+  --ember: #c96f14;
+  --magma: #d9512f;
+  --magma-dark: #a63a1c;
+  --sonar: #2dc6a4;
+  --lagoon: #4ba6e2;
+  --relic: #b173dc;
+  --relic-dark: #7e4aa8;
+  --loam: #c98c2e;
+  --ash: #9c9086;
 
-  --el-flame: #ff6a3c;
-  --el-aqua: #3cc8ff;
-  --el-terra: #8ad84a;
-  --el-gale: #c8a4ff;
-  --el-null: #dcd2c0;
+  /* --- 属性 --- */
+  --el-flame: #d9512f;
+  --el-aqua: #4ba6e2;
+  --el-terra: #c98c2e;
+  --el-gale: #2dc6a4;
+  --el-null: #9c9086;
 
-  --text: #f0eadf;
-  --text-dim: #a49b8d;
-  --text-faint: #6d675e;
+  --text: var(--bone);
+  --text-dim: #b8ad98;
+  --text-faint: #8a8071;
 
   --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 16px;
-  --r-pill: 999px;
+  --r-md: 12px;
+  --r-lg: 20px;
 
   --dur-fast: 120ms;
   --dur: 220ms;
   --dur-slow: 420ms;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --ease-out-back: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-back: cubic-bezier(0.34, 1.42, 0.64, 1);
 
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
+  /* ホームインジケータのスワイプ誤爆を避ける最低クリアランス */
+  --deck-bottom: calc(var(--safe-b) + 12px);
 
-  --font-ui: ui-sans-serif, system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
-    'Noto Sans JP', 'Yu Gothic UI', Meiryo, sans-serif;
-  /* 数値はタビュラー幅の等幅に寄せる。HPやダメージが揺れないのが重要 */
-  --font-num: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+  --gutter: 16px;
+  --ui-scale: 1;
+  --fs-body: 15px;
+  --fs-label: 13px;
+  --fs-title: 20px;
+  --fs-display: 28px;
+  --fs-num: 18px;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
+    'Noto Sans JP', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+}
+
+/* 密度。幅で文字と余白だけを変える（レイアウト型は別軸） */
+@media (min-width: 600px) {
+  :root { --ui-scale: 1.08; --fs-body: 16px; --fs-label: 14px; --gutter: 20px; }
+}
+@media (min-width: 1024px) {
+  :root { --ui-scale: 1.14; --fs-title: 22px; --fs-display: 32px; --gutter: 24px; }
+}
+@media (min-width: 1440px) {
+  :root { --fs-body: 17px; }
 }
 
 * { box-sizing: border-box; }
@@ -59,45 +88,288 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-deep);
+  background: var(--obsidian);
   color: var(--text);
   font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+  font-variant-numeric: tabular-nums;
 }
 
-#app {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100dvh;
-}
+#app { position: fixed; inset: 0; width: 100%; height: 100dvh; }
 
-#gl {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  touch-action: none;
-}
+/* L0: ステージ。UIに面積を譲らない */
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-/* UIレイヤ。既定ではポインタを透過し、実UIだけが受け取る */
-#ui {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 10;
-}
-#ui > * { pointer-events: auto; }
+#ui { position: absolute; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
+#ui .interactive, #ui button, #ui [data-ui-block] { pointer-events: auto; }
 
 /* =========================================================================
-   ブート画面
+   共通部品
+   ========================================================================= */
+
+/* ボクセルの押し出しと同じ言語。押下で沈む */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 0 20px;
+  border: 2px solid var(--obsidian);
+  border-radius: var(--r-md);
+  background: var(--sandstone);
+  color: var(--obsidian);
+  font: inherit;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--bedrock);
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.btn:active, .btn.is-pressed {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--bedrock);
+}
+.btn:disabled { opacity: 0.42; box-shadow: 0 4px 0 var(--bedrock); pointer-events: none; }
+
+.btn--primary { background: var(--amber); box-shadow: 0 4px 0 var(--ember); min-height: 64px; font-size: 15px; }
+.btn--ghost { background: transparent; color: var(--bone); border-color: var(--clay); box-shadow: 0 4px 0 #241a12; }
+.btn--danger { background: var(--magma-dark); color: var(--bone); box-shadow: 0 4px 0 #6e2512; }
+.btn--sm { min-height: 44px; padding: 0 12px; font-size: 12px; border-radius: var(--r-sm); box-shadow: 0 3px 0 var(--bedrock); }
+.btn--sm:active { transform: translateY(3px); }
+.btn--icon { min-width: 56px; padding: 0; flex-direction: column; gap: 2px; }
+.btn--round { border-radius: 50%; min-width: 72px; min-height: 72px; padding: 0; }
+.btn--wide { width: 100%; }
+
+.btn .k { font-size: 10px; font-weight: 700; opacity: 0.55; letter-spacing: 0.1em; }
+
+/* パネルは不透明。背後のボクセルの原色が透けると文字が読めない */
+.panel {
+  background: var(--strata);
+  border: 2px solid var(--obsidian);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45);
+}
+.panel--sunk { background: var(--obsidian); border-color: var(--bedrock); box-shadow: none; }
+.panel--light { background: var(--sandstone); color: var(--obsidian); }
+
+.bar {
+  position: relative;
+  height: 10px;
+  background: var(--obsidian);
+  border: 2px solid var(--obsidian);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+.bar > i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--sonar);
+  transition: width var(--dur) var(--ease);
+}
+.bar--hp > i { background: var(--sonar); }
+.bar--hp.is-low > i { background: var(--magma); }
+.bar--hp.is-mid > i { background: var(--amber); }
+.bar--od > i { background: var(--amber); }
+.bar--exp > i { background: var(--lagoon); }
+.bar--slim { height: 6px; }
+/* シールドは本体バーの上に重ねる */
+.bar > .shield { position: absolute; inset: 0 auto 0 0; background: var(--lagoon); opacity: 0.55; }
+
+.num { font-variant-numeric: tabular-nums; font-weight: 700; }
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  background: var(--obsidian);
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.chip--flame { color: var(--el-flame); }
+.chip--aqua { color: var(--el-aqua); }
+.chip--terra { color: var(--el-terra); }
+.chip--gale { color: var(--el-gale); }
+.chip--null { color: var(--el-null); }
+
+/* =========================================================================
+   層モデル
+   ========================================================================= */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.screen.is-active { opacity: 1; }
+
+/* L1: 上端の常時情報。旧「上画面」の役割 */
+.status-strip {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: calc(var(--safe-t) + 8px) calc(var(--gutter) + var(--safe-l)) 8px
+    calc(var(--gutter) + var(--safe-r));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(20, 16, 11, 0.92) 0%, rgba(20, 16, 11, 0) 100%);
+}
+.status-strip > .interactive { pointer-events: auto; }
+
+/* L1: 周縁情報 */
+.rail {
+  position: absolute;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rail--l { left: calc(var(--gutter) + var(--safe-l)); top: 50%; transform: translateY(-50%); }
+.rail--r { right: calc(var(--gutter) + var(--safe-r)); top: 96px; }
+
+/* L2: 親指デッキ。旧「下画面」の役割 */
+.deck {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 12px calc(var(--gutter) + var(--safe-l)) var(--deck-bottom)
+    calc(var(--gutter) + var(--safe-r));
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(20, 16, 11, 0.9) 30%, rgba(20, 16, 11, 0) 100%);
+}
+.deck > * { pointer-events: auto; }
+
+/* L2: トースト */
+.toast-area {
+  position: absolute;
+  left: 50%;
+  bottom: 210px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  width: min(440px, calc(100% - var(--gutter) * 2));
+}
+.toast {
+  padding: 10px 18px;
+  background: var(--strata);
+  border: 2px solid var(--obsidian);
+  border-left: 4px solid var(--sonar);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-label);
+  font-weight: 700;
+  animation: toast-in var(--dur) var(--ease-back);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+  max-width: 100%;
+}
+.toast--warn { border-left-color: var(--amber); }
+.toast--bad { border-left-color: var(--magma); }
+.toast.is-out { animation: toast-out var(--dur) var(--ease) forwards; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(-8px); }
+}
+
+/* L3: モーダル／シート */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 8, 5, 0.62);
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.scrim.is-open { opacity: 1; }
+
+.sheet {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  max-height: 78dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--strata);
+  border-top: 2px solid var(--obsidian);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  padding: 8px calc(var(--gutter) + var(--safe-l)) var(--deck-bottom)
+    calc(var(--gutter) + var(--safe-r));
+  transform: translateY(100%);
+  transition: transform var(--dur-slow) var(--ease);
+  pointer-events: auto;
+}
+.sheet.is-open { transform: none; }
+.sheet .grabber {
+  width: 44px; height: 4px;
+  background: var(--clay);
+  border-radius: 2px;
+  margin: 6px auto 12px;
+  flex: none;
+}
+.sheet .sheet-body { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+
+/* =========================================================================
+   レイアウト型: WIDE（スマホ横 / PC）
+   縦持ちで完結させ、横持ちでは「おまけ」だけを足す
+   ========================================================================= */
+body[data-layout='wide'] .deck { justify-content: center; }
+body[data-layout='wide'] .side-only { display: flex; }
+body[data-layout='tower'] .side-only { display: none; }
+
+.side-panel {
+  position: absolute;
+  top: 76px;
+  bottom: 120px;
+  width: 300px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+  overflow: hidden;
+}
+.side-panel--l { left: calc(var(--gutter) + var(--safe-l)); }
+.side-panel--r { right: calc(var(--gutter) + var(--safe-r)); }
+
+/* =========================================================================
+   ブート
    ========================================================================= */
 #boot {
   position: absolute;
@@ -105,47 +377,31 @@ html, body {
   z-index: 100;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at 50% 40%, #1b2430 0%, #0a0d12 70%);
+  background: radial-gradient(ellipse at 50% 42%, #241a12 0%, #0c0907 72%);
   transition: opacity var(--dur-slow) var(--ease);
 }
 #boot.hidden { opacity: 0; pointer-events: none; }
-
-.boot-inner { text-align: center; width: min(420px, 78vw); }
-
-.boot-logo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  letter-spacing: 0.22em;
-  margin-bottom: 28px;
-}
+.boot-inner { text-align: center; width: min(420px, 76vw); }
+.boot-logo { display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; }
 .boot-logo-main {
-  font-size: clamp(28px, 8vw, 46px);
+  font-size: clamp(30px, 9vw, 52px);
   font-weight: 800;
   color: var(--bone);
-  text-shadow: 0 0 24px rgba(255, 182, 72, 0.3);
+  letter-spacing: 0.16em;
+  text-shadow: 0 3px 0 var(--bedrock);
 }
 .boot-logo-sub {
-  font-size: clamp(12px, 3.4vw, 17px);
-  font-weight: 600;
+  font-size: clamp(11px, 3.2vw, 15px);
+  font-weight: 700;
   color: var(--amber);
-  letter-spacing: 0.5em;
-  margin-top: 4px;
-  margin-left: 0.5em;
+  letter-spacing: 0.54em;
+  margin-top: 6px;
+  margin-left: 0.54em;
 }
-
-.boot-bar {
-  height: 3px;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: var(--r-pill);
-  overflow: hidden;
-}
+.boot-bar { height: 4px; width: 100%; background: var(--strata); border-radius: 2px; overflow: hidden; }
 .boot-bar i {
-  display: block;
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--amber-dim), var(--amber));
+  display: block; height: 100%; width: 0%;
+  background: var(--amber);
   transition: width var(--dur) var(--ease);
 }
 .boot-status {
@@ -153,9 +409,45 @@ html, body {
   font-size: 12px;
   color: var(--text-faint);
   letter-spacing: 0.08em;
-  min-height: 1.2em;
+  min-height: 1.3em;
+}
+
+/* =========================================================================
+   フラッシュ（ポスプロ0パスのティア用にCSSで代替）
+   ========================================================================= */
+#flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 50;
+  mix-blend-mode: screen;
+}
+
+/* 砂の質感。個別パーツに貼らず最上層に1枚だけ */
+#grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
+}
+/* 周縁減光。GPUを使わないビネット */
+#vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 55;
+  background: radial-gradient(ellipse at 50% 46%, transparent 42%, rgba(8, 6, 4, 0.55) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
+
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }

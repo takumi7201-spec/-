@@ -33,7 +33,7 @@ export class CreatureAnimator {
   private body?: THREE.Object3D;
   private baseY = 0;
 
-  constructor(private obj: CreatureObject) {
+  constructor(obj: CreatureObject) {
     const p = obj.parts;
     this.body = p.get('body');
     this.neck = p.get('neck');
