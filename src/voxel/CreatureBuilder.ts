@@ -112,26 +112,26 @@ function skeletonFor(a: Archetype, bulk: number): Skeleton {
   switch (a) {
     case 'theropod':
       Object.assign(s, {
-        bodyLen: 17, bodyR: 5.0 * bulk, neckLen: 7, neckR: 2.9 * bulk, neckPitch: 0.55,
-        headW: 7, headH: 6, headD: 10, headType: 'jaw' as const,
-        tailSegs: 3, tailLen: 9, tailR: 3.6 * bulk, tailDroop: 0.06,
-        legCount: 2 as const, legLen: 14, legR: 2.7 * bulk, legSpread: 3.6 * bulk,
-        armLen: 5, armR: 1.2, hipY: 16,
+        bodyLen: 15, bodyR: 5.2 * bulk, neckLen: 5, neckR: 3.2 * bulk, neckPitch: 0.7,
+        headW: 9, headH: 8, headD: 13, headType: 'jaw' as const,
+        tailSegs: 3, tailLen: 10, tailR: 3.8 * bulk, tailDroop: 0.06,
+        legCount: 2 as const, legLen: 15, legR: 2.9 * bulk, legSpread: 3.8 * bulk,
+        armLen: 5, armR: 1.3, hipY: 17,
       });
       break;
     case 'raptor':
       Object.assign(s, {
-        bodyLen: 14, bodyR: 3.6 * bulk, neckLen: 7, neckR: 2.1 * bulk, neckPitch: 0.75,
-        headW: 5, headH: 4, headD: 8, headType: 'jaw' as const,
-        tailSegs: 4, tailLen: 11, tailR: 2.2 * bulk, tailDroop: -0.05,
-        legCount: 2 as const, legLen: 12, legR: 2.0 * bulk, legSpread: 2.9 * bulk,
-        armLen: 6, armR: 1.1, hipY: 14,
+        bodyLen: 12, bodyR: 3.8 * bulk, neckLen: 4, neckR: 2.4 * bulk, neckPitch: 0.9,
+        headW: 6, headH: 6, headD: 10, headType: 'jaw' as const,
+        tailSegs: 4, tailLen: 12, tailR: 2.4 * bulk, tailDroop: -0.05,
+        legCount: 2 as const, legLen: 13, legR: 2.1 * bulk, legSpread: 3.0 * bulk,
+        armLen: 6, armR: 1.2, hipY: 15,
       });
       break;
     case 'sauropod':
       Object.assign(s, {
-        bodyLen: 16, bodyR: 6.4 * bulk, neckLen: 18, neckR: 2.6 * bulk, neckPitch: 1.05,
-        headW: 4, headH: 4, headD: 6, headType: 'blunt' as const,
+        bodyLen: 15, bodyR: 6.4 * bulk, neckLen: 15, neckR: 2.8 * bulk, neckPitch: 1.15,
+        headW: 6, headH: 5, headD: 8, headType: 'blunt' as const,
         tailSegs: 4, tailLen: 15, tailR: 3.4 * bulk, tailDroop: 0.12,
         legCount: 4 as const, legLen: 14, legR: 2.9 * bulk, legSpread: 4.4 * bulk,
         hipY: 17,
@@ -148,8 +148,8 @@ function skeletonFor(a: Archetype, bulk: number): Skeleton {
       break;
     case 'stegosaur':
       Object.assign(s, {
-        bodyLen: 17, bodyR: 5.4 * bulk, neckLen: 6, neckR: 2.6 * bulk, neckPitch: -0.25,
-        headW: 4, headH: 4, headD: 7, headType: 'blunt' as const,
+        bodyLen: 16, bodyR: 5.4 * bulk, neckLen: 5, neckR: 2.8 * bulk, neckPitch: -0.15,
+        headW: 6, headH: 5, headD: 9, headType: 'blunt' as const,
         tailSegs: 3, tailLen: 11, tailR: 3.0 * bulk, tailDroop: -0.1,
         legCount: 4 as const, legLen: 11, legR: 2.4 * bulk, legSpread: 3.8 * bulk,
         hipY: 14,
@@ -157,8 +157,8 @@ function skeletonFor(a: Archetype, bulk: number): Skeleton {
       break;
     case 'ankylosaur':
       Object.assign(s, {
-        bodyLen: 17, bodyR: 6.4 * bulk, bodyTilt: 0, neckLen: 4, neckR: 3.4 * bulk, neckPitch: -0.1,
-        headW: 7, headH: 5, headD: 7, headType: 'blunt' as const,
+        bodyLen: 16, bodyR: 6.2 * bulk, bodyTilt: 0, neckLen: 4, neckR: 3.2 * bulk, neckPitch: 0.05,
+        headW: 9, headH: 6, headD: 10, headType: 'blunt' as const,
         tailSegs: 3, tailLen: 10, tailR: 2.6 * bulk, tailDroop: 0.05,
         legCount: 4 as const, legLen: 8, legR: 2.4 * bulk, legSpread: 4.4 * bulk,
         hipY: 10,
@@ -175,8 +175,8 @@ function skeletonFor(a: Archetype, bulk: number): Skeleton {
       break;
     case 'aquatic':
       Object.assign(s, {
-        bodyLen: 18, bodyR: 5.0 * bulk, neckLen: 5, neckR: 3.0 * bulk, neckPitch: 0.15,
-        headW: 6, headH: 5, headD: 10, headType: 'jaw' as const,
+        bodyLen: 17, bodyR: 5.0 * bulk, neckLen: 5, neckR: 3.2 * bulk, neckPitch: 0.25,
+        headW: 8, headH: 6, headD: 12, headType: 'jaw' as const,
         tailSegs: 3, tailLen: 12, tailR: 3.0 * bulk, tailDroop: 0,
         legCount: 4 as const, legLen: 6, legR: 1.6 * bulk, legSpread: 4.6 * bulk,
         hipY: 9,
@@ -265,27 +265,35 @@ export function buildCreature(spec: CreatureSpec): CreatureModel {
   ));
 
   // ---- 首 ----
+  // 首は前へ進むほど持ち上がるので、グリッドの高さは太さではなく
+  // 「持ち上がる量 + 太さ」で確保する。ここを太さだけで取ると
+  // 首長竜の首が途中で切り落とされる。
+  const neckRise = Math.max(0, Math.sin(Math.max(0, sk.neckPitch)) * sk.neckLen * 0.42);
   const neckW = Math.ceil(sk.neckR * 2 + 2);
+  const neckH = Math.ceil(sk.neckR * 2 + 2 + neckRise + Math.max(0, -sk.neckPitch) * sk.neckLen * 0.42);
+  const neckBase = Math.ceil(sk.neckR + 1);
   const neck = reg(part(
-    'neck', neckW, neckW, Math.ceil(sk.neckLen),
+    'neck', neckW, neckH, Math.ceil(sk.neckLen),
     [0, sk.bodyR * 0.45, sk.bodyLen / 2 - 1],
-    [-neckW / 2, -neckW / 2, 0],
+    [-neckW / 2, -neckBase, 0],
     (p, g) => {
       const c = neckW / 2;
       for (let z = 0; z < g.sz; z++) {
         const t = z / Math.max(1, g.sz - 1);
-        const r = sk.neckR * (1 - t * 0.32);
-        // 首は前へ進むほど持ち上がる。これで頭の位置が自然に決まる
-        const y = c + Math.sin(t * sk.neckPitch) * sk.neckLen * 0.42;
-        p.ellipsoid(c, y, z + 0.5, r, r, 0.9, SLOT.PRIMARY);
+        const r = sk.neckR * (1 - t * 0.34);
+        const y = neckBase + Math.sin(t * sk.neckPitch) * sk.neckLen * 0.42;
+        p.ellipsoid(c, y, z + 0.5, r, r, 0.95, SLOT.PRIMARY);
       }
     },
   ));
   body.children.push(neck);
 
   // ---- 頭 ----
-  const hw = Math.ceil(sk.headW), hh = Math.ceil(sk.headH + 4), hd = Math.ceil(sk.headD + 2);
+  const hw = Math.ceil(sk.headW), hd = Math.ceil(sk.headD + 2);
+  // フリル・角・クレストは頭より上へ伸びる
+  const hh = Math.ceil(sk.headH + (spec.archetype === 'ceratopsian' ? sk.headW * 2.6 : 8));
   const neckEndY = Math.sin(sk.neckPitch) * sk.neckLen * 0.42;
+  // （首パーツのローカル原点はピボット基準なので、そのまま頭の高さになる）
   const head = reg(part(
     'head', hw + 2, hh, hd,
     [0, neckEndY, sk.neckLen],

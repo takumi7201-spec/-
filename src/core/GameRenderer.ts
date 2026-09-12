@@ -66,7 +66,7 @@ export class GameRenderer {
     // ACES はボクセルの原色を一律にくすませる。Neutral は中間調の
     // 色相・彩度をほぼ保存したままハイライトだけ丸める
     this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 0.92;
+    this.renderer.toneMappingExposure = 1.02;
     // composer は内部で複数回 render するので、自動リセットだと最後のパスの値しか残らない
     this.renderer.info.autoReset = false;
     this.renderer.shadowMap.enabled = this.quality.shadows;

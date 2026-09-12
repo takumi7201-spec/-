@@ -67,10 +67,11 @@ export class Sky {
           vec3 d = normalize(vDir);
           float h = d.y;
 
-          // 地平付近を圧縮したグラデーション。線形だと空が平坦に見える
-          float upper = smoothstep(0.0, 0.55, h);
+          // 実際の空は地平から10度ほど上でもう青い。ここを広く取ると
+          // 俯瞰カメラでは画面に地平の色しか入らず、空が単色に見える
+          float upper = smoothstep(-0.02, 0.22, h);
           float lower = smoothstep(0.0, -0.35, h);
-          vec3 col = mix(uHorizon, uTop, pow(upper, 0.72));
+          vec3 col = mix(uHorizon, uTop, pow(upper, 0.85));
           col = mix(col, uBottom, lower);
 
           // 太陽

@@ -90,7 +90,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     name: 'ソルト・キャニオン',
     tagline: '乾いた層に浅く眠る、最初の発掘場',
     palette: CANYON,
-    sky: 0x6ba8d8, horizon: 0xf0c48a, fog: 0xc9a880,
+    sky: 0xbfe2ff, horizon: 0xf5d2a4, fog: 0xd6b78e,
     sunColor: 0xffeec8, sunIntensity: 2.15,
     ambientSky: 0x9ec8ff, ambientGround: 0x6b5238, ambientIntensity: 0.62,
     relief: 1.0, hardness: 0.28, level: [1, 8],
@@ -100,7 +100,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     name: 'フロストピーク',
     tagline: '氷漬けの保存状態、ただし岩は硬い',
     palette: FROST,
-    sky: 0x8fbde0, horizon: 0xc8dcec, fog: 0xa8c4d8,
+    sky: 0xcfe8ff, horizon: 0xdcecf6, fog: 0xbcd4e4,
     sunColor: 0xe8f2ff, sunIntensity: 2.0,
     ambientSky: 0xc8e4ff, ambientGround: 0x5a6570, ambientIntensity: 0.75,
     relief: 1.35, hardness: 0.52, level: [6, 16],
@@ -120,7 +120,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     name: 'タイドホロウ',
     tagline: '干上がった内海。水棲種の墓場',
     palette: TIDE,
-    sky: 0x78b0b8, horizon: 0x9fcabf, fog: 0x86aca2,
+    sky: 0xbfe6e8, horizon: 0xbadfd2, fog: 0x9cc0b4,
     sunColor: 0xe6fff8, sunIntensity: 1.95,
     ambientSky: 0xa8dcd4, ambientGround: 0x3d5a52, ambientIntensity: 0.7,
     relief: 0.8, hardness: 0.4, level: [9, 20],
@@ -131,11 +131,14 @@ export const BIOMES: Record<BiomeId, Biome> = {
 export type ElementId = 'flame' | 'aqua' | 'terra' | 'gale' | 'null';
 
 export const ELEMENT_PALETTES: Record<ElementId, Float32Array> = {
-  flame: buildPalette([0x000000, 0xd1503a, 0x8f2f22, 0xf0a878, 0xffb63c, 0xf5e6c8, 0x1a1012, 0x2a1512, 0xff7a2a]),
-  aqua: buildPalette([0x2f7fb8, 0x2f7fb8, 0x1d5687, 0xa8dcf0, 0x64e0d8, 0xeaf6ff, 0x0c1a24, 0x10222e, 0x5ff0e0]),
-  terra: buildPalette([0x000000, 0x7a9a4a, 0x4f7030, 0xd8d08a, 0xc08a3a, 0xf0e8c8, 0x14180e, 0x22260f, 0xb8f04a]),
-  gale: buildPalette([0x000000, 0x8a7fc8, 0x5c4f9a, 0xd8d0f0, 0xf0e04a, 0xffffff, 0x14101f, 0x1c1830, 0xf8f060]),
-  null: buildPalette([0x000000, 0x9a9088, 0x6e665f, 0xd8d0c8, 0xb8a888, 0xf0ece4, 0x181614, 0x242018, 0xd8d0b0]),
+  // 腹（index 3）は体色の明部として置く。白を入れると全種が
+  // 「白い腹の塊」に見えて、シルエットの差が消える。
+  // 爪・牙（index 5）も生成り色に寄せ、ハイライトを独占させない。
+  flame: buildPalette([0x000000, 0xc2452f, 0x87291d, 0xdd8a5c, 0xf2a52e, 0xe8d2a8, 0x1a1012, 0x2a1512, 0xff7a2a]),
+  aqua: buildPalette([0x000000, 0x2f7fb8, 0x1d5687, 0x6fb4d8, 0x3fc8bc, 0xd8e4ea, 0x0c1a24, 0x10222e, 0x5ff0e0]),
+  terra: buildPalette([0x000000, 0x6f8f42, 0x48682c, 0xa2b566, 0xc08a3a, 0xdcd2b0, 0x14180e, 0x22260f, 0xb8f04a]),
+  gale: buildPalette([0x000000, 0x7d72bb, 0x51458c, 0xa79ed6, 0xe0cf42, 0xe2dcc8, 0x14101f, 0x1c1830, 0xf8f060]),
+  null: buildPalette([0x000000, 0x8e857c, 0x635b55, 0xb3aaa0, 0xa89878, 0xdcd6cc, 0x181614, 0x242018, 0xd8d0b0]),
 };
 
 export const ELEMENT_COLORS: Record<ElementId, number> = {

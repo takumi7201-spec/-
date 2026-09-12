@@ -152,3 +152,126 @@ body[data-layout='wide'] .rail--r { top: 84px; }
 body[data-layout='wide'] .deck--dig { padding-left: 5vw; padding-right: 5vw; }
 body[data-layout='wide'] .title-actions { width: min(520px, 100%); }
 body[data-layout='wide'] .home-grid { grid-template-columns: repeat(6, 1fr); }
+
+/* =========================================================================
+   バトル
+   敵は上・味方は下。格闘ゲームとRPGで共通のメンタルモデルなので、
+   ここを独自にしても得がない。
+   ========================================================================= */
+.battle-enemy {
+  position: absolute;
+  top: calc(var(--safe-t) + 8px);
+  left: calc(var(--gutter) + var(--safe-l));
+  right: calc(var(--gutter) + var(--safe-r));
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.battle-enemy-head { display: flex; align-items: center; gap: 8px; }
+.battle-enemy-head .bar { flex: 1; }
+.battle-enemy-head .round { font-size: 12px; color: var(--text-dim); min-width: 36px; text-align: right; }
+
+.enemy-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.enemy-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 6px 7px;
+  background: var(--obsidian);
+  border: 2px solid #000;
+  border-radius: var(--r-sm);
+  transition: transform var(--dur-fast) var(--ease), opacity var(--dur) var(--ease);
+}
+.enemy-card .card-name,
+.ally-card .card-name {
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.enemy-card .chip { height: 18px; font-size: 10px; padding: 0 5px; align-self: flex-start; }
+
+.is-acting { outline: 2px solid var(--amber); outline-offset: 2px; }
+.is-hurt { transform: translateX(-3px); }
+.is-dead { opacity: 0.34; filter: grayscale(1); }
+
+/* 行動順。誰が次に動くかを常に見せる */
+.battle-order {
+  position: absolute;
+  right: calc(var(--gutter) + var(--safe-r));
+  top: 168px;
+  display: flex; flex-direction: column; gap: 5px;
+  pointer-events: none;
+}
+.order-pip {
+  width: 34px; height: 26px;
+  display: grid; place-items: center;
+  background: var(--strata);
+  border: 2px solid var(--obsidian);
+  border-left-width: 4px;
+  border-radius: var(--r-sm);
+  font-size: 10px; font-weight: 800;
+  color: var(--text-dim);
+  opacity: 0.72;
+}
+.order-pip.is-ally { border-left-color: var(--sonar); }
+.order-pip.is-foe { border-left-color: var(--magma); }
+.order-pip.is-next { opacity: 1; transform: scale(1.12); color: var(--bone); }
+
+.battle-banner {
+  position: absolute; left: 0; right: 0; top: 38%;
+  text-align: center;
+  font-size: clamp(22px, 7vw, 38px);
+  font-weight: 800; letter-spacing: 0.14em;
+  color: var(--bone);
+  text-shadow: 0 4px 0 var(--bedrock), 0 0 26px rgba(0, 0, 0, 0.7);
+  opacity: 0; transform: scale(0.9);
+  transition: opacity 160ms var(--ease), transform 260ms var(--ease-back);
+  pointer-events: none;
+}
+.battle-banner.is-on { opacity: 1; transform: none; }
+
+.deck--battle { flex-direction: column; align-items: stretch; }
+.battle-deck-inner { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+
+.ally-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ally-card {
+  display: flex; flex-direction: column; gap: 5px;
+  min-height: 0; padding: 7px 8px 8px;
+  background: var(--strata);
+  border: 2px solid var(--obsidian);
+  border-radius: var(--r-sm);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  align-items: stretch;
+  text-align: left;
+}
+.ally-card:active { transform: translateY(3px); box-shadow: none; }
+.ally-card .card-top { display: flex; align-items: center; gap: 5px; }
+.ally-card .chip { height: 18px; font-size: 10px; padding: 0 5px; }
+.ally-card .card-row { display: flex; align-items: center; gap: 5px; }
+.ally-card .card-hp { font-size: 11px; min-width: 34px; }
+.ally-card .card-od-label { font-size: 9px; color: var(--text-faint); font-weight: 700; }
+.ally-card .card-row .bar { flex: 1; }
+/* OD が満ちたら光らせる。押さなくても進むので、視覚だけだと気づかれない */
+.ally-card.is-od-ready { border-color: var(--amber); box-shadow: 0 3px 0 var(--ember), 0 0 16px rgba(244, 162, 60, 0.45); }
+
+.battle-controls { display: flex; align-items: center; gap: 8px; }
+.battle-controls .spacer { flex: 1; }
+
+.battle-log {
+  max-height: 108px; overflow-y: auto;
+  padding: 8px 10px;
+  background: var(--obsidian);
+  border: 2px solid #000;
+  border-radius: var(--r-sm);
+  font-size: 11px; line-height: 1.6; color: var(--text-dim);
+  overscroll-behavior: contain; touch-action: pan-y;
+}
+.log-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* WIDE: 面積があるので常時ログを出す */
+body[data-layout='wide'] .battle-enemy { left: auto; right: calc(var(--gutter) + var(--safe-r)); width: 340px; }
+body[data-layout='wide'] .deck--battle { padding-left: 5vw; padding-right: 5vw; }
+body[data-layout='wide'] .battle-deck-inner { flex-direction: row; align-items: flex-end; gap: 12px; }
+body[data-layout='wide'] .ally-cards { flex: 1; }
+body[data-layout='wide'] .battle-log { display: block; width: 320px; max-height: 96px; }
+body[data-layout='wide'] .battle-order { top: 96px; left: calc(var(--gutter) + var(--safe-l)); right: auto; }

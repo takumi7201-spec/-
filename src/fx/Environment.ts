@@ -22,7 +22,9 @@ export class Environment {
   private shadowRadius = 22;
 
   constructor(quality: QualitySettings) {
-    this.sky = new Sky(400);
+    // 天球はカメラに追従するので、半径は far より内側に取る。
+    // far(200〜260) より外に置くと錐台でクリップされ、空が一度も描かれない。
+    this.sky = new Sky(150);
     this.group.add(this.sky.mesh);
 
     this.sun = new THREE.DirectionalLight(0xfff0d0, 3.0);

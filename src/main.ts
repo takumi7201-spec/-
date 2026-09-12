@@ -7,9 +7,13 @@ import { UIRoot } from './ui/UIRoot';
 import { TitleScreen } from './ui/screens/TitleScreen';
 import { DigScreen } from './ui/screens/DigScreen';
 import { DigScene } from './scenes/DigScene';
+import { BattleScene } from './scenes/BattleScene';
+import { BattleScreen } from './ui/screens/BattleScreen';
+import { BattlePlayer } from './game/battle/BattlePlayer';
+import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil } from './game/party';
 import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
-import { load as loadSave, save as writeSave, defaultSave, dropDecay, type SaveData } from './core/Save';
+import { load as loadSave, save as writeSave, defaultSave, dropDecay, addExp, type SaveData } from './core/Save';
 import type { BiomeId } from './voxel/palette';
 
 const boot = document.getElementById('boot')!;
@@ -41,18 +45,32 @@ async function main(): Promise<void> {
   let data: SaveData = loadSave();
 
   const dig = new DigScene(renderer.quality);
+  const battle = new BattleScene(renderer.quality);
+  battle.reducedShake = data.settings.reducedShake;
+  let player: BattlePlayer | null = null;
+  /** この周回で回収した化石 */
+  let runFossils: { defId: string; rarity: number }[] = [];
   const speciesPool = REVOS.map((r) => ({ id: r.id, rarity: r.rarity, weight: r.rarity === 1 ? 10 : r.rarity === 2 ? 6 : r.rarity === 3 ? 3 : 1 }));
 
   const title = new TitleScreen();
   const digScreen = new DigScreen(dig);
+  const battleScreen = new BattleScreen();
   ui.register(title);
   ui.register(digScreen);
+  ui.register(battleScreen);
 
   input.onStickChange = (a, ox, oy, dx, dy) => digScreen.setStick(a, ox, oy, dx, dy);
 
   title.onStart = (fresh) => {
-    if (fresh) { data = defaultSave(); writeSave(data); }
+    if (fresh) { data = defaultSave(); }
+    grantStarters(data);
+    writeSave(data);
     void startRun(data.unlockedBiomes[0] ?? 'canyon');
+  };
+  title.onBattle = () => {
+    grantStarters(data);
+    writeSave(data);
+    void startBattle();
   };
   title.setHasSave(data.stats.runs > 0 || data.roster.length > 0);
 
@@ -65,12 +83,81 @@ async function main(): Promise<void> {
   digScreen.onFinish = () => {
     data.stats.runs++;
     data.daily.runs++;
+    // 精錬ミニゲームは未実装なので、暫定でBランク相当のクリーン度を与える
+    for (const f of runFossils) {
+      const { isNew } = addFossil(data, f.defId, 62);
+      data.stats.fossils++;
+      ui.toast(isNew ? `新種：${revosLabel(f.defId)}` : `${revosLabel(f.defId)} のスキルLvが上がった`, 'info', 2600);
+    }
     writeSave(data);
-    ui.toast('発掘終了。拠点に戻ります', 'info');
-    setTimeout(() => { ui.show('title'); audio.startMusic('calm'); }, 900);
+    if (runFossils.length > 0) {
+      ui.toast('発掘完了。バトルへ', 'info', 1800);
+      setTimeout(() => void startBattle(), 1400);
+    } else {
+      ui.toast('収穫なし。拠点に戻ります', 'warn');
+      setTimeout(() => { ui.show('title'); audio.startMusic('calm'); }, 1200);
+    }
+  };
+
+  battleScreen.onFinish = (winner) => {
+    data.stats.battles++;
+    if (winner === 0) {
+      data.stats.wins++;
+      data.stageProgress++;
+      data.player.coins += 120 + data.stageProgress * 40;
+      // EXPは前列に厚く配る。さらに未育成ユニットにはキャッチアップ補正
+      const setup = buildTeamSetup(data.roster, data.party.order, data.party.formation);
+      const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
+      setup?.members.forEach((m, i) => {
+        const unit = data.roster.find((r) => r.uid === m.uid);
+        if (!unit) return;
+        const share = i === 0 ? 0.5 : 0.25;
+        const catchUp = unit.level < maxLv - 2 ? 2.0 : 1;
+        const { leveled } = addExp(unit, Math.round(1800 * share * catchUp));
+        if (leveled > 0) ui.toast(`${revosLabel(unit.defId)} が Lv${unit.level} に`, 'info', 2400);
+      });
+    }
+    writeSave(data);
+    setTimeout(() => {
+      ui.show('title');
+      title.setHasSave(true);
+      audio.startMusic('calm');
+      renderer.setScene(titleScene, titleCam);
+    }, 600);
+  };
+
+  function revosLabel(defId: string): string {
+    return REVOS.find((r) => r.id === defId)?.name ?? defId;
+  }
+
+  async function startBattle(): Promise<void> {
+    const mine = buildTeamSetup(data.roster, data.party.order, data.party.formation);
+    if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); return; }
+    boot.classList.remove('hidden');
+    await progress(0.4, '闘技場を生成しています…');
+    const seed = (Date.now() ^ (data.stageProgress * 104729)) >>> 0;
+    battle.buildArena(data.unlockedBiomes[0] ?? 'canyon', seed);
+    const foes = buildEnemyTeam(data.stageProgress, seed);
+    player = new BattlePlayer(seed, mine, foes, battle);
+    battleScreen.setPlayer(player);
+    player.speed = data.settings.battleSpeed;
+    await progress(0.9, 'リヴォスを復元しています…');
+    battle.resize(renderer.aspect);
+    renderer.setScene(battle.scene, battle.camera);
+    renderer.invalidateShadows();
+    player.start();
+    ui.show('battle');
+    audio.startMusic('battle');
+    await progress(1, '');
+    setTimeout(() => boot.classList.add('hidden'), 200);
+  }
+
+  dig.events.onCollect = (n) => {
+    if (n.kind === 'fossil') runFossils.push({ defId: n.speciesId, rarity: n.rarity });
   };
 
   async function startRun(biome: BiomeId): Promise<void> {
+    runFossils = [];
     boot.classList.remove('hidden');
     await progress(0.35, 'エリアを生成しています…');
     const seed = (Date.now() ^ (data.daily.runs * 7919)) >>> 0;
@@ -118,6 +205,7 @@ async function main(): Promise<void> {
     resizeTimer = setTimeout(() => {
       renderer.resize();
       dig.resize(renderer.aspect);
+      battle.resize(renderer.aspect);
       titleCam.aspect = renderer.aspect;
       titleCam.updateProjectionMatrix();
     }, 120) as unknown as number;
@@ -153,10 +241,13 @@ async function main(): Promise<void> {
     if (paused) return;
 
     input.beginFrame();
-    const inDig = ui.currentName === 'dig';
-    if (inDig) {
+    const screen = ui.currentName;
+    if (screen === 'dig') {
       dig.update(dt, input, true);
       if (dig.consumeShadowDirty()) renderer.invalidateShadows();
+    } else if (screen === 'battle') {
+      player?.update(dt);
+      battle.update(dt);
     } else {
       titleCam.position.x = Math.sin(now * 0.00012) * 9;
       titleCam.position.z = Math.cos(now * 0.00012) * 9;
