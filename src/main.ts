@@ -8,6 +8,8 @@ import { TitleScreen } from './ui/screens/TitleScreen';
 import { DigScreen } from './ui/screens/DigScreen';
 import { DigScene } from './scenes/DigScene';
 import { BattleScene } from './scenes/BattleScene';
+import { CleanScene } from './scenes/CleanScene';
+import { CleanScreen } from './ui/screens/CleanScreen';
 import { BattleScreen } from './ui/screens/BattleScreen';
 import { BattlePlayer } from './game/battle/BattlePlayer';
 import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil } from './game/party';
@@ -46,6 +48,7 @@ async function main(): Promise<void> {
 
   const dig = new DigScene(renderer.quality);
   const battle = new BattleScene(renderer.quality);
+  const clean = new CleanScene(renderer.quality);
   battle.reducedShake = data.settings.reducedShake;
   let player: BattlePlayer | null = null;
   /** この周回で回収した化石 */
@@ -55,8 +58,10 @@ async function main(): Promise<void> {
   const title = new TitleScreen();
   const digScreen = new DigScreen(dig);
   const battleScreen = new BattleScreen();
+  const cleanScreen = new CleanScreen(clean);
   ui.register(title);
   ui.register(digScreen);
+  ui.register(cleanScreen);
   ui.register(battleScreen);
 
   input.onStickChange = (a, ox, oy, dx, dy) => digScreen.setStick(a, ox, oy, dx, dy);
@@ -83,21 +88,45 @@ async function main(): Promise<void> {
   digScreen.onFinish = () => {
     data.stats.runs++;
     data.daily.runs++;
-    // 精錬ミニゲームは未実装なので、暫定でBランク相当のクリーン度を与える
-    for (const f of runFossils) {
-      const { isNew } = addFossil(data, f.defId, 62);
-      data.stats.fossils++;
-      ui.toast(isNew ? `新種：${revosLabel(f.defId)}` : `${revosLabel(f.defId)} のスキルLvが上がった`, 'info', 2600);
-    }
-    writeSave(data);
-    if (runFossils.length > 0) {
-      ui.toast('発掘完了。バトルへ', 'info', 1800);
-      setTimeout(() => void startBattle(), 1400);
-    } else {
+    if (runFossils.length === 0) {
+      writeSave(data);
       ui.toast('収穫なし。拠点に戻ります', 'warn');
       setTimeout(() => { ui.show('title'); audio.startMusic('calm'); }, 1200);
+      return;
     }
+    // 精錬は1周につき1体だけ。残りはストックに積む
+    const best = runFossils.slice().sort((a, b) => b.rarity - a.rarity)[0];
+    for (const f of runFossils) {
+      if (f === best) continue;
+      data.stock.push({ defId: f.defId, rarity: f.rarity, biome: data.unlockedBiomes[0] ?? 'canyon' });
+    }
+    writeSave(data);
+    void startClean(best.defId, best.rarity);
   };
+
+  cleanScreen.onFinish = (score, defId) => {
+    const { isNew } = addFossil(data, defId, score.clean);
+    data.stats.fossils++;
+    writeSave(data);
+    ui.toast(
+      `${revosLabel(defId)} — ランク ${score.rank}（クリーン度 ${score.clean}）` +
+      (isNew ? ' / 新種' : ' / スキルLv上昇'),
+      score.rank === 'D' ? 'warn' : 'info', 3400,
+    );
+    if (score.rank === 'S') ui.toast('Sランク：スキルスロット3枠目を開放', 'info', 3000);
+    setTimeout(() => void startBattle(), 1800);
+  };
+
+  async function startClean(defId: string, rarity: number): Promise<void> {
+    boot.classList.remove('hidden');
+    await progress(0.5, '母岩を切り出しています…');
+    clean.resize(renderer.aspect);
+    renderer.setScene(clean.scene, clean.camera);
+    await progress(1, '');
+    ui.show('clean', { defId, rarity, seed: (Date.now() ^ 0x51ed) >>> 0 });
+    audio.startMusic('calm');
+    setTimeout(() => boot.classList.add('hidden'), 200);
+  }
 
   battleScreen.onFinish = (winner) => {
     data.stats.battles++;
@@ -186,6 +215,16 @@ async function main(): Promise<void> {
   renderer.setScene(titleScene, titleCam);
   ui.show('title');
 
+  // 開発用の直接遷移。?screen=clean / ?screen=battle で各画面を単体確認できる
+  const jump = new URLSearchParams(location.search).get('screen');
+  if (jump === 'clean') {
+    grantStarters(data);
+    void startClean('ignirapt', 2);
+  } else if (jump === 'battle') {
+    grantStarters(data);
+    void startBattle();
+  }
+
   // --- 入力の解錠（iOSはユーザージェスチャが要る）---
   const unlock = () => {
     void audio.unlock();
@@ -206,6 +245,7 @@ async function main(): Promise<void> {
       renderer.resize();
       dig.resize(renderer.aspect);
       battle.resize(renderer.aspect);
+      clean.resize(renderer.aspect);
       titleCam.aspect = renderer.aspect;
       titleCam.updateProjectionMatrix();
     }, 120) as unknown as number;
@@ -248,6 +288,8 @@ async function main(): Promise<void> {
     } else if (screen === 'battle') {
       player?.update(dt);
       battle.update(dt);
+    } else if (screen === 'clean') {
+      // 更新は CleanScreen.update から駆動する（入力と時間が結び付くため）
     } else {
       titleCam.position.x = Math.sin(now * 0.00012) * 9;
       titleCam.position.z = Math.cos(now * 0.00012) * 9;

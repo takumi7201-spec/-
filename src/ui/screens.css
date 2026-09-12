@@ -275,3 +275,79 @@ body[data-layout='wide'] .battle-deck-inner { flex-direction: row; align-items: 
 body[data-layout='wide'] .ally-cards { flex: 1; }
 body[data-layout='wide'] .battle-log { display: block; width: 320px; max-height: 96px; }
 body[data-layout='wide'] .battle-order { top: 96px; left: calc(var(--gutter) + var(--safe-l)); right: auto; }
+
+/* =========================================================================
+   精錬（クリーニング）
+   唯一「2ゾーン」を復活させる画面。ただし 50:50 ではなく 12:88。
+   ========================================================================= */
+.clean-strip {
+  position: absolute;
+  top: calc(var(--safe-t) + 8px);
+  left: calc(var(--gutter) + var(--safe-l));
+  right: calc(var(--gutter) + var(--safe-r));
+  padding: 8px 12px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+.clean-strip-row { display: flex; align-items: center; gap: 14px; }
+.clean-col { display: flex; flex-direction: column; gap: 3px; }
+.clean-col.grow { flex: 1; min-width: 0; }
+.clean-prog-head { display: flex; justify-content: space-between; align-items: baseline; }
+.clean-prog-head .num { font-size: 13px; }
+.clean-time { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.clean-time.is-low { color: var(--magma); }
+.clean-bone { font-size: 13px; letter-spacing: 0.12em; color: var(--sonar); }
+.clean-bone.is-bad { color: var(--magma); }
+.clean-name { font-size: 11px; color: var(--text-dim); }
+
+/* 作業面。ストリップの下からツールバーの上まで */
+.clean-surface {
+  position: absolute;
+  top: 96px;
+  left: 0; right: 64px;
+  bottom: 176px;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* 回転レール。指を離さずにY軸回転できる */
+.clean-rail {
+  position: absolute;
+  right: calc(var(--safe-r));
+  top: 108px; bottom: 188px;
+  width: 56px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(90deg, transparent, rgba(20, 16, 11, 0.55));
+  border-left: 2px solid var(--panel-line, rgba(255, 200, 120, 0.16));
+  touch-action: none;
+}
+.clean-rail .rail-label {
+  font-size: 10px; letter-spacing: 0.2em; color: var(--text-faint);
+  writing-mode: vertical-rl;
+}
+
+.deck--clean { flex-direction: column; align-items: stretch; }
+.clean-deck-inner { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+/* ドラッグがそのままツールバーへ侵入するのを防ぐ緩衝帯 */
+.clean-dead-zone { height: 12px; flex: none; }
+.clean-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.btn--tool {
+  flex-direction: column; gap: 2px; min-height: 68px; padding: 6px 4px;
+  background: var(--strata); color: var(--text); border-color: var(--obsidian);
+  box-shadow: 0 4px 0 #100c08;
+}
+.btn--tool .btn-label { font-size: 13px; }
+.btn--tool .btn-sub { font-size: 9px; color: var(--text-faint); font-weight: 600; letter-spacing: 0; }
+.btn--tool.is-on {
+  background: var(--sandstone); color: var(--obsidian);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 0 var(--bedrock);
+}
+.btn--tool.is-on .btn-sub { color: var(--clay); }
+.clean-actions { display: flex; justify-content: flex-end; }
+.clean-actions .btn { min-width: 120px; }
+
+body[data-layout='wide'] .clean-surface { left: 12vw; right: calc(12vw + 64px); bottom: 150px; }
+body[data-layout='wide'] .clean-rail { right: 10vw; }
+body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px); justify-content: center; }
