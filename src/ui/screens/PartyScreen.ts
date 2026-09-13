@@ -2,7 +2,7 @@ import { Screen } from '../UIRoot';
 import { h, button, bar, clear } from '../dom';
 import type { SaveData, OwnedRevos } from '../../core/Save';
 import { getRevos } from '../../game/data/revos';
-import { FORMATIONS, type FormationId } from '../../game/battle/types';
+import { FORMATIONS, TARGET_PREFS, type FormationId, type TargetPref } from '../../game/battle/types';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
 import { revosIcon } from '../revosIcon';
@@ -22,18 +22,21 @@ export class PartyScreen extends Screen {
   private rosterEl!: HTMLElement;
   private totalEl!: HTMLElement;
   private formEl!: HTMLElement;
+  private tacticEl!: HTMLElement;
   private order: (string | null)[] = [null, null, null];
   private formation: FormationId = 'wedge';
+  private prefs: TargetPref[] = ['front', 'front', 'front'];
   private selected: string | null = null;
 
   onBack?: () => void;
-  onApply?: (order: [string, string, string], formation: FormationId) => void;
+  onApply?: (order: [string, string, string], formation: FormationId, prefs: TargetPref[]) => void;
 
   constructor() { super('party'); }
 
   setData(d: SaveData): void {
     this.data = d;
     this.formation = d.party.formation;
+    const savedPrefs = d.party.targetPrefs ?? [];
     const saved = d.party.order;
     this.order = [0, 1, 2].map((i) => {
       const uid = saved?.[i];
@@ -46,6 +49,12 @@ export class PartyScreen extends Screen {
       if (empty < 0) break;
       this.order[empty] = r.uid;
     }
+    // 未保存のスロットは、そのリヴォスの推奨作戦から始める
+    this.prefs = [0, 1, 2].map((i) => {
+      if (savedPrefs[i]) return savedPrefs[i];
+      const u = this.unitOf(this.order[i]);
+      return u ? getRevos(u.defId).defaultPref : 'front';
+    });
     this.render();
   }
 
@@ -58,6 +67,7 @@ export class PartyScreen extends Screen {
     this.slotsEl = h('div', { class: 'party-field' });
     this.totalEl = h('div', { class: 'party-total' });
     this.formEl = h('div', { class: 'party-forms' });
+    this.tacticEl = h('div', { class: 'party-tactics' });
     this.rosterEl = h('div', { class: 'party-roster' });
 
     const body = h('div', { class: 'party-body' },
@@ -65,6 +75,8 @@ export class PartyScreen extends Screen {
       this.totalEl,
       h('div', { class: 'label party-label', text: '陣形' }),
       this.formEl,
+      h('div', { class: 'label party-label', text: '作戦' }),
+      this.tacticEl,
       h('div', { class: 'label party-label', text: '手持ち' }),
       this.rosterEl,
     );
@@ -133,6 +145,36 @@ export class PartyScreen extends Screen {
       h('span', { class: 'num', text: `DEF ${def}` }),
       h('span', { class: 'total-elems', text: [...elems].map(([e, n]) => `${ELEMENT_NAMES[e as never]}×${n}`).join(' ') }),
     );
+
+    // ---- 作戦 ----
+    // 誰を狙うかはスロットごとに決める。編成とセットで意味が出る決定なので、
+    // 別画面には切らず、スロットのすぐ下に置く。
+    clear(this.tacticEl);
+    this.order.forEach((uid, i) => {
+      const u = this.unitOf(uid);
+      const row = h('div', { class: 'tactic-row' });
+      const head = h('div', { class: 'tactic-head' });
+      if (u) {
+        head.append(revosIcon(u.defId, 'tactic-icon'), h('span', { class: 'tactic-name', text: getRevos(u.defId).name }));
+      } else {
+        head.append(h('span', { class: 'tactic-name dim', text: `スロット${i + 1}` }));
+      }
+      const opts = h('div', { class: 'tactic-opts' });
+      for (const t of TARGET_PREFS) {
+        const on = this.prefs[i] === t.id;
+        const b = button(t.name.replace('優先', ''), () => {
+          audio.uiTap();
+          this.prefs[i] = t.id;
+          this.render();
+        }, { class: `btn--sm tactic-btn ${on ? 'is-on' : ''}` });
+        b.title = t.desc;
+        b.disabled = !u;
+        opts.appendChild(b);
+      }
+      const cur = TARGET_PREFS.find((t) => t.id === this.prefs[i]);
+      row.append(head, opts, h('span', { class: 'tactic-desc', text: cur?.desc ?? '' }));
+      this.tacticEl.appendChild(row);
+    });
 
     // ---- 陣形 ----
     clear(this.formEl);
@@ -206,6 +248,6 @@ export class PartyScreen extends Screen {
     }
     while (filled.length < 3) filled.push(filled[0]);
     audio.uiConfirm();
-    this.onApply?.([filled[0], filled[1], filled[2]], this.formation);
+    this.onApply?.([filled[0], filled[1], filled[2]], this.formation, [...this.prefs]);
   }
 }

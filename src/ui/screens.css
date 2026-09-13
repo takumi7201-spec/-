@@ -191,7 +191,67 @@ body[data-layout='wide'] .home-grid { grid-template-columns: repeat(6, 1fr); }
   font-size: 11px; font-weight: 700; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
-.enemy-card .chip { height: 18px; font-size: 10px; padding: 0 5px; align-self: flex-start; }
+.enemy-card .card-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ally-card .card-top { min-width: 0; }
+.enemy-card .card-name, .ally-card .card-name { width: 100%; }
+/* グリッド項目は既定で min-width: auto。アイコンを足した内容幅で
+   3列が押し出されるので、明示的に縮めるようにする */
+.enemy-card, .ally-card { min-width: 0; }
+.enemy-card .chip { height: 18px; font-size: 10px; padding: 0 5px; }
+.enemy-card .card-name { font-size: 10px; }
+
+/* -------------------------------------------------------------------------
+   クールタイム表示つきアイコン
+   攻撃間隔の残りを暗いスイープで伏せ、溜まったぶんをリングで返す。
+   数字を置かないのは、視線がフィールド側にあるまま端で読めるのは
+   色と角度だけだから。
+   ------------------------------------------------------------------------- */
+.unit-icon {
+  --cd: 0;
+  position: relative;
+  flex: none;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 34%, #3b2d21, #17110c);
+  box-shadow: inset 0 0 0 2px var(--obsidian);
+  overflow: hidden;
+}
+.unit-icon .revos-icon { width: 100%; height: 100%; }
+/* 未回復ぶんを伏せるスイープ。12時から時計回りに開いていく */
+.unit-cd {
+  position: absolute; inset: 0;
+  background: conic-gradient(from -90deg,
+    transparent 0 calc(var(--cd) * 360deg),
+    rgba(6, 4, 3, 0.74) calc(var(--cd) * 360deg) 360deg);
+  pointer-events: none;
+}
+.unit-cd-ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg,
+    var(--sonar) 0 calc(var(--cd) * 360deg),
+    rgba(0, 0, 0, 0.45) calc(var(--cd) * 360deg) 360deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 0 76%, #000 79%);
+  mask: radial-gradient(circle closest-side, transparent 0 76%, #000 79%);
+  pointer-events: none;
+}
+.unit-icon--foe .unit-cd-ring {
+  background: conic-gradient(from -90deg,
+    var(--magma) 0 calc(var(--cd) * 360deg),
+    rgba(0, 0, 0, 0.45) calc(var(--cd) * 360deg) 360deg);
+}
+/* OD が満ちている＝次の行動は特殊攻撃。間隔も長くなるので先に予告する */
+.unit-icon.is-charged .unit-cd-ring {
+  background: conic-gradient(from -90deg,
+    var(--amber) 0 calc(var(--cd) * 360deg),
+    rgba(0, 0, 0, 0.45) calc(var(--cd) * 360deg) 360deg);
+}
+.unit-icon.is-full { box-shadow: inset 0 0 0 2px var(--obsidian), 0 0 10px rgba(45, 198, 164, 0.55); }
+.unit-icon.is-full.is-charged { box-shadow: inset 0 0 0 2px var(--obsidian), 0 0 14px rgba(244, 162, 60, 0.6); }
+@media (prefers-reduced-motion: no-preference) {
+  .unit-icon.is-full .unit-cd-ring { animation: cd-pop 900ms var(--ease) infinite; }
+}
+@keyframes cd-pop { 0%, 100% { opacity: 1; } 50% { opacity: 0.62; } }
 
 .is-acting { outline: 2px solid var(--amber); outline-offset: 2px; }
 .is-hurt { transform: translateX(-3px); }
@@ -206,7 +266,7 @@ body[data-layout='wide'] .home-grid { grid-template-columns: repeat(6, 1fr); }
   pointer-events: none;
 }
 .order-pip {
-  width: 34px; height: 26px;
+  width: 34px; height: 30px;
   display: grid; place-items: center;
   background: var(--strata);
   border: 2px solid var(--obsidian);
@@ -219,6 +279,7 @@ body[data-layout='wide'] .home-grid { grid-template-columns: repeat(6, 1fr); }
 .order-pip.is-ally { border-left-color: var(--sonar); }
 .order-pip.is-foe { border-left-color: var(--magma); }
 .order-pip.is-next { opacity: 1; transform: scale(1.12); color: var(--bone); }
+.order-pip .revos-icon { width: 26px; height: 24px; }
 
 .battle-banner {
   position: absolute; left: 0; right: 0; top: 38%;
@@ -249,7 +310,7 @@ body[data-layout='wide'] .home-grid { grid-template-columns: repeat(6, 1fr); }
   text-align: left;
 }
 .ally-card:active { transform: translateY(3px); box-shadow: none; }
-.ally-card .card-top { display: flex; align-items: center; gap: 5px; }
+.ally-card .card-top { display: flex; align-items: center; gap: 6px; }
 .ally-card .chip { height: 18px; font-size: 10px; padding: 0 5px; }
 .ally-card .card-row { display: flex; align-items: center; gap: 5px; }
 .ally-card .card-hp { font-size: 11px; min-width: 34px; }
@@ -416,6 +477,30 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 .form-btn .btn-sub { font-size: 9px; color: var(--text-faint); letter-spacing: 0; }
 .form-btn.is-on { background: var(--amber); color: var(--obsidian); box-shadow: 0 4px 0 var(--ember); }
 .form-btn.is-on .btn-sub { color: #6b3f08; }
+
+/* 作戦。スロットごとに「誰から狙うか」だけを決める。
+   選択肢を5つに固定し、説明は選んだ1件だけ出す——並べて読ませない */
+.party-tactics { display: flex; flex-direction: column; gap: 8px; }
+.tactic-row {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 7px 8px;
+  background: var(--obsidian);
+  border: 2px solid #000; border-radius: var(--r-sm);
+}
+.tactic-head { display: flex; align-items: center; gap: 6px; }
+.tactic-icon { width: 26px; height: 26px; flex: none; }
+.tactic-name { font-size: 12px; font-weight: 700; }
+.tactic-name.dim { color: var(--text-faint); }
+.tactic-opts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.tactic-btn {
+  min-height: 34px; padding: 0 2px;
+  background: var(--strata); color: var(--text);
+  border-color: var(--obsidian); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+.tactic-btn .btn-label { font-size: 11px; letter-spacing: 0; }
+.tactic-btn.is-on { background: var(--amber); color: var(--obsidian); box-shadow: 0 2px 0 var(--ember); }
+.tactic-btn:disabled { opacity: 0.34; }
+.tactic-desc { font-size: 10px; color: var(--text-faint); }
 
 .party-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
 .roster-card {

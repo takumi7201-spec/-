@@ -43,8 +43,8 @@ export interface BattleUnitView {
  * 対峙も同時に成り立つ。
  */
 const SLOT_POS: Record<Side, Record<number, [number, number]>> = {
-  0: { 0: [-0.95, 3.4], 1: [-1.9, 5.4], 2: [0.45, 5.9] },
-  1: { 0: [0.95, -3.4], 1: [1.9, -5.4], 2: [-0.45, -5.9] },
+  0: { 0: [-1.2, 3.4], 1: [-1.95, 5.5], 2: [0.9, 6.0] },
+  1: { 0: [1.2, -3.4], 1: [1.95, -5.5], 2: [-0.9, -6.0] },
 };
 
 export class BattleScene {
@@ -68,6 +68,16 @@ export class BattleScene {
   private hitStop = 0;
   private slowMo = 0;
   private tmp = new THREE.Vector3();
+  /**
+   * 画面比ごとのフレーミング補正。
+   *
+   * 縦長では下端をデッキ（味方カード）が占めるので、そのぶん引いて
+   * 見る点を手前に送り、6体ぶんを上半分に寄せる。画角を広げるだけだと
+   * 手前の味方が枠外に落ちる。
+   */
+  private camOffset = new THREE.Vector3();
+  private lookOffset = new THREE.Vector3();
+  private goalTmp = new THREE.Vector3();
 
   reducedShake = false;
 
@@ -356,8 +366,8 @@ export class BattleScene {
   }
 
   private updateCamera(dt: number): void {
-    this.camPos.lerp(this.camGoal, Math.min(1, dt * 3.4));
-    this.camLook.lerp(this.lookGoal, Math.min(1, dt * 4.2));
+    this.camPos.lerp(this.goalTmp.copy(this.camGoal).add(this.camOffset), Math.min(1, dt * 3.4));
+    this.camLook.lerp(this.goalTmp.copy(this.lookGoal).add(this.lookOffset), Math.min(1, dt * 4.2));
     this.camera.position.copy(this.camPos);
 
     if (this.shake > 0.001) {
@@ -375,6 +385,18 @@ export class BattleScene {
     // 縦長では画角を広げないと3体が収まらない
     this.camera.fov = aspect < 0.75 ? 50 : aspect < 1.3 ? 46 : 40;
     this.camera.updateProjectionMatrix();
+
+    if (aspect < 0.75) {
+      this.camOffset.set(0, 2.0, 4.0);
+      this.lookOffset.set(0, -0.5, 2.0);
+    } else if (aspect < 1.3) {
+      this.camOffset.set(0, 0.9, 1.6);
+      this.lookOffset.set(0, -0.2, 0.8);
+    } else {
+      // 横長でも下端はデッキが取る。画角が狭いぶん寄って見えるので少し引く
+      this.camOffset.set(0, 0.8, 2.6);
+      this.lookOffset.set(0, -0.15, 1.3);
+    }
   }
 
   /** 画面上の位置を返す。HPバーなどをDOMで置く場合に使う */

@@ -5,6 +5,7 @@ import type { BattleEvent, Side } from '../../game/battle/types';
 import { getRevos } from '../../game/data/revos';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
+import { revosIcon } from '../revosIcon';
 
 interface UnitCard {
   uid: string;
@@ -15,6 +16,31 @@ interface UnitCard {
   odBtn?: HTMLButtonElement;
   alive: boolean;
   maxHp: number;
+  /** アイコンの外枠。クールタイムのリングとスイープを持つ */
+  icon: HTMLElement;
+  /** 表示中の充填率。シミュレータの離散更新を補間してなめらかに見せる */
+  cd: number;
+  cdReady: boolean;
+}
+
+/** 行動が回る AV のしきい値（simulate.ts と同じ） */
+const AV_THRESHOLD = 10000;
+
+/**
+ * クールタイム表示つきのアイコン。
+ *
+ * 数字ではなくリングで出す。オートバトルの視線はフィールドに置かれていて、
+ * カードは視野の端でしか読まれない——端で読めるのは色と角度だけ。
+ */
+function unitIcon(defId: string, foe: boolean): HTMLElement {
+  const wrap = h('div', { class: `unit-icon${foe ? ' unit-icon--foe' : ''}` });
+  wrap.style.setProperty('--cd', '0');
+  wrap.append(
+    revosIcon(defId),
+    h('i', { class: 'unit-cd' }),
+    h('i', { class: 'unit-cd-ring' }),
+  );
+  return wrap;
 }
 
 /**
@@ -114,27 +140,34 @@ export class BattleScreen extends Screen {
       const od = bar('bar--od bar--slim', f.od / 100);
       const hpText = h('span', { class: 'num card-hp', text: `${f.hp}` });
 
+      const icon = unitIcon(f.defId, f.side === 1);
+
       if (f.side === 0) {
         // 自軍カードは OD ボタンを兼ねる。介入点をここ1箇所に集約する
         const btn = button('', () => this.tryOd(f.uid), { class: 'ally-card' });
+        // 名前は1行まるごと使う。アイコンの横に置くと3列では必ず省略が出る
         btn.append(
           h('div', { class: 'card-top' },
+            icon,
             h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
-            h('span', { class: 'card-name', text: def.name }),
           ),
+          h('span', { class: 'card-name', text: def.name }),
           hp.el,
           h('div', { class: 'card-row' }, hpText, h('span', { class: 'card-od-label', text: 'OD' }), od.el),
         );
         this.allyRow.appendChild(btn);
-        this.allyCards.push({ uid: f.uid, el: btn, hp, od, hpText, odBtn: btn, alive: true, maxHp: f.maxHp });
+        this.allyCards.push({ uid: f.uid, el: btn, hp, od, hpText, odBtn: btn, alive: true, maxHp: f.maxHp, icon, cd: 0, cdReady: false });
       } else {
         const el = h('div', { class: 'enemy-card' },
-          h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
+          h('div', { class: 'card-top' },
+            icon,
+            h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
+          ),
           h('span', { class: 'card-name', text: def.name }),
           hp.el,
         );
         this.enemyRow.appendChild(el);
-        this.enemyCards.push({ uid: f.uid, el, hp, od, hpText, alive: true, maxHp: f.maxHp });
+        this.enemyCards.push({ uid: f.uid, el, hp, od, hpText, alive: true, maxHp: f.maxHp, icon, cd: 0, cdReady: false });
       }
     }
   }
@@ -282,10 +315,40 @@ export class BattleScreen extends Screen {
   }
 
   update(dt: number): void {
+    this.updateCooldowns(dt);
+
     this.orderTimer += dt;
     if (this.orderTimer < 0.12) return;
     this.orderTimer = 0;
     this.renderOrder();
+  }
+
+  /**
+   * 攻撃間隔の可視化。
+   *
+   * シミュレータの AV は1行動ぶんまとめて進むので、そのまま流すと段階的に跳ねる。
+   * 指数補間で追従させて、見かけ上は連続的に溜まるようにする。
+   * 必殺技のあとに大きく戻るのも、この減る向きの補間でそのまま伝わる。
+   */
+  private updateCooldowns(dt: number): void {
+    const k = 1 - Math.exp(-dt * 7);
+    for (const c of [...this.allyCards, ...this.enemyCards]) {
+      const f = this.player.sim.fighters.find((x) => x.uid === c.uid);
+      if (!f) continue;
+
+      const target = f.alive ? clamp01(f.av / AV_THRESHOLD) : 0;
+      c.cd += (target - c.cd) * k;
+      if (Math.abs(target - c.cd) < 0.002) c.cd = target;
+      c.icon.style.setProperty('--cd', c.cd.toFixed(3));
+
+      // OD が満ちていれば次は特殊攻撃。リングの色で予告する
+      const ready = f.alive && f.od >= 100;
+      if (ready !== c.cdReady) {
+        c.cdReady = ready;
+        c.icon.classList.toggle('is-charged', ready);
+      }
+      c.icon.classList.toggle('is-full', f.alive && c.cd > 0.97);
+    }
   }
 
   /**
@@ -306,7 +369,7 @@ export class BattleScreen extends Screen {
         h('div', {
           class: `order-pip order-pip--${def.element} ${it.f.side === 0 ? 'is-ally' : 'is-foe'} ${i === 0 ? 'is-next' : ''}`,
           title: def.name,
-        }, h('span', { text: def.name.slice(0, 2) })),
+        }, revosIcon(def.id)),
       );
     });
   }
@@ -318,4 +381,8 @@ export class BattleScreen extends Screen {
   exit(): void {
     clear(this.ui.toastArea);
   }
+}
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
 }

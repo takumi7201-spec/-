@@ -29,6 +29,16 @@ class Prng {
 }
 
 const AV_THRESHOLD = 10000;
+
+/** OD技を撃った後に空く追加の間隔（通常攻撃1回ぶんを1.0として） */
+const OD_RECOVERY: Record<string, number> = {
+  // 単体
+  faultcrush: 0.5, flamevolley: 0.5, vortexfang: 0.5, obsidiancut: 0.5, faulthaul: 0.55,
+  // 全体
+  galerend: 0.9, scorchring: 0.8, erosionstorm: 0.8, greateruption: 0.85,
+  // 支援：撃っても攻め手が止まらないよう隙を小さく
+  rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28,
+};
 const MAX_TURNS = 200;
 
 /** レベル補正。Lv30 でおよそ 2.6 倍 */
@@ -82,7 +92,7 @@ function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
       statuses: [],
       shield: null,
       stance: setup.stances?.[slot] ?? 'balanced',
-      targetPref: setup.targetPrefs?.[slot] ?? 'weakest',
+      targetPref: setup.targetPrefs?.[slot] ?? def.defaultPref,
       stacks: {},
       promoteDelay: 0,
       draggedTurns: 0,
@@ -192,7 +202,7 @@ export class BattleSim {
       const st = actor.stacks.sediment ?? 0;
       if (st < 5) {
         actor.stacks.sediment = st + 1;
-        this.addMod(actor, { kind: 'def', value: 0.08, turns: 999, source: 'sediment' }, ev, '堆積');
+        this.addMod(actor, { kind: 'def', value: 0.09, turns: 999, source: 'sediment' }, ev, '堆積');
       }
     }
     // 「共鳴」: 味方全体の OD を押し上げる
@@ -349,12 +359,12 @@ export class BattleSim {
       case 'galerend': {
         ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
         for (const e of enemies) this.dealDamage(actor, e, power, ev);
-        actor.av += 5000;
+        actor.av += 3200;
         break;
       }
       case 'rockaegis': {
         ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: allies.map((a) => a.uid) });
-        const amount = Math.round(actor.def * 2.2 * (1 + this.modSum(actor, 'def')));
+        const amount = Math.round(actor.def * 3.0 * (1 + this.modSum(actor, 'def')));
         for (const a of allies) {
           a.shield = { amount, turns: 4 };
           ev.push({ t: 'shield', uid: a.uid, amount });
@@ -420,7 +430,7 @@ export class BattleSim {
           this.dealDamage(actor, e, power, ev);
           if (e.alive) this.applyBurn(e, ev, actor.uid);
         }
-        const self = Math.round(actor.maxHp * 0.2);
+        const self = Math.round(actor.maxHp * 0.12);
         actor.hp = Math.max(1, actor.hp - self);
         ev.push({ t: 'damage', uid: actor.uid, from: actor.uid, amount: self, crit: false, eff: 1, hp: actor.hp, shielded: 0 });
         break;
@@ -428,6 +438,9 @@ export class BattleSim {
     }
     actor.od = 0;
     ev.push({ t: 'od', uid: actor.uid, value: 0 });
+    // 特殊攻撃のあとは隙ができる。隙の大きさは技の重さに比例させる。
+    // 一律にすると、全体攻撃と支援技が同じ代償になってしまう
+    actor.av -= AV_THRESHOLD * OD_RECOVERY[id];
   }
 
   // ------------------------------------------------------------ 計算
@@ -440,7 +453,10 @@ export class BattleSim {
     atk: Fighter, def: Fighter, power: number, roll: boolean,
   ): { amount: number; crit: boolean; eff: 1.5 | 1 | 0.7 } {
     const atkStat = atk.atk * clamp(1 + this.modSum(atk, 'atk'), 0.3, 3);
-    const defStat = def.def * clamp(1 + this.modSum(def, 'def'), 0.3, 3);
+    let defStat = def.def * clamp(1 + this.modSum(def, 'def'), 0.3, 3);
+    // 「硬い敵優先」は狙いを定めて継ぎ目を突く：防御を15%無視する。
+    // これが無いと、通りにくい相手を選ぶだけの損な作戦になる
+    if (atk.targetPref === 'defense') defStat *= 0.90;
     // 除算形の防御。減算形だと DEF を伸ばした瞬間ダメージ0になり戦闘が終わらなくなる
     const dr = 150 / (150 + defStat);
     let base = 4.15 * (power / 100) * atkStat * dr;
@@ -449,16 +465,25 @@ export class BattleSim {
     if (passiveOf(atk) === 'immutable' || passiveOf(def) === 'immutable') eff = 1;
 
     const posAtk = atk.row === 'front' ? 1.15 : 0.9;
-    const posDef = def.row === 'front' ? 1.0 : 0.8;
+    // 後列は本来 0.8 だが、「後衛優先」で狙い続けているなら軽減を緩める
+    const backGuard = atk.targetPref === 'back' ? 0.95 : 0.8;
+    const posDef = def.row === 'front' ? 1.0 : backGuard;
 
     let buff = (1 + this.modSum(atk, 'dealt')) * (1 + this.modSum(def, 'taken'));
     buff *= this.formations[atk.side].allDamageDealt;
     buff *= this.formations[def.side].allDamageTaken;
     if (atk.row === 'front') buff *= this.formations[atk.side].frontDamage;
 
+    // 「支援役優先」は狙った相手に限り通りをよくする。
+    // 支援役は後列にいることが多く、位置補正で威力が死んでいた
+    if (atk.targetPref === 'support') {
+      const role = getRevos(def.defId).role;
+      if (role === 'Healer' || role === 'Buffer' || role === 'Debuffer') buff *= 1.22;
+    }
+
     const pa = passiveOf(atk);
     if (pa === 'deeppressure' && def.spd >= atk.spd + 20) buff *= 1.14;
-    if (pa === 'traction' && def.row === 'back') buff *= 1.26;
+    if (pa === 'traction' && def.row === 'back') buff *= 1.34;
     if (pa === 'overheat') buff *= 1 + 0.25 * (1 - atk.hp / atk.maxHp);
     const pd = passiveOf(def);
     if (pd === 'subsidence' && def.row === 'front') buff *= 0.85;
@@ -500,7 +525,7 @@ export class BattleSim {
 
     // 「熱反射」
     if (passiveOf(target) === 'heatreflect' && remaining > 0 && atk.alive && atk !== target) {
-      const back = Math.max(1, Math.round(remaining * 0.18));
+      const back = Math.max(1, Math.round(remaining * 0.15));
       atk.hp = Math.max(0, atk.hp - back);
       ev.push({ t: 'passive', uid: target.uid, label: '熱反射' });
       ev.push({ t: 'damage', uid: atk.uid, from: target.uid, amount: back, crit: false, eff: 1, hp: atk.hp, shielded: 0 });
@@ -613,12 +638,30 @@ export class BattleSim {
       return w;
     });
 
-    // 方針による重み付け。完全なランダムにはしない（観戦していて理不尽に見える）
+    // 作戦による重み付け。完全なランダムにはしない
+    // （観戦しかできないプレイヤーには理不尽にしか見えない）
     const bias = enemies.map((e, i) => {
       let b = weights[i];
-      if (actor.targetPref === 'weakest') b *= 1 + (1 - e.hp / e.maxHp) * 1.2;
-      else if (actor.targetPref === 'strongest') b *= 1 + (e.atk / 160) * 0.8;
-      else if (actor.targetPref === 'backline' && e.row === 'back') b *= 2.2;
+      const def = getRevos(e.defId);
+      switch (actor.targetPref) {
+        case 'front':
+          b *= e.row === 'front' ? 1.7 : 1;
+          break;
+        case 'back':
+          b *= e.row === 'back' ? 2.4 : 1;
+          break;
+        case 'lowhp':
+          // 集中砲火は元々強いので、重みは控えめでも充分に機能する
+          b *= 1 + Math.pow(1 - e.hp / e.maxHp, 1.5) * 1.6;
+          break;
+        case 'defense':
+          b *= 1 + (e.def / 150) * 1.25;
+          break;
+        case 'support':
+          b *= def.role === 'Healer' || def.role === 'Buffer' ? 2.4
+            : def.role === 'Debuffer' ? 1.5 : 1;
+          break;
+      }
       if (actor.stance === 'aggressive') {
         const est = this.estimateDamage(actor, e, actor.basicPower);
         if (est >= e.hp) b *= 3;

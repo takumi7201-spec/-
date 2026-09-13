@@ -142,7 +142,7 @@ async function main(): Promise<void> {
   }
 
   async function startBattle(): Promise<void> {
-    const mine = buildTeamSetup(data.roster, data.party.order, data.party.formation);
+    const mine = buildTeamSetup(data.roster, data.party.order, data.party.formation, data.party.targetPrefs);
     if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); goHome(); return; }
     boot.classList.remove('hidden');
     await progress(0.4, '闘技場を生成しています…');
@@ -270,7 +270,7 @@ async function main(): Promise<void> {
       data.player.coins += coins;
       rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
 
-      const setup = buildTeamSetup(data.roster, data.party.order, data.party.formation);
+      const setup = buildTeamSetup(data.roster, data.party.order, data.party.formation, data.party.targetPrefs);
       const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
       setup?.members.forEach((m, i) => {
         const unit = data.roster.find((r) => r.uid === m.uid);
@@ -302,9 +302,10 @@ async function main(): Promise<void> {
   };
 
   partyScreen.onBack = () => goHome();
-  partyScreen.onApply = (order, formation) => {
+  partyScreen.onApply = (order, formation, prefs) => {
     data.party.order = order;
     data.party.formation = formation;
+    data.party.targetPrefs = prefs;
     writeSave(data);
     ui.toast('編成を保存した', 'info', 1600);
     goHome();

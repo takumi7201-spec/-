@@ -5,15 +5,24 @@
  */
 import { BattleSim } from '../src/game/battle/simulate.ts';
 import { REVOS } from '../src/game/data/revos.ts';
-import type { TeamSetup, FormationId, BattleEvent } from '../src/game/battle/types.ts';
+import type { TeamSetup, FormationId, BattleEvent, TargetPref } from '../src/game/battle/types.ts';
 
 const FORMS: FormationId[] = ['wedge', 'ring', 'rush', 'metro'];
 
-function mkTeam(ids: string[], form: FormationId, level: number, clean: number, tag: string): TeamSetup {
+/**
+ * 作戦はユニット固有の強さではなく戦術なので、性能比較では固定する。
+ * 種ごとの推奨作戦のまま測ると「作戦の有利不利」がユニットの勝率に
+ * 化けて、どちらを直すべきか読めなくなる。
+ */
+function mkTeam(
+  ids: string[], form: FormationId, level: number, clean: number, tag: string,
+  pref: TargetPref = 'front',
+): TeamSetup {
   return {
     members: ids.map((id, i) => ({ uid: `${tag}${i}`, defId: id, level, clean, skillLevel: 1 })),
     order: [0, 1, 2],
     formation: form,
+    targetPrefs: [pref, pref, pref],
   };
 }
 

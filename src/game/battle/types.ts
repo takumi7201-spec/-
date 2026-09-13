@@ -3,7 +3,16 @@ import type { ElementId } from '../../voxel/palette';
 export type Row = 'front' | 'back';
 export type Side = 0 | 1;
 export type Stance = 'aggressive' | 'balanced' | 'conservative';
-export type TargetPref = 'weakest' | 'strongest' | 'backline';
+/** 作戦。誰から狙うかだけを決める */
+export type TargetPref = 'front' | 'back' | 'lowhp' | 'defense' | 'support';
+
+export const TARGET_PREFS: { id: TargetPref; name: string; desc: string }[] = [
+  { id: 'front', name: '前衛優先', desc: '前に出ている敵から崩す' },
+  { id: 'back', name: '後衛優先', desc: '奥の敵を狙う' },
+  { id: 'lowhp', name: '手負い優先', desc: 'HPの減った敵を仕留める' },
+  { id: 'defense', name: '硬い敵優先', desc: '守りの厚い敵から削る' },
+  { id: 'support', name: '支援役優先', desc: '回復・強化役を先に潰す' },
+];
 export type FormationId = 'wedge' | 'ring' | 'rush' | 'metro';
 
 export interface Formation {

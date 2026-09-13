@@ -67,7 +67,7 @@ export function defaultSave(): SaveData {
       order: null,
       formation: 'wedge',
       stances: ['balanced', 'balanced', 'balanced'],
-      targetPrefs: ['weakest', 'weakest', 'weakest'],
+      targetPrefs: ['front', 'lowhp', 'support'],
     },
     stock: [],
     dex: [],
@@ -95,12 +95,14 @@ const DEF_ID_ALIASES: Record<string, string> = {
   cerciwing: 'pteranodon',
   terracrest: 'triceratops',
   pyroceras: 'goyocephale',
-  nereidon: 'mosasaurus',
+  nereidon: 'shonisaurus',
   zepharis: 'velociraptor',
   obsidon: 'tyrannosaurus',
   luminax: 'pachycephalosaurus',
   tectos: 'iguanodon',
   volcanix: 'spinosaurus',
+  // スプライト差し替え時の暫定名から正式名へ
+  mosasaurus: 'shonisaurus',
 };
 
 /** 既存プレイヤーの手持ち・図鑑・ストックを新IDへ移す */

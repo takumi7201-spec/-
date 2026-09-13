@@ -1,7 +1,7 @@
 import { REVOS, getRevos } from './data/revos';
 import type { OwnedRevos, SaveData } from '../core/Save';
 import { makeUid } from '../core/Save';
-import type { FormationId, TeamSetup } from './battle/types';
+import type { FormationId, TargetPref, TeamSetup } from './battle/types';
 import { Rng } from '../voxel/VoxelPainter';
 
 /** 所持ユニットから編成を作る。足りなければ先頭から埋める */
@@ -9,6 +9,7 @@ export function buildTeamSetup(
   roster: OwnedRevos[],
   order: [string, string, string] | null,
   formation: FormationId,
+  prefs?: TargetPref[],
 ): TeamSetup | null {
   if (roster.length === 0) return null;
   const byUid = new Map(roster.map((r) => [r.uid, r]));
@@ -25,8 +26,9 @@ export function buildTeamSetup(
   }
   while (picked.length < 3) picked.push(picked[picked.length % Math.max(1, picked.length)]);
 
+  const members = picked.slice(0, 3);
   return {
-    members: picked.slice(0, 3).map((r) => ({
+    members: members.map((r) => ({
       uid: r.uid,
       defId: r.defId,
       level: r.level,
@@ -35,6 +37,8 @@ export function buildTeamSetup(
     })),
     order: [0, 1, 2],
     formation,
+    // 未設定のスロットは各リヴォスの推奨作戦で埋める
+    targetPrefs: members.map((r, i) => prefs?.[i] ?? getRevos(r.defId).defaultPref),
   };
 }
 
@@ -79,7 +83,7 @@ export function buildEnemyTeam(stage: number, seed: number): TeamSetup {
 /** 初回起動時の配布。属性が偏らない3体を渡す */
 export function grantStarters(data: SaveData): void {
   if (data.roster.length > 0) return;
-  for (const defId of ['ankylosaurus', 'yutyrannus', 'mosasaurus']) {
+  for (const defId of ['ankylosaurus', 'yutyrannus', 'shonisaurus']) {
     data.roster.push({
       uid: makeUid(),
       defId,
