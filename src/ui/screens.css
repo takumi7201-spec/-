@@ -517,3 +517,124 @@ body[data-layout='wide'] .party-field { grid-template-columns: repeat(3, 180px);
   pointer-events: none;
 }
 .screen--party > *, .screen--dex > * { position: relative; }
+
+/* =========================================================================
+   発掘中の持ち物パネル
+   左に情報を積み、右半分はフィールドを見せたままにする。
+   ========================================================================= */
+.inv {
+  position: absolute;
+  top: calc(var(--safe-t) + 62px);
+  left: calc(var(--gutter) + var(--safe-l));
+  width: min(272px, 72%);
+  max-height: calc(100dvh - var(--safe-t) - 62px - 208px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  pointer-events: auto;
+  scrollbar-width: none;
+}
+.inv::-webkit-scrollbar { display: none; }
+.inv.is-open { animation: inv-in 220ms var(--ease); }
+.inv.is-closing { animation: inv-out 200ms var(--ease) forwards; }
+@keyframes inv-in {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes inv-out {
+  to { opacity: 0; transform: translateX(-10px); }
+}
+
+.inv-panel {
+  background: #171310;
+  border: 2px solid #0c0906;
+  border-radius: var(--r-md);
+  padding: 9px 11px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+}
+
+.inv-head { display: flex; align-items: center; gap: 8px; }
+.inv-icon {
+  width: 22px; height: 22px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: #241d17;
+  color: var(--sand, #e5d2ae);
+  font-size: 13px;
+}
+.inv-label {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.18em;
+  color: var(--bone);
+}
+.inv-count { margin-left: auto; font-size: 12px; color: var(--text-dim); }
+
+.inv-title { font-size: 15px; font-weight: 800; letter-spacing: 0.02em; }
+.inv-sub { font-size: 10px; color: var(--text-faint); line-height: 1.6; font-style: italic; }
+.inv-panel .bar { height: 10px; border-radius: var(--r-pill); border-width: 2px; }
+.inv-panel .bar > i { background: linear-gradient(90deg, var(--amber-dim, #b07a24), var(--amber)); }
+
+/* ---- アイテム格子 ---- */
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 3px;
+}
+.inv-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--r-sm);
+  background: #221b16;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.inv-cell.is-empty { background: #1b1611; }
+.inv-cell--mineral { background: #1f2229; }
+.inv-silho { display: block; width: 84%; height: 84%; object-fit: contain; image-rendering: pixelated; }
+.inv-mineral { font-size: 17px; color: var(--lagoon); }
+.inv-qty {
+  position: absolute; right: 2px; bottom: 1px;
+  font-size: 10px; font-weight: 800; color: var(--bone);
+  text-shadow: 0 1px 0 #000, 0 0 3px #000;
+}
+
+.inv-pager { margin-left: auto; display: flex; align-items: center; gap: 5px; }
+.inv-page-btn {
+  background: none; border: 0; color: var(--text-dim);
+  font-size: 11px; padding: 2px 3px; cursor: pointer; line-height: 1;
+}
+.inv-dot { width: 5px; height: 5px; border-radius: 50%; background: #3a2f26; }
+.inv-dot.is-on { background: var(--bone); }
+
+/* ---- 編成 ---- */
+.inv-form-list { display: flex; flex-direction: column; gap: 5px; }
+.inv-form-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 4px 6px;
+  background: #221b16;
+  border-radius: var(--r-sm);
+  border-left: 3px solid transparent;
+}
+.inv-form-row.is-front { border-left-color: var(--amber); }
+.inv-form-row .inv-silho { width: 26px; height: 26px; flex: none; }
+.inv-form-main { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.inv-form-name { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.inv-form-sub { font-size: 10px; color: var(--text-faint); letter-spacing: 0.04em; }
+.inv-empty { font-size: 11px; color: var(--text-faint); padding: 4px 0; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.dot--flame { background: var(--el-flame); }
+.dot--aqua { background: var(--el-aqua); }
+.dot--terra { background: var(--el-terra); }
+.dot--gale { background: var(--el-gale); }
+.dot--null { background: var(--el-null); }
+
+/* 持ち物を開いている間はミニマップを畳む。左右で情報が競合する */
+.screen--dig.inv-open .rail--r { opacity: 0; pointer-events: none; }
+body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); }

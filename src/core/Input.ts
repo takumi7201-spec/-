@@ -11,7 +11,7 @@ export interface Vec2 {
   y: number;
 }
 
-export type ActionName = 'radar' | 'interact' | 'dash' | 'menu' | 'confirm' | 'cancel';
+export type ActionName = 'radar' | 'interact' | 'dash' | 'menu' | 'confirm' | 'cancel' | 'inventory';
 
 const KEY_MAP: Record<string, ActionName> = {
   Space: 'radar',
@@ -19,6 +19,7 @@ const KEY_MAP: Record<string, ActionName> = {
   KeyF: 'interact',
   ShiftLeft: 'dash',
   ShiftRight: 'dash',
+  KeyI: 'inventory',
   Escape: 'menu',
   Enter: 'confirm',
   Backspace: 'cancel',

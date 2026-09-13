@@ -48,6 +48,8 @@ export interface CreatureSpec {
 
 export interface VoxelPart {
   name: string;
+  /** シルエット投影で親のZオフセットを引き継ぐための作業領域 */
+  parentZ?: number;
   grid: VoxelGrid;
   /** 親ローカルでのピボット位置（ボクセル単位） */
   pivot: [number, number, number];

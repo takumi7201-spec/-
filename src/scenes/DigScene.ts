@@ -85,6 +85,9 @@ export class DigScene {
   private camRay = new THREE.Vector3();
   private tmpDir = new THREE.Vector3();
   private scanBlend = 0;
+  /** 画面のどれだけ右に被写体を寄せるか 0..1。持ち物を開いたときに使う */
+  private viewShift = 0;
+  private viewShiftTarget = 0;
   private depthM = 0;
 
   constructor(quality: QualitySettings) {
@@ -616,6 +619,9 @@ export class DigScene {
 
   // ------------------------------------------------------------ カメラ
 
+  /** 左にパネルを出すとき、プレイヤーを画面の右へ逃がす */
+  setViewShift(v: number): void { this.viewShiftTarget = v; }
+
   setMode(mode: DigMode): void {
     if (this.mode === mode) return;
     this.mode = mode;
@@ -666,8 +672,17 @@ export class DigScene {
     this.camPos.lerp(goal, Math.min(1, dt * target));
     this.camera.position.copy(this.camPos);
 
+    this.viewShift += (this.viewShiftTarget - this.viewShift) * Math.min(1, dt * 5);
+    // 注視点をカメラの左へずらすと、被写体は画面の右に寄る
+    const rx = -Math.cos(this.camYaw);
+    const rz = Math.sin(this.camYaw);
+    const shift = this.viewShift * 1.5;
     this.camTarget.lerp(
-      this.tmpV.set(this.pos.x, this.pos.y + (this.mode === 'scan' ? 0.2 : 1.0), this.pos.z),
+      this.tmpV.set(
+        this.pos.x - rx * shift,
+        this.pos.y + (this.mode === 'scan' ? 0.2 : 1.0),
+        this.pos.z - rz * shift,
+      ),
       Math.min(1, dt * 8),
     );
     this.camera.lookAt(this.camTarget);

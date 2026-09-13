@@ -1,5 +1,7 @@
 import { Screen, type LayoutKind } from '../UIRoot';
 import { h, button, bar, clear } from '../dom';
+import { InventoryPanel, type InventoryContext } from '../InventoryPanel';
+import type { SaveData } from '../../core/Save';
 import type { DigScene } from '../../scenes/DigScene';
 import type { BuriedNode } from '../../game/TerrainGen';
 import { AREA_VOX, VOXEL_SIZE } from '../../game/TerrainGen';
@@ -29,6 +31,10 @@ export class DigScreen extends Screen {
   private mapTimer = 0;
   private echoRemain = 0;
   private mapRange: { lo: number; hi: number } | null = null;
+
+  private inv = new InventoryPanel();
+  private save: SaveData | null = null;
+  private haul: { defId: string; rarity: number; kind: 'fossil' | 'mineral' }[] = [];
 
   onExit?: () => void;
   onFinish?: () => void;
@@ -91,13 +97,14 @@ export class DigScreen extends Screen {
 
     const deck = h('div', { class: 'deck deck--dig' },
       h('div', { class: 'deck-left' },
+        button('持ち物', () => this.toggleInventory(), { class: 'btn--sm btn--ghost', key: 'I' }),
         button('俯瞰', () => this.toggleScan(), { class: 'btn--sm btn--ghost', key: 'Q' }),
         button('引き上げる', () => this.leave(), { class: 'btn--sm btn--ghost' }),
       ),
       h('div', { class: 'deck-right' }, this.echoBtn, this.digBtn),
     );
 
-    this.el.append(strip, rail, this.scanFrame, this.stickEl, deck);
+    this.el.append(strip, rail, this.scanFrame, this.stickEl, this.inv.el, deck);
   }
 
   enter(): void {
@@ -125,9 +132,12 @@ export class DigScreen extends Screen {
       this.ui.flash('#f4a23c', 0.3);
     };
     this.scene.events.onCollect = (n) => {
+      this.haul.push({ defId: n.speciesId, rarity: n.rarity, kind: n.kind });
       this.onCollectFossil?.(n);
       this.onCollect(n);
       this.updateFinds();
+      const ctx = this.invContext();
+      if (ctx) this.inv.update(ctx);
     };
     this.scene.events.onDigBlocked = () => {
       this.ui.toast('岩盤に当たった。ここはもう掘れない', 'warn', 1800);
@@ -142,6 +152,9 @@ export class DigScreen extends Screen {
       this.echoBtn.classList.toggle('is-cooling', remain > 0);
     };
     this.mapRange = null;
+    this.haul = [];
+    this.inv.close();
+    this.el.classList.remove('inv-open');
     this.updateFinds();
   }
 
@@ -172,6 +185,37 @@ export class DigScreen extends Screen {
     this.scene.requestEcho();
   }
 
+  /** ゲーム側の保存データを渡す。編成の表示に使う */
+  setSave(d: SaveData): void { this.save = d; }
+
+  private invContext(): InventoryContext | null {
+    if (!this.save || !this.scene.site) return null;
+    const total = this.scene.site.nodes.length;
+    return {
+      biome: this.scene.biomeId,
+      haul: this.haul,
+      found: total - this.scene.remainingFinds,
+      total,
+      data: this.save,
+    };
+  }
+
+  private toggleInventory(): void {
+    if (this.inv.isOpen) {
+      audio.uiBack();
+      this.inv.close();
+      this.el.classList.remove('inv-open');
+      this.scene.setViewShift(0);
+      return;
+    }
+    const ctx = this.invContext();
+    if (!ctx) return;
+    audio.uiTap();
+    this.inv.open(ctx);
+    this.el.classList.add('inv-open');
+    this.scene.setViewShift(1);
+  }
+
   private leave(): void {
     audio.uiTap();
     void this.ui.confirm('発掘を終える', '掘り出した化石を持って引き上げます。', '引き上げる')
@@ -194,6 +238,13 @@ export class DigScreen extends Screen {
     this.stickEl.style.left = `${ox}px`;
     this.stickEl.style.top = `${oy}px`;
     this.stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  }
+
+  get inventoryOpen(): boolean { return this.inv.isOpen; }
+
+  /** キーボードからの開閉。ゲームループから毎フレーム呼ぶ */
+  pollInventoryKey(pressed: boolean): void {
+    if (pressed) this.toggleInventory();
   }
 
   update(dt: number): void {
@@ -263,6 +314,9 @@ export class DigScreen extends Screen {
   }
 
   exit(): void {
+    this.inv.close();
+    this.el.classList.remove('inv-open');
+    this.scene.setViewShift(0);
     clear(this.ui.toastArea);
   }
 }

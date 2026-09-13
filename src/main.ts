@@ -124,6 +124,7 @@ async function main(): Promise<void> {
     renderer.setScene(dig.scene, dig.camera);
     renderer.invalidateShadows();
     await progress(1, '準備完了');
+    digScreen.setSave(data);
     ui.show('dig');
     audio.startMusic('dig');
     setTimeout(() => boot.classList.add('hidden'), 240);
@@ -204,6 +205,7 @@ async function main(): Promise<void> {
     }
   };
 
+  digScreen.setSave(data);
   digScreen.onCollectFossil = (n) => {
     if (n.kind === 'fossil') runFossils.push({ defId: n.speciesId, rarity: n.rarity });
     else data.player.coins += 40 + n.rarity * 20;
@@ -425,7 +427,10 @@ async function main(): Promise<void> {
     input.beginFrame();
     switch (ui.currentName) {
       case 'dig':
-        dig.update(dt, input, true);
+        // 持ち物を開いている間はフィールド操作を止める。
+        // 3D は動かし続けるので、自分がどこに立っているかは見えたまま
+        digScreen.pollInventoryKey(input.justPressed('inventory'));
+        dig.update(dt, input, !digScreen.inventoryOpen);
         if (dig.consumeShadowDirty()) renderer.invalidateShadows();
         break;
       case 'battle':
