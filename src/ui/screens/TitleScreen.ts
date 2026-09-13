@@ -35,7 +35,7 @@ export class TitleScreen extends Screen {
         this.newBtn,
         button('バトルを試す', () => { audio.uiTap(); this.onBattle?.(); }, { class: 'btn--ghost' }),
         h('div', { class: 'row' },
-          button('設定', () => { audio.uiTap(); this.onSettings?.(); }, { class: 'btn--sm btn--ghost' }),
+          button('操作を左右反転', () => { audio.uiTap(); this.onSettings?.(); }, { class: 'btn--sm btn--ghost' }),
           button('図鑑', () => { audio.uiTap(); this.ui.toast('図鑑は準備中'); }, { class: 'btn--sm btn--ghost' }),
         ),
         h('div', { class: 'title-ver', text: 'v0.1.0 — 発掘オートバトル' }),

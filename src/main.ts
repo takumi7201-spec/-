@@ -92,6 +92,13 @@ async function main(): Promise<void> {
 
   input.onStickChange = (a, ox, oy, dx, dy) => digScreen.setStick(a, ox, oy, dx, dy);
 
+  // 右半分で移動・左半分で視点。主アクションも移動と反対側の親指へ寄せる
+  const applyHand = (): void => {
+    input.setSwapSides(data.settings.swapSides);
+    document.body.dataset.hand = data.settings.swapSides ? 'left' : 'right';
+  };
+  applyHand();
+
   // ---------------------------------------------------------------- 遷移
 
   function goHome(): void {
@@ -169,7 +176,15 @@ async function main(): Promise<void> {
     goHome();
   };
   title.onBattle = () => { grantStarters(data); writeSave(data); void startBattle(); };
-  title.onSettings = () => ui.toast('設定は準備中', 'info');
+  title.onSettings = () => {
+    data.settings.swapSides = !data.settings.swapSides;
+    applyHand();
+    writeSave(data);
+    ui.toast(
+      data.settings.swapSides ? '操作：右で移動 / 左で視点' : '操作：左で移動 / 右で視点',
+      'info', 2200,
+    );
+  };
   title.setHasSave(data.stats.runs > 0 || data.roster.length > 0);
 
   homeScreen.onGo = (where) => {

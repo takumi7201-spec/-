@@ -40,7 +40,8 @@ export interface SaveData {
   daily: { date: string; runs: number };
   settings: {
     quality: QualityTier | 'auto';
-    leftHanded: boolean;
+    /** true: 右半分で移動・左半分で視点（既定） */
+    swapSides: boolean;
     sfx: number;
     bgm: number;
     battleSpeed: 1 | 2 | 3;
@@ -76,7 +77,7 @@ export function defaultSave(): SaveData {
     daily: { date: todayKey(), runs: 0 },
     settings: {
       quality: 'auto',
-      leftHanded: false,
+      swapSides: true,
       sfx: 0.8,
       bgm: 0.5,
       battleSpeed: 1,

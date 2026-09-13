@@ -45,6 +45,10 @@
 
 /* ---- 発掘デッキ ---- */
 .deck--dig { justify-content: space-between; align-items: flex-end; }
+/* 移動が画面右になったので、主アクションは左側の親指へ移す */
+body[data-hand='left'] .deck--dig { flex-direction: row-reverse; }
+body[data-hand='left'] .deck--dig .deck-right { flex-direction: row-reverse; }
+body[data-hand='left'] .rail--r { right: auto; left: calc(var(--gutter) + var(--safe-l)); top: 108px; }
 .deck-left { display: flex; flex-direction: column; gap: 8px; }
 .deck-right { display: flex; align-items: flex-end; gap: 12px; }
 

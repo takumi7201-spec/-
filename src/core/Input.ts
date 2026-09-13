@@ -48,6 +48,8 @@ export class InputManager {
   private actionsReleased = new Set<ActionName>();
   private touches = new Map<number, TouchState>();
   private mouseLooking = false;
+  /** 画面の左右どちらで移動するか。true で「右が移動・左が視点」 */
+  private swapSides = true;
   private el: HTMLElement;
   private stickRadius = 64;
   private lookSensitivity = 1;
@@ -70,6 +72,14 @@ export class InputManager {
   setLookSensitivity(v: number): void {
     this.lookSensitivity = v;
   }
+
+  /** true: 右半分で移動・左半分で視点 / false: その逆 */
+  setSwapSides(v: boolean): void {
+    this.swapSides = v;
+    this.reset();
+  }
+
+  get sidesSwapped(): boolean { return this.swapSides; }
 
   private bind(): void {
     addEventListener('keydown', this.onKeyDown);
@@ -127,7 +137,8 @@ export class InputManager {
     }
 
     const half = innerWidth * 0.5;
-    const role: TouchState['role'] = e.clientX < half ? 'move' : 'look';
+    const onLeft = e.clientX < half;
+    const role: TouchState['role'] = (this.swapSides ? !onLeft : onLeft) ? 'move' : 'look';
     this.touches.set(e.pointerId, {
       id: e.pointerId,
       originX: e.clientX,

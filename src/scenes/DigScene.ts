@@ -22,6 +22,8 @@ export interface DigEvents {
   onFossilTouched?(node: BuriedNode): void;
   onCollect?(node: BuriedNode): void;
   onDigBlocked?(): void;
+  /** 反応の真上だがまだ浅い。残り深度（メートル） */
+  onNearMiss?(node: BuriedNode, remain: number): void;
   onStaminaChange?(v: number, max: number): void;
   onEchoCooldown?(remain: number, total: number): void;
   onModeChange?(mode: DigMode): void;
@@ -33,8 +35,6 @@ const ECHO_RADIUS = 8;
 const ECHO_CD = 3.0;
 const ECHO_CHARGE = 0.6;
 const MAX_STAMINA = 45;
-/** 地表からこの割合だけ岩を剥がせば回収できる */
-const COLLECT_RATIO = 0.42;
 
 export class DigScene {
   readonly scene = new THREE.Scene();
@@ -69,6 +69,15 @@ export class DigScene {
   private charging = 0;
   private digCooldown = 0;
   private digging = false;
+  /** 一時的に開いている穴。時間が来たら埋め戻す */
+  private holes: { cells: { x: number; y: number; z: number; v: number }[]; t: number; life: number }[] = [];
+  /** 地点ごとの掘削深度（ボクセル単位）。地形は変えずここだけを進める */
+  private digDepth = new Map<number, number>();
+  /** 回収済みで埋め戻してはいけない化石ボクセル */
+  private collectedVoxels = new Set<string>();
+  private digMarker!: THREE.Mesh;
+  private markerPulse = 0;
+  private shadowCullTimer = 0;
   private shadowDirty = true;
   private lastChunkKey = '';
   private tmpV = new THREE.Vector3();
@@ -76,7 +85,6 @@ export class DigScene {
   private camRay = new THREE.Vector3();
   private tmpDir = new THREE.Vector3();
   private scanBlend = 0;
-  private lamp!: THREE.PointLight;
   private depthM = 0;
 
   constructor(quality: QualitySettings) {
@@ -99,10 +107,19 @@ export class DigScene {
       rimStrength: 0.26,
     });
 
-    // 発掘者のヘッドランプ。地下では太陽も半球光もほとんど届かない
-    this.lamp = new THREE.PointLight(0xffe4c4, 0, 14, 1.7);
-    this.lamp.castShadow = false;
-    this.scene.add(this.lamp);
+    // 掘る場所を常に示す。俯瞰視点では「自分の足元のどこを掘るか」が
+    // 体で隠れて読み取れない
+    const ringGeo = new THREE.RingGeometry(0.5, 0.72, 22);
+    ringGeo.rotateX(-Math.PI / 2);
+    this.digMarker = new THREE.Mesh(
+      ringGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0xf4a23c, transparent: true, opacity: 0.8,
+        depthWrite: false, fog: false,
+      }),
+    );
+    this.digMarker.renderOrder = 8;
+    this.scene.add(this.digMarker);
 
     this.debris = new DebrisSystem(Math.min(quality.maxParticles, 320), VOXEL_SIZE);
     this.scene.add(this.debris.mesh);
@@ -122,11 +139,9 @@ export class DigScene {
     this.scene.add(this.world.group);
 
     this.env.applyBiome(biome, this.scene);
-    const half = AREA_METERS / 2;
-    this.env.fitShadowToArea(
-      new THREE.Vector3(half, this.site.center.y, half),
-      half * 1.05,
-    );
+    // 40m 四方を1枚で覆うと 2048px でも 2cm/texel しかなく、
+    // ボクセルの角が甘くなる。プレイヤー周辺 17m に絞って追従させる
+    this.env.fitShadowToArea(this.pos.clone(), 17);
 
     if (!this.rig) {
       this.rig = buildCharacter(this.charMaterial);
@@ -181,7 +196,17 @@ export class DigScene {
     this.markers.update(dt);
     this.env.update(dt, this.camera.position);
 
+    this.updateHoles(dt);
     const built = this.world.update();
+
+    this.updateDigMarker(dt);
+
+    // 影を落とすのはプレイヤー周辺だけ。遠景の影は判別できない
+    this.shadowCullTimer += dt;
+    if (this.shadowCullTimer > 0.3) {
+      this.shadowCullTimer = 0;
+      this.world.setShadowRange(this.pos, 16);
+    }
     if (built > 0) this.shadowDirty = true;
 
     // 影はチャンクをまたいだときとメッシュが変わったときだけ焼き直す
@@ -189,6 +214,7 @@ export class DigScene {
     if (key !== this.lastChunkKey) {
       this.lastChunkKey = key;
       this.shadowDirty = true;
+      this.env.followShadow(this.pos);
     }
   }
 
@@ -197,6 +223,31 @@ export class DigScene {
     const d = this.shadowDirty;
     this.shadowDirty = false;
     return d;
+  }
+
+  /** 掘削地点のマーカー。掘れない場所では色を落として無駄打ちを防ぐ */
+  private updateDigMarker(dt: number): void {
+    this.markerPulse += dt * 3.2;
+    const fx = this.pos.x + Math.sin(this.yaw) * 1.05;
+    const fz = this.pos.z + Math.cos(this.yaw) * 1.05;
+    const gx = Math.floor(fx / VOXEL_SIZE);
+    const gz = Math.floor(fz / VOXEL_SIZE);
+    const inside = gx >= 1 && gz >= 1 && gx < AREA_VOX - 1 && gz < AREA_VOX - 1;
+    this.digMarker.visible = inside && this.mode !== 'scan';
+    if (!inside) return;
+
+    const surface = this.site.heights[gx + gz * AREA_VOX];
+    const depth = this.digDepth.get(gx + gz * AREA_VOX) ?? 0;
+    const y = Math.max(1, surface - depth);
+    this.digMarker.position.set((gx + 0.5) * VOXEL_SIZE, (y + 1) * VOXEL_SIZE + 0.04, (gz + 0.5) * VOXEL_SIZE);
+
+    const mat = this.digMarker.material as THREE.MeshBasicMaterial;
+    const canDig = this.stamina > 0 && surface - depth > 2;
+    mat.color.set(canDig ? 0xf4a23c : 0x6e5f52);
+    mat.opacity = 0.5 + (canDig ? Math.sin(this.markerPulse) * 0.16 + 0.22 : 0);
+    // 掘るほどマーカーを小さくして、進んでいることを形でも伝える
+    const shrink = Math.max(0.55, 1 - depth * 0.05);
+    this.digMarker.scale.setScalar(shrink);
   }
 
   private handleLook(input: InputManager): void {
@@ -254,17 +305,17 @@ export class DigScene {
     this.rig.root.position.copy(this.pos);
     this.rig.root.rotation.y = this.yaw;
 
-    const groundLevel = this.site.heights[
-      Math.max(0, Math.min(AREA_VOX - 1, gx)) + Math.max(0, Math.min(AREA_VOX - 1, gz)) * AREA_VOX
-    ];
-    const depthM = Math.max(0, (groundLevel - surface) * VOXEL_SIZE);
-    this.depthM = depthM;
-    this.events.onDepthChange?.(depthM);
+    // 表示する深度は「その地点を何回掘ったか」。地形は変わらない
+    const clampedX = Math.max(0, Math.min(AREA_VOX - 1, gx));
+    const clampedZ = Math.max(0, Math.min(AREA_VOX - 1, gz));
+    const front = {
+      x: Math.floor((this.pos.x + Math.sin(this.yaw) * 1.05) / VOXEL_SIZE),
+      z: Math.floor((this.pos.z + Math.cos(this.yaw) * 1.05) / VOXEL_SIZE),
+    };
+    this.depthM = this.depthAt(front.x, front.z);
+    this.events.onDepthChange?.(this.depthM);
+    void clampedX; void clampedZ;
 
-    // 潜るほど強く灯す。地表では消えているので日中の絵を壊さない
-    this.lamp.position.set(this.pos.x, this.pos.y + 1.5, this.pos.z);
-    const want = THREE.MathUtils.clamp((depthM - 0.4) / 1.6, 0, 1);
-    this.lamp.intensity += (want * 3.8 - this.lamp.intensity) * Math.min(1, dt * 4);
   }
 
   /** 軸ごとに分離して押し出す。斜めに壁へ突っ込んでも滑る */
@@ -350,23 +401,7 @@ export class DigScene {
     const shown = hits.slice(0, 3);
     for (const hitItem of shown) hitItem.node.revealed = true;
 
-    this.markers.set(
-      this.site.nodes
-        .filter((n) => n.revealed && !n.collected)
-        .slice(0, 3)
-        .map((n) => {
-          const wx = (n.cx + 0.5) * VOXEL_SIZE;
-          const wz = (n.cz + 0.5) * VOXEL_SIZE;
-          const gy = this.site.heights[n.cx + n.cz * AREA_VOX];
-          const d = Math.hypot(wx - this.pos.x, wz - this.pos.z);
-          return {
-            nodeId: n.id,
-            position: new THREE.Vector3(wx, gy * VOXEL_SIZE + 0.9, wz),
-            strength: strengthForDistance(d) ?? 1,
-            kind: n.kind,
-          };
-        }),
-    );
+    this.refreshMarkers();
 
     if (shown.length > 0) {
       audio.echoHit(shown[0].strength);
@@ -394,99 +429,130 @@ export class DigScene {
   }
 
   /**
-   * 掘削1回。足元前方のボクセルを削る。
-   * 化石は削れない（誤爆で割らせない）が、周囲の岩を剥がすと露出が進む。
+   * 掘削1回。
+   *
+   * 地形は恒久的には変えない。掘った穴は数秒で埋まる。
+   * 穴を残す方式だとエリアが虫食いになり、カメラが土の断面に埋まり、
+   * 一度掘った場所が二度と使えなくなる。ここで管理するのは
+   * 「その地点を何回掘ったか」という深度だけで、見た目の穴はその演出。
    */
   private dig(): void {
     this.digCooldown = 0.26;
 
-    // 掘るのは自分の真下。掘るほど沈み、壁面に地層が立ち上がる。
-    // 前方を掘る方式にすると横穴になり、深度という概念が機能しなくなる。
-    const gx = Math.floor(this.pos.x / VOXEL_SIZE);
-    const gz = Math.floor(this.pos.z / VOXEL_SIZE);
-    let gy = -1;
-    const from = Math.floor(this.pos.y / VOXEL_SIZE);
-    for (let y = from; y >= 0; y--) {
-      if (this.world.grid.isSolid(gx, y, gz)) { gy = y; break; }
-    }
-    if (gy < 0) { audio.uiError(); return; }
+    // 掘るのはプレイヤーのすぐ前。足元を掘ると自分が穴に落ちる
+    const fx = this.pos.x + Math.sin(this.yaw) * 1.05;
+    const fz = this.pos.z + Math.cos(this.yaw) * 1.05;
+    const gx = Math.floor(fx / VOXEL_SIZE);
+    const gz = Math.floor(fz / VOXEL_SIZE);
+    if (gx < 1 || gz < 1 || gx >= AREA_VOX - 1 || gz >= AREA_VOX - 1) { audio.uiError(); return; }
 
-    const slot = this.world.grid.get(gx, gy, gz);
-    if (slot === T.FOSSIL) {
-      // 化石そのものは削れない。周囲を剥がすよう促す
-      this.events.onDigBlocked?.();
-      audio.uiError();
-      return;
-    }
+    const surface = this.site.heights[gx + gz * AREA_VOX];
+    const key = gx + gz * AREA_VOX;
+    const depth = (this.digDepth.get(key) ?? 0) + 1;
 
+    // 掘り進める先のボクセル。空振りなら空振りと伝える
+    const targetY = surface - depth;
+    if (targetY < 2) { audio.uiError(); this.events.onDigBlocked?.(); return; }
+    const slot = this.world.grid.get(gx, targetY, gz);
+    if (slot === 0) { audio.uiError(); return; }
+
+    this.digDepth.set(key, depth);
     this.stamina = Math.max(0, this.stamina - 1);
     this.events.onStaminaChange?.(this.stamina, MAX_STAMINA);
+    this.events.onDepthChange?.(depth * VOXEL_SIZE);
 
     const hardness = hardnessOf(slot);
-    // 硬い岩ほど削れる範囲が狭い。同じ1タップでも進みが違うのが手応えになる
-    const radius = hardness >= 4 ? 1.05 : hardness >= 2.5 ? 1.25 : 1.5;
-    let removed = 0;
-    let touchedFossil: BuriedNode | null = null;
+    this.openHole(gx, gz, surface, depth);
 
-    // 上へ行くほど広く削る＝すり鉢。垂直な井戸を掘ると中が一切見えなくなる
-    const r = Math.ceil(radius * 2.2);
-    for (let dz = -r; dz <= r; dz++)
-      for (let dy = -r; dy <= r; dy++)
-        for (let dx = -r; dx <= r; dx++) {
-          const widen = dy > 0 ? 1 + dy * 0.46 : 1;
-          if (Math.hypot(dx, dz) > radius * widen) continue;
-          if (Math.abs(dy) > radius * 1.1 && dy < 0) continue;
-          if (dy > radius * 2.6) continue;
-          const x = gx + dx, y = gy + dy, z = gz + dz;
-          const v = this.world.grid.get(x, y, z);
-          if (v === 0 || v === T.FOSSIL) continue;
-          this.world.set(x, y, z, 0);
-          removed++;
-        }
-
-    // 剥がした結果、露出した化石ボクセルを数える
-    for (const n of this.site.nodes) {
-      if (n.collected) continue;
-      if (Math.hypot(n.cx - gx, n.cy - gy, n.cz - gz) > n.radius + 3) continue;
-      const exposed = this.countExposed(n);
-      if (exposed > n.exposed) {
-        if (n.exposed === 0) touchedFossil = n;
-        n.exposed = exposed;
-        n.revealed = true;
-      }
-      if (n.exposed / n.total >= COLLECT_RATIO) {
-        this.collect(n);
-      }
-    }
-
-    const worldPos = new THREE.Vector3((gx + 0.5) * VOXEL_SIZE, (gy + 0.5) * VOXEL_SIZE, (gz + 0.5) * VOXEL_SIZE);
-    const color = colorForSlot(slot, this.biomeId);
-    this.debris.burst(worldPos, color, Math.min(14, 5 + removed), { speed: 2.6, up: 3.0, life: 0.8 });
+    const worldPos = new THREE.Vector3(
+      (gx + 0.5) * VOXEL_SIZE, (targetY + 0.5) * VOXEL_SIZE, (gz + 0.5) * VOXEL_SIZE,
+    );
+    this.debris.burst(worldPos, colorForSlot(slot, this.biomeId), 12, { speed: 2.8, up: 3.2, life: 0.8 });
     audio.dig(hardness);
     this.events.onDig?.(slot, worldPos);
 
-    if (touchedFossil) {
-      audio.fossilHit();
-      this.events.onFossilTouched?.(touchedFossil);
-      this.debris.burst(worldPos, 0xf4a23c, 20, { speed: 3.4, up: 4.2, life: 1.1, size: 0.8 });
+    // --- 埋蔵物の判定 ---
+    // 平面距離が近く、その地点の深度が埋蔵深度に届いたら掘り当て
+    for (const n of this.site.nodes) {
+      if (n.collected) continue;
+      const planar = Math.hypot(n.cx - gx, n.cz - gz);
+      if (planar > n.radius + 1.6) continue;
+      const needed = Math.max(1, Math.round((this.site.heights[n.cx + n.cz * AREA_VOX] - n.cy)));
+      if (depth + 1 < needed) {
+        // 近いが浅い。手応えだけ返して「もう一掘り」を促す
+        if (!n.revealed) { n.revealed = true; this.refreshMarkers(); }
+        if (planar <= n.radius) this.events.onNearMiss?.(n, (needed - depth) * VOXEL_SIZE);
+        continue;
+      }
+      this.collect(n);
+      break;
     }
   }
 
-  private countExposed(n: BuriedNode): number {
-    let c = 0;
-    const r = Math.ceil(n.radius) + 2;
+  /** 一時的な穴を開ける。元のボクセルを控えておき、時間経過で埋め戻す */
+  private openHole(gx: number, gz: number, surface: number, depth: number): void {
+    const cells: { x: number; y: number; z: number; v: number }[] = [];
+    const radius = 1.7;
+    const r = Math.ceil(radius * 2);
+    const bottom = Math.max(1, surface - depth);
+
     for (let dz = -r; dz <= r; dz++)
-      for (let dy = -r; dy <= r; dy++)
-        for (let dx = -r; dx <= r; dx++) {
-          const x = n.cx + dx, y = n.cy + dy, z = n.cz + dz;
-          if (this.world.grid.get(x, y, z) !== T.FOSSIL) continue;
-          if (
-            !this.world.grid.isSolid(x + 1, y, z) || !this.world.grid.isSolid(x - 1, y, z) ||
-            !this.world.grid.isSolid(x, y + 1, z) || !this.world.grid.isSolid(x, y - 1, z) ||
-            !this.world.grid.isSolid(x, y, z + 1) || !this.world.grid.isSolid(x, y, z - 1)
-          ) c++;
+      for (let dx = -r; dx <= r; dx++) {
+        for (let y = bottom; y <= surface; y++) {
+          // 上へ行くほど広いすり鉢。垂直な井戸だと中が見えない
+          const up = y - bottom;
+          const rad = radius * (1 + up * 0.22);
+          if (Math.hypot(dx, dz) > rad) continue;
+          const x = gx + dx, z = gz + dz;
+          const v = this.world.grid.get(x, y, z);
+          if (v === 0) continue;
+          cells.push({ x, y, z, v });
+          this.world.set(x, y, z, 0);
         }
-    return c;
+      }
+    if (cells.length === 0) return;
+    this.holes.push({ cells, t: 0, life: 2.6 });
+  }
+
+  /** 穴を埋め戻す。掘った直後は見えていて、数秒で崩れて元に戻る */
+  private updateHoles(dt: number): void {
+    for (let i = this.holes.length - 1; i >= 0; i--) {
+      const hole = this.holes[i];
+      hole.t += dt;
+      if (hole.t < hole.life) continue;
+      for (const c of hole.cells) {
+        // 掘り出し済みの化石は戻さない
+        if (c.v === T.FOSSIL && this.collectedVoxels.has(`${c.x},${c.y},${c.z}`)) continue;
+        this.world.set(c.x, c.y, c.z, c.v);
+      }
+      this.holes.splice(i, 1);
+      this.shadowDirty = true;
+    }
+  }
+
+  /** 掘り返し可能かの目安。UI のヒントに使う */
+  depthAt(gx: number, gz: number): number {
+    return (this.digDepth.get(gx + gz * AREA_VOX) ?? 0) * VOXEL_SIZE;
+  }
+
+  private refreshMarkers(): void {
+    this.markers.set(
+      this.site.nodes
+        .filter((n) => n.revealed && !n.collected)
+        .slice(0, 3)
+        .map((n) => {
+          const wx = (n.cx + 0.5) * VOXEL_SIZE;
+          const wz = (n.cz + 0.5) * VOXEL_SIZE;
+          const gy = this.site.heights[n.cx + n.cz * AREA_VOX];
+          const d = Math.hypot(wx - this.pos.x, wz - this.pos.z);
+          return {
+            nodeId: n.id,
+            position: new THREE.Vector3(wx, gy * VOXEL_SIZE + 0.9, wz),
+            strength: strengthForDistance(d) ?? 1,
+            kind: n.kind,
+          };
+        }),
+    );
   }
 
   private collect(n: BuriedNode): void {
@@ -494,17 +560,21 @@ export class DigScene {
     const wx = (n.cx + 0.5) * VOXEL_SIZE;
     const wy = (n.cy + 0.5) * VOXEL_SIZE;
     const wz = (n.cz + 0.5) * VOXEL_SIZE;
-    // 残った化石ボクセルを消す
+
+    // 掘り当てた化石は地中から消す。埋め戻しでも復活させない
     const r = Math.ceil(n.radius) + 2;
     for (let dz = -r; dz <= r; dz++)
       for (let dy = -r; dy <= r; dy++)
         for (let dx = -r; dx <= r; dx++) {
           const x = n.cx + dx, y = n.cy + dy, z = n.cz + dz;
-          if (this.world.grid.get(x, y, z) === T.FOSSIL) this.world.set(x, y, z, 0);
+          if (this.world.grid.get(x, y, z) !== T.FOSSIL) continue;
+          this.collectedVoxels.add(`${x},${y},${z}`);
+          this.world.set(x, y, z, 0);
         }
+
     this.markers.remove(n.id);
-    this.debris.burst(new THREE.Vector3(wx, wy, wz), n.kind === 'fossil' ? 0xf4a23c : 0x4ba6e2, 26, {
-      speed: 3.8, up: 5, life: 1.2, size: 0.9,
+    this.debris.burst(new THREE.Vector3(wx, wy, wz), n.kind === 'fossil' ? 0xf4a23c : 0x4ba6e2, 30, {
+      speed: 4.0, up: 5.2, life: 1.3, size: 1,
     });
     audio.fossilHit();
     this.events.onCollect?.(n);
@@ -524,9 +594,8 @@ export class DigScene {
 
   private cameraGoal(): THREE.Vector3 {
     // 俯角50°前後。エリアの約1/3が常に見えている構図
-    const deep = THREE.MathUtils.clamp((this.depthM - 0.5) / 2.4, 0, 1);
-    const pitch = this.mode === 'scan' ? 1.40 : THREE.MathUtils.lerp(0.86, 1.46, deep);
-    const dist = this.mode === 'scan' ? 22 : THREE.MathUtils.lerp(10.5, 8.0, deep);
+    const pitch = this.mode === 'scan' ? 1.40 : 0.86;
+    const dist = this.mode === 'scan' ? 22 : 10.5;
     const h = Math.sin(pitch) * dist;
     const horiz = Math.cos(pitch) * dist;
     this.tmpV.set(
@@ -590,6 +659,8 @@ export class DigScene {
     this.debris.dispose();
     this.echo.dispose();
     this.markers.dispose();
+    this.digMarker.geometry.dispose();
+    (this.digMarker.material as THREE.Material).dispose();
     this.env.dispose();
     this.material.dispose();
     this.charMaterial.dispose();

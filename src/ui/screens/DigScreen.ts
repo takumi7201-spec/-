@@ -121,7 +121,11 @@ export class DigScreen extends Screen {
       this.updateFinds();
     };
     this.scene.events.onDigBlocked = () => {
-      this.ui.toast('化石は削れない。周りの岩を剥がそう', 'warn', 2000);
+      this.ui.toast('岩盤に当たった。ここはもう掘れない', 'warn', 1800);
+    };
+    this.scene.events.onNearMiss = (_n, remain) => {
+      // 深さは掘るまで分からないので、数値ではなく手応えで伝える
+      this.ui.toast(remain > 1.2 ? '固い層。まだ下だ' : 'もう少し下に何かある', 'info', 1400);
     };
     this.scene.events.onEchoCooldown = (remain, total) => {
       this.echoRemain = remain;
@@ -166,6 +170,8 @@ export class DigScreen extends Screen {
 
   /** InputManager から仮想スティックの状態を受ける */
   setStick(active: boolean, ox: number, oy: number, dx: number, dy: number): void {
+    // 入力層は画面の構築より先に動きうる（起動時の設定適用など）
+    if (!this.stickEl) return;
     this.stickEl.classList.toggle('is-on', active);
     if (!active) return;
     this.stickEl.style.left = `${ox}px`;

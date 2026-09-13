@@ -169,6 +169,24 @@ export class VoxelWorld {
     this.group.add(mesh);
   }
 
+  /**
+   * 影を落とすチャンクを近傍だけに絞る。
+   * 俯瞰視点ではエリア全体が視界に入るため、全チャンクが
+   * シャドウパスにも積まれてドローコールが倍になる。
+   * 遠景の影は画面上ほとんど判別できないので落として構わない。
+   */
+  setShadowRange(center: THREE.Vector3, radius: number): void {
+    const r2 = radius * radius;
+    for (const c of this.chunks) {
+      if (!c.mesh) continue;
+      const cx = (c.cx + 0.5) * CHUNK * this.voxelSize;
+      const cz = (c.cz + 0.5) * CHUNK * this.voxelSize;
+      const dx = cx - center.x, dz = cz - center.z;
+      const want = dx * dx + dz * dz <= r2;
+      if (c.mesh.castShadow !== want) c.mesh.castShadow = want;
+    }
+  }
+
   raycast(origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number): {
     x: number; y: number; z: number; value: number; nx: number; ny: number; nz: number; dist: number;
   } | null {
