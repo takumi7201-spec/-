@@ -4,6 +4,7 @@ import type { SaveData } from '../../core/Save';
 import { REVOS, RARITY_NAMES, getRevos } from '../../game/data/revos';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
+import { revosIcon } from '../revosIcon';
 
 /** 図鑑。未取得はシルエットで見せ、「あと何が居るか」を常に示す */
 export class DexScreen extends Screen {
@@ -59,6 +60,7 @@ export class DexScreen extends Screen {
         class: `dex-cell ${has ? '' : 'is-locked'}`,
       });
       cell.append(
+        revosIcon(r.id, `dex-icon ${has ? '' : 'is-silhouette'}`),
         h('span', { class: `chip chip--${r.element}`, text: ELEMENT_NAMES[r.element] }),
         h('span', { class: 'dex-name', text: has ? r.name : '？？？' }),
         h('span', { class: 'dex-rarity', text: '★'.repeat(r.rarity) }),
@@ -72,6 +74,7 @@ export class DexScreen extends Screen {
     const r = getRevos(id);
     const owned = this.data.roster.filter((u) => u.defId === id);
     const body = h('div', { class: 'dex-detail' },
+      h('div', { class: 'dex-hero' }, revosIcon(r.id, 'dex-hero-img')),
       h('div', { class: 'dex-detail-head' },
         h('span', { class: `chip chip--${r.element}`, text: ELEMENT_NAMES[r.element] }),
         h('span', { class: 'dex-detail-role', text: r.role }),

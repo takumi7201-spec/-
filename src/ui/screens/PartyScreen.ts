@@ -5,6 +5,7 @@ import { getRevos } from '../../game/data/revos';
 import { FORMATIONS, type FormationId } from '../../game/battle/types';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
+import { revosIcon } from '../revosIcon';
 import { audio } from '../../core/Audio';
 
 /**
@@ -99,6 +100,7 @@ export class PartyScreen extends Screen {
         const def = getRevos(u.defId);
         const mc = cleanMultiplier(u.clean);
         slot.append(
+          revosIcon(u.defId, 'slot-icon'),
           h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
           h('span', { class: 'slot-name', text: def.name }),
           h('span', { class: 'slot-sub num', text: `Lv${u.level} / ${cleanRank(u.clean)}ランク` }),
@@ -155,6 +157,7 @@ export class PartyScreen extends Screen {
       });
       const hpBar = bar('bar--slim', u.clean / 100);
       card.append(
+        revosIcon(u.defId, 'roster-icon'),
         h('span', { class: `chip chip--${d.element}`, text: ELEMENT_NAMES[d.element] }),
         h('span', { class: 'roster-name', text: d.name }),
         h('span', { class: 'roster-sub num', text: `Lv${u.level} ${cleanRank(u.clean)}` }),

@@ -2,10 +2,9 @@ import * as THREE from 'three';
 import { VoxelGrid } from '../voxel/VoxelGrid';
 import { VoxelPainter, Rng } from '../voxel/VoxelPainter';
 import { greedyMesh } from '../voxel/greedyMesher';
-import { buildPalette, ELEMENT_PALETTES, BIOMES } from '../voxel/palette';
+import { buildPalette, BIOMES } from '../voxel/palette';
 import { createVoxelMaterial, type VoxelMaterial } from '../shaders/VoxelMaterial';
-import { buildCreature, creatureToObject3D, type CreatureObject } from '../voxel/CreatureBuilder';
-import { CreatureAnimator } from '../voxel/CreatureAnimator';
+import { SpriteUnit, SpriteAnimator } from '../fx/SpriteUnit';
 import { Environment } from '../fx/Environment';
 import { getRevos } from '../game/data/revos';
 import type { QualitySettings } from '../core/Quality';
@@ -41,9 +40,8 @@ export class HomeScene {
   private env: Environment;
   private material: VoxelMaterial;
   private camp?: THREE.Mesh;
-  private guest?: CreatureObject;
-  private guestAnim?: CreatureAnimator;
-  private guestMaterial?: VoxelMaterial;
+  private guest?: SpriteUnit;
+  private guestAnim?: SpriteAnimator;
   private fire?: THREE.PointLight;
   private t = 0;
 
@@ -157,41 +155,26 @@ export class HomeScene {
     if (this.guest) {
       this.scene.remove(this.guest.root);
       this.guest.dispose();
-      this.guestMaterial?.dispose();
       this.guest = undefined;
       this.guestAnim = undefined;
     }
     if (!defId) return;
     const def = getRevos(defId);
-    const model = buildCreature({
-      archetype: def.build.archetype,
-      seed: def.build.seed,
-      bulk: def.build.bulk,
-      scale: def.build.scale,
-      horns: def.build.horns,
-      sail: def.build.sail,
-      crest: def.build.crest,
-      spikes: def.build.spikes,
+    this.guest = new SpriteUnit(def.sprite, {
+      height: 2.6 * (def.build.scale ?? 1),
+      facingRight: true,
+      shadow: 0.34,
     });
-    this.guestMaterial = createVoxelMaterial({
-      voxelSize: model.voxelSize,
-      colorJitter: 0.05,
-      edgeDarkness: 0.05,
-      aoDirect: 0.34,
-      rimStrength: 0.26,
-      floorLight: 0.1,
-    });
-    this.guest = creatureToObject3D(model, ELEMENT_PALETTES[def.element], this.guestMaterial);
-    this.guest.root.position.set(1.9, 0.62, -0.5);
-    this.guest.root.rotation.y = -0.9;
+    this.guest.root.position.set(2.1, 0.62, -0.4);
     this.scene.add(this.guest.root);
-    this.guestAnim = new CreatureAnimator(this.guest);
+    this.guestAnim = new SpriteAnimator(this.guest);
     this.guestAnim.play('idle');
   }
 
   update(dt: number): void {
     this.t += dt;
     this.guestAnim?.update(dt);
+    this.guest?.faceCamera(this.camera);
     if (this.fire) {
       // 焚き火の揺らぎ。周期が見えないよう2つの正弦を重ねる
       this.fire.intensity = 2.6 + Math.sin(this.t * 9.1) * 0.4 + Math.sin(this.t * 4.3) * 0.28;
@@ -212,7 +195,6 @@ export class HomeScene {
   dispose(): void {
     if (this.camp) { this.scene.remove(this.camp); this.camp.geometry.dispose(); }
     if (this.guest) { this.scene.remove(this.guest.root); this.guest.dispose(); }
-    this.guestMaterial?.dispose();
     this.material.dispose();
     this.env.dispose();
   }

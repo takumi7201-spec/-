@@ -1,5 +1,5 @@
 import { h, clear, bar } from './dom';
-import { silhouetteImg } from './silhouette';
+import { revosIcon } from './revosIcon';
 import { getRevos } from '../game/data/revos';
 import { BIOMES, ELEMENT_NAMES, type BiomeId } from '../voxel/palette';
 import { FORMATIONS } from '../game/battle/types';
@@ -155,7 +155,7 @@ export class InventoryPanel {
       const def = getRevos(u.defId);
       this.formList.appendChild(
         h('div', { class: `inv-form-row ${i === 0 ? 'is-front' : ''}` },
-          silhouetteImg(u.defId, 34, 'inv-silho'),
+          revosIcon(u.defId, 'inv-silho'),
           h('div', { class: 'inv-form-main' },
             h('div', { class: 'inv-form-name', text: def.name },
               h('span', { class: `dot dot--${def.element}`, title: ELEMENT_NAMES[def.element] }),
@@ -178,7 +178,7 @@ export class InventoryPanel {
       }
       const cell = h('div', { class: `inv-cell inv-cell--${it.kind}`, title: it.kind === 'fossil' ? getRevos(it.defId).name : '鉱石' });
       if (it.kind === 'fossil') {
-        cell.appendChild(silhouetteImg(it.defId, 38, 'inv-silho'));
+        cell.appendChild(revosIcon(it.defId, 'inv-silho'));
       } else {
         cell.appendChild(h('span', { class: 'inv-mineral', text: '◈' }));
       }

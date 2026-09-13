@@ -79,7 +79,7 @@ export function buildEnemyTeam(stage: number, seed: number): TeamSetup {
 /** 初回起動時の配布。属性が偏らない3体を渡す */
 export function grantStarters(data: SaveData): void {
   if (data.roster.length > 0) return;
-  for (const defId of ['gravodon', 'ignirapt', 'nereidon']) {
+  for (const defId of ['ankylosaurus', 'yutyrannus', 'mosasaurus']) {
     data.roster.push({
       uid: makeUid(),
       defId,

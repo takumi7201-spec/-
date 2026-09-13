@@ -638,3 +638,24 @@ body[data-layout='wide'] .party-field { grid-template-columns: repeat(3, 180px);
 /* 持ち物を開いている間はミニマップを畳む。左右で情報が競合する */
 .screen--dig.inv-open .rail--r { opacity: 0; pointer-events: none; }
 body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); }
+
+/* =========================================================================
+   リヴォスのスプライト（ドット絵なので拡大は nearest）
+   ========================================================================= */
+.revos-icon, .inv-silho, .slot-icon, .roster-icon, .dex-icon, .dex-hero-img {
+  image-rendering: pixelated;
+  display: block;
+  object-fit: contain;
+}
+.slot-icon { width: 100%; height: 46px; margin-bottom: 2px; }
+.roster-icon { width: 100%; height: 36px; }
+.dex-icon { width: 100%; height: 52px; }
+/* 未取得はシルエットで見せる。何が居るかは示すが、姿は伏せる */
+.dex-icon.is-silhouette { filter: brightness(0) opacity(0.34); }
+.dex-hero {
+  display: grid; place-items: center;
+  background: linear-gradient(180deg, #241b14, #17110c);
+  border-radius: var(--r-md);
+  padding: 6px;
+}
+.dex-hero-img { width: 148px; height: 148px; }

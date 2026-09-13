@@ -2,10 +2,9 @@ import * as THREE from 'three';
 import { VoxelGrid } from '../voxel/VoxelGrid';
 import { VoxelPainter, Rng } from '../voxel/VoxelPainter';
 import { greedyMesh } from '../voxel/greedyMesher';
-import { ELEMENT_PALETTES, ELEMENT_COLORS, BIOMES, type BiomeId, type ElementId } from '../voxel/palette';
+import { ELEMENT_COLORS, BIOMES, type BiomeId, type ElementId } from '../voxel/palette';
 import { createVoxelMaterial, type VoxelMaterial } from '../shaders/VoxelMaterial';
-import { buildCreature, creatureToObject3D, type CreatureObject } from '../voxel/CreatureBuilder';
-import { CreatureAnimator, type CreatureState } from '../voxel/CreatureAnimator';
+import { SpriteUnit, SpriteAnimator, type SpriteState } from '../fx/SpriteUnit';
 import { Environment } from '../fx/Environment';
 import { DebrisSystem } from '../fx/Debris';
 import { DamageNumbers } from '../fx/DamageNumbers';
@@ -23,8 +22,8 @@ import type { QualitySettings } from '../core/Quality';
 
 export interface BattleUnitView {
   uid: string;
-  obj: CreatureObject;
-  anim: CreatureAnimator;
+  unit: SpriteUnit;
+  anim: SpriteAnimator;
   home: THREE.Vector3;
   side: Side;
   row: Row;
@@ -33,15 +32,19 @@ export interface BattleUnitView {
   /** 被弾で押し戻される量 */
   knock: number;
   flash: number;
-  material: VoxelMaterial;
   /** 攻撃時の踏み込み先。未設定なら home へ戻る */
   lungeTarget?: THREE.Vector3;
   lungeT?: number;
 }
 
+/**
+ * 自軍は左手前、敵は右奥。真正面の奥行き配置だと、横向きに描かれた
+ * スプライト同士が向き合って見えない。斜めに置けば奥行きも左右の
+ * 対峙も同時に成り立つ。
+ */
 const SLOT_POS: Record<Side, Record<number, [number, number]>> = {
-  0: { 0: [0, 3.8], 1: [-2.15, 5.9], 2: [2.15, 5.9] },
-  1: { 0: [0, -3.8], 1: [-2.15, -5.9], 2: [2.15, -5.9] },
+  0: { 0: [-0.95, 3.4], 1: [-1.9, 5.4], 2: [0.45, 5.9] },
+  1: { 0: [0.95, -3.4], 1: [1.9, -5.4], 2: [-0.45, -5.9] },
 };
 
 export class BattleScene {
@@ -84,8 +87,8 @@ export class BattleScene {
     this.scene.add(this.debris.mesh);
     this.scene.add(this.numbers.group);
 
-    this.camPos.set(0, 8.4, 19.6);
-    this.camLook.set(0, 1.4, 0);
+    this.camPos.set(0, 8.6, 15.8);
+    this.camLook.set(0, 1.2, -0.3);
   }
 
   // ------------------------------------------------------------ 構築
@@ -164,37 +167,19 @@ export class BattleScene {
     this.clearUnits();
     for (const f of fighters) {
       const def = getRevos(f.defId);
-      const model = buildCreature({
-        archetype: def.build.archetype,
-        seed: def.build.seed,
-        bulk: def.build.bulk,
-        scale: def.build.scale,
-        horns: def.build.horns,
-        sail: def.build.sail,
-        crest: def.build.crest,
-        spikes: def.build.spikes,
+      const unit = new SpriteUnit(def.sprite, {
+        height: 1.95 * (def.build.scale ?? 1),
+        facingRight: f.side === 0,
+        shadow: 0.3,
       });
-      const material = createVoxelMaterial({
-        voxelSize: model.voxelSize,
-        colorJitter: 0.05,
-        edgeDarkness: 0.05,
-        aoDirect: 0.36,
-        rimColor: ELEMENT_COLORS[def.element],
-        rimStrength: 0.3,
-        floorLight: 0.1,
-      });
-      const obj = creatureToObject3D(model, ELEMENT_PALETTES[def.element], material);
-
       const [px, pz] = SLOT_POS[f.side][f.slot];
-      obj.root.position.set(px, 0, pz);
-      // 相手を向く。自軍は -Z、敵は +Z
-      obj.root.rotation.y = f.side === 0 ? Math.PI : 0;
-      this.scene.add(obj.root);
+      unit.root.position.set(px, 0, pz);
+      this.scene.add(unit.root);
 
       const view: BattleUnitView = {
         uid: f.uid,
-        obj,
-        anim: new CreatureAnimator(obj),
+        unit,
+        anim: new SpriteAnimator(unit),
         home: new THREE.Vector3(px, 0, pz),
         side: f.side,
         row: f.row,
@@ -202,7 +187,6 @@ export class BattleScene {
         alive: true,
         knock: 0,
         flash: 0,
-        material,
       };
       view.anim.play('idle');
       this.units.set(f.uid, view);
@@ -211,16 +195,15 @@ export class BattleScene {
 
   private clearUnits(): void {
     for (const u of this.units.values()) {
-      this.scene.remove(u.obj.root);
-      u.obj.dispose();
-      u.material.dispose();
+      this.scene.remove(u.unit.root);
+      u.unit.dispose();
     }
     this.units.clear();
   }
 
   // ------------------------------------------------------------ 演出API
 
-  play(uid: string, state: CreatureState): void {
+  play(uid: string, state: SpriteState): void {
     this.units.get(uid)?.anim.play(state);
   }
 
@@ -230,8 +213,8 @@ export class BattleScene {
     const b = this.units.get(targetUid);
     if (!a || !b) return;
     a.anim.play('attack');
-    const dir = this.tmp.copy(b.obj.root.position).sub(a.obj.root.position).setY(0).normalize();
-    const dist = a.obj.root.position.distanceTo(b.obj.root.position);
+    const dir = this.tmp.copy(b.unit.root.position).sub(a.unit.root.position).setY(0).normalize();
+    const dist = a.unit.root.position.distanceTo(b.unit.root.position);
     a.lungeTarget = a.home.clone().addScaledVector(dir, Math.min(2.6, dist * 0.42));
     a.lungeT = 0;
   }
@@ -243,8 +226,8 @@ export class BattleScene {
     u.flash = 1;
     u.knock = Math.min(0.75, 0.22 + (amount / maxHp) * 1.6);
 
-    const pos = u.obj.root.position.clone();
-    pos.y += 2.1;
+    const pos = u.unit.root.position.clone();
+    pos.y += u.unit.spriteHeight * 0.95;
     const color = crit ? '#ffd15c' : eff > 1 ? '#ff9c3c' : eff < 1 ? '#9c9086' : '#f8f2e4';
     this.numbers.spawn(pos, crit ? `${amount}!` : `${amount}`, { color, crit, scale: 0.85 + Math.min(0.45, amount / maxHp) });
 
@@ -257,8 +240,8 @@ export class BattleScene {
   heal(uid: string, amount: number): void {
     const u = this.units.get(uid);
     if (!u) return;
-    const pos = u.obj.root.position.clone();
-    pos.y += 2.1;
+    const pos = u.unit.root.position.clone();
+    pos.y += u.unit.spriteHeight * 0.95;
     this.numbers.spawn(pos, `+${amount}`, { color: '#2dc6a4', scale: 1 });
     this.debris.burst(pos, 0x2dc6a4, 10, { speed: 1.4, up: 3.2, life: 0.9, size: 0.6 });
   }
@@ -271,8 +254,8 @@ export class BattleScene {
     this.hitStop = Math.max(this.hitStop, 0.12);
     // 決着の一撃だけスローにする。1戦に1回だから効く
     this.addShake(0.5);
-    const pos = u.obj.root.position.clone();
-    pos.y += 1.2;
+    const pos = u.unit.root.position.clone();
+    pos.y += u.unit.spriteHeight * 0.5;
     this.debris.burst(pos, ELEMENT_COLORS[u.element], 30, { speed: 3.4, up: 4.0, life: 1.2, size: 1 });
   }
 
@@ -300,18 +283,18 @@ export class BattleScene {
     const a = this.units.get(actorUid);
     if (!a) return;
     const t = targetUid ? this.units.get(targetUid) : undefined;
-    const mid = this.tmp.copy(a.obj.root.position);
-    if (t) mid.add(t.obj.root.position).multiplyScalar(0.5);
+    const mid = this.tmp.copy(a.unit.root.position);
+    if (t) mid.add(t.unit.root.position).multiplyScalar(0.5);
 
     // 自軍側から見る構図を保ったまま、行動者の側へ寄る
     const fromSelf = a.side === 0 ? 1 : 0.55;
-    this.camGoal.set(mid.x * 0.36, 6.6 + fromSelf * 1.2, mid.z * 0.28 + 16.4);
-    this.lookGoal.set(mid.x * 0.55, 2.4, mid.z * 0.62);
+    this.camGoal.set(mid.x * 0.28, 7.8 + fromSelf * 0.7, mid.z * 0.2 + 14.4);
+    this.lookGoal.set(mid.x * 0.42, 1.1, mid.z * 0.45);
   }
 
   wideShot(): void {
-    this.camGoal.set(0, 8.4, 19.6);
-    this.lookGoal.set(0, 3.0, -1.2);
+    this.camGoal.set(0, 8.6, 15.8);
+    this.lookGoal.set(0, 1.2, -0.3);
   }
 
   // ------------------------------------------------------------ ループ
@@ -329,27 +312,40 @@ export class BattleScene {
     const sdt = dt * scale;
 
     for (const u of this.units.values()) {
+      // Y はアニメーション側の持ち分。XZ だけを外から動かす
       u.anim.update(sdt);
+      const animY = u.unit.root.position.y;
 
-      // 踏み込み
       if (u.lungeTarget) {
         u.lungeT = (u.lungeT ?? 0) + sdt;
         const p = Math.min(1, u.lungeT / 0.95);
         const k = p < 0.46 ? easeOut(p / 0.46) : 1 - easeIn((p - 0.46) / 0.54);
-        u.obj.root.position.lerpVectors(u.home, u.lungeTarget, k);
-        if (p >= 1) { u.lungeTarget = undefined; u.obj.root.position.copy(u.home); }
+        u.unit.root.position.x = u.home.x + (u.lungeTarget.x - u.home.x) * k;
+        u.unit.root.position.z = u.home.z + (u.lungeTarget.z - u.home.z) * k;
+        if (p >= 1) {
+          u.lungeTarget = undefined;
+          u.unit.root.position.x = u.home.x;
+          u.unit.root.position.z = u.home.z;
+        }
       } else if (u.knock > 0) {
         const dir = u.side === 0 ? 1 : -1;
-        u.obj.root.position.z = u.home.z + u.knock * dir;
+        u.unit.root.position.x = u.home.x - 0.5 * u.knock * dir;
+        u.unit.root.position.z = u.home.z + u.knock * dir;
         u.knock = Math.max(0, u.knock - sdt * 3.4);
-        if (u.knock === 0) u.obj.root.position.copy(u.home);
+        if (u.knock === 0) {
+          u.unit.root.position.x = u.home.x;
+          u.unit.root.position.z = u.home.z;
+        }
       } else {
-        u.obj.root.position.lerp(u.home, Math.min(1, dt * 6));
+        u.unit.root.position.x += (u.home.x - u.unit.root.position.x) * Math.min(1, dt * 6);
+        u.unit.root.position.z += (u.home.z - u.unit.root.position.z) * Math.min(1, dt * 6);
       }
+      u.unit.root.position.y = animY;
+      u.unit.faceCamera(this.camera);
 
       if (u.flash > 0) {
         u.flash = Math.max(0, u.flash - dt * 6);
-        u.material.userData.setEmissivePulse(u.flash * 0.3);
+        u.unit.setFlash(u.flash * 0.85);
       }
     }
 
@@ -377,7 +373,7 @@ export class BattleScene {
   resize(aspect: number): void {
     this.camera.aspect = aspect;
     // 縦長では画角を広げないと3体が収まらない
-    this.camera.fov = aspect < 0.75 ? 54 : aspect < 1.3 ? 48 : 42;
+    this.camera.fov = aspect < 0.75 ? 50 : aspect < 1.3 ? 46 : 40;
     this.camera.updateProjectionMatrix();
   }
 
@@ -385,7 +381,7 @@ export class BattleScene {
   worldOf(uid: string, out: THREE.Vector3): THREE.Vector3 | null {
     const u = this.units.get(uid);
     if (!u) return null;
-    return out.copy(u.obj.root.position).setY(2.4);
+    return out.copy(u.unit.root.position).setY(u.unit.spriteHeight * 0.9);
   }
 
   dispose(): void {

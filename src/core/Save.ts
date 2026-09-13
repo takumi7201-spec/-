@@ -87,6 +87,30 @@ export function defaultSave(): SaveData {
   };
 }
 
+/** 旧オリジナル名から実在種への読み替え表 */
+const DEF_ID_ALIASES: Record<string, string> = {
+  gravodon: 'ankylosaurus',
+  ignirapt: 'yutyrannus',
+  abyssmaul: 'kronosaurus',
+  cerciwing: 'pteranodon',
+  terracrest: 'triceratops',
+  pyroceras: 'goyocephale',
+  nereidon: 'mosasaurus',
+  zepharis: 'velociraptor',
+  obsidon: 'tyrannosaurus',
+  luminax: 'pachycephalosaurus',
+  tectos: 'iguanodon',
+  volcanix: 'spinosaurus',
+};
+
+/** 既存プレイヤーの手持ち・図鑑・ストックを新IDへ移す */
+function migrateDefIds(data: SaveData): void {
+  const map = (id: string): string => DEF_ID_ALIASES[id] ?? id;
+  for (const r of data.roster ?? []) r.defId = map(r.defId);
+  for (const s of data.stock ?? []) s.defId = map(s.defId);
+  data.dex = [...new Set((data.dex ?? []).map(map))];
+}
+
 export function load(): SaveData {
   try {
     const raw = localStorage.getItem(KEY);
@@ -96,6 +120,7 @@ export function load(): SaveData {
     // 日付が変わっていたら周回数をリセット（逓減ドロップの基準）
     const t = todayKey();
     if (data.daily?.date !== t) data.daily = { date: t, runs: 0 };
+    migrateDefIds(data);
     const base = defaultSave();
     // 浅いマージだと、後から足した設定キーが既存プレイヤーに一生届かない。
     // settings と party はネストしているので個別に埋める

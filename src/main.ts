@@ -343,7 +343,7 @@ async function main(): Promise<void> {
   const jump = new URLSearchParams(location.search).get('screen');
   if (jump) {
     grantStarters(data);
-    if (jump === 'clean') void startClean('ignirapt', 2);
+    if (jump === 'clean') void startClean('yutyrannus', 2);
     else if (jump === 'battle') void startBattle();
     else if (jump === 'home') goHome();
     else if (jump === 'party') { partyScreen.setData(data); ui.show('party'); }
