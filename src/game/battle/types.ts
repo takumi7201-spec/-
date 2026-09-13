@@ -22,22 +22,22 @@ export interface Formation {
 
 export const FORMATIONS: Record<FormationId, Formation> = {
   wedge: {
-    id: 'wedge', name: '楔陣', desc: '前列 与ダメ +20% / 後列 被弾率 +5pt',
+    id: 'wedge', name: '楔陣', desc: '前列 与ダメ +20%',
     frontDamage: 1.2, backHitRateBonus: 0.05, allDamageTaken: 1, allDamageDealt: 1,
     spdMul: 1, defMul: 1, startOd: 0, odGainMul: 1,
   },
   ring: {
-    id: 'ring', name: '環陣', desc: '全体 被ダメ −12% / 与ダメ −8%',
+    id: 'ring', name: '環陣', desc: '被ダメ −12% 与ダメ −8%',
     frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 0.88, allDamageDealt: 0.92,
     spdMul: 1, defMul: 1, startOd: 0, odGainMul: 1,
   },
   rush: {
-    id: 'rush', name: '疾陣', desc: '全体 SPD +15% / DEF −10%',
+    id: 'rush', name: '疾陣', desc: 'SPD +15% DEF −10%',
     frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 1, allDamageDealt: 1,
     spdMul: 1.15, defMul: 0.9, startOd: 0, odGainMul: 1,
   },
   metro: {
-    id: 'metro', name: '律陣', desc: '開始OD +40 / OD獲得 +15%',
+    id: 'metro', name: '律陣', desc: '開始OD +40 獲得 +15%',
     frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 1, allDamageDealt: 1,
     spdMul: 1, defMul: 1, startOd: 40, odGainMul: 1.15,
   },

@@ -351,3 +351,165 @@ body[data-layout='wide'] .battle-order { top: 96px; left: calc(var(--gutter) + v
 body[data-layout='wide'] .clean-surface { left: 12vw; right: calc(12vw + 64px); bottom: 150px; }
 body[data-layout='wide'] .clean-rail { right: 10vw; }
 body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px); justify-content: center; }
+
+/* =========================================================================
+   拠点 / 編成 / 図鑑 / リザルト
+   ========================================================================= */
+.screen-title { flex: 1; font-size: var(--fs-title); font-weight: 800; }
+
+.home-head .who { display: flex; flex-direction: column; gap: 4px; }
+.home-head .who .num { font-size: var(--fs-num); font-weight: 800; }
+.home-head .who .bar { width: 120px; }
+
+.deck--home { flex-direction: column; align-items: stretch; }
+.home-deck-inner { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.home-notice {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 12px;
+  background: var(--strata); border: 2px solid var(--obsidian);
+  border-left: 4px solid var(--amber); border-radius: var(--r-sm);
+  font-size: 12px; color: var(--text-dim);
+}
+.home-tile { position: relative; }
+
+/* ---- 編成 ---- */
+.party-body {
+  position: absolute;
+  top: calc(var(--safe-t) + 56px); bottom: 96px;
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: auto;
+}
+.party-label { margin-top: 6px; }
+.party-field { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.party-slot {
+  flex-direction: column; align-items: flex-start; gap: 3px;
+  min-height: 116px; padding: 8px;
+  background: var(--strata); color: var(--text);
+  border-color: var(--obsidian); box-shadow: 0 4px 0 rgba(0,0,0,.5);
+  text-align: left;
+}
+.party-slot.is-front { border-color: var(--amber); }
+.party-slot.is-empty { background: transparent; border-style: dashed; box-shadow: none; }
+.party-slot .slot-label { font-size: 9px; letter-spacing: .16em; color: var(--text-faint); font-weight: 700; }
+.party-slot .slot-name { font-size: 13px; font-weight: 800; }
+.party-slot .slot-sub { font-size: 10px; color: var(--text-dim); }
+.party-slot .slot-empty { font-size: 28px; color: var(--clay); margin: auto; }
+.party-slot .chip { height: 18px; font-size: 10px; padding: 0 5px; }
+
+.party-total {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  padding: 8px 10px; background: var(--obsidian);
+  border: 2px solid #000; border-radius: var(--r-sm);
+  font-size: 12px;
+}
+.party-total .total-elems { color: var(--text-dim); margin-left: auto; }
+
+.party-forms { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.form-btn { flex-direction: column; gap: 1px; min-height: 52px; align-items: flex-start; padding: 6px 10px; }
+.form-btn .btn-label { font-size: 13px; }
+.form-btn .btn-sub { font-size: 9px; color: var(--text-faint); letter-spacing: 0; }
+.form-btn.is-on { background: var(--amber); color: var(--obsidian); box-shadow: 0 4px 0 var(--ember); }
+.form-btn.is-on .btn-sub { color: #6b3f08; }
+
+.party-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.roster-card {
+  flex-direction: column; align-items: flex-start; gap: 3px;
+  min-height: 88px; padding: 7px; text-align: left;
+  background: var(--strata); color: var(--text); border-color: var(--obsidian);
+  box-shadow: 0 3px 0 rgba(0,0,0,.5);
+}
+.roster-card .chip { height: 17px; font-size: 9px; padding: 0 4px; }
+.roster-card .roster-name { font-size: 12px; font-weight: 700; }
+.roster-card .roster-sub { font-size: 10px; color: var(--text-dim); }
+.roster-card .bar { width: 100%; }
+.roster-card.is-in { border-color: var(--sonar); }
+.roster-card.is-sel { border-color: var(--amber); transform: translateY(-3px); box-shadow: 0 6px 0 var(--ember); }
+
+.deck--party { padding-top: 8px; }
+
+/* ---- 図鑑 ---- */
+.dex-count { font-size: 13px; color: var(--text-dim); }
+.dex-body {
+  position: absolute;
+  top: calc(var(--safe-t) + 56px); bottom: calc(var(--deck-bottom));
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 10px;
+  pointer-events: auto;
+}
+.dex-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.dex-chip { min-height: 36px; padding: 0 12px; flex: none; }
+.dex-chip.is-on { background: var(--sonar); color: var(--obsidian); box-shadow: 0 3px 0 #17796a; }
+.dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; padding-bottom: 20px; }
+.dex-cell {
+  flex-direction: column; align-items: flex-start; gap: 4px;
+  min-height: 88px; padding: 8px; text-align: left;
+  background: var(--strata); color: var(--text); border-color: var(--obsidian);
+  box-shadow: 0 3px 0 rgba(0,0,0,.5);
+}
+.dex-cell.is-locked { opacity: .42; }
+.dex-cell .chip { height: 17px; font-size: 9px; padding: 0 4px; }
+.dex-name { font-size: 12px; font-weight: 700; }
+.dex-rarity { font-size: 11px; color: var(--amber); letter-spacing: .1em; }
+
+.dex-detail { display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
+.dex-detail-head { display: flex; align-items: center; gap: 8px; }
+.dex-detail-role { font-size: 11px; letter-spacing: .12em; color: var(--text-faint); }
+.dex-detail-rarity { font-size: 11px; color: var(--amber); margin-left: auto; }
+.dex-flavor { margin: 0; font-size: 13px; color: var(--text-dim); line-height: 1.8; }
+.dex-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.dex-stat {
+  display: flex; flex-direction: column; gap: 2px; align-items: center;
+  padding: 6px 4px; background: var(--obsidian); border-radius: var(--r-sm);
+}
+.dex-stat .num { font-size: 15px; }
+.dex-skill { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-dim); line-height: 1.7; }
+.dex-skill b { font-size: 12px; color: var(--text); }
+.dex-skill b.od { color: var(--amber); }
+.dex-owned, .dex-habitat { font-size: 12px; color: var(--text-dim); display: flex; gap: 8px; align-items: center; }
+
+/* ---- リザルト ---- */
+.result-skip { position: absolute; inset: 0; }
+.result-wrap { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 var(--gutter); pointer-events: none; }
+.result-card {
+  width: min(420px, 100%); padding: 22px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  animation: result-pop 450ms var(--ease-back);
+}
+@keyframes result-pop {
+  from { opacity: 0; transform: translateY(18px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+.result-title { font-size: var(--fs-display); font-weight: 800; letter-spacing: .1em; text-align: center; }
+.result-title.is-bad { color: var(--magma); }
+.result-sub { font-size: 12px; color: var(--text-dim); text-align: center; margin-bottom: 10px; }
+.result-rows { display: flex; flex-direction: column; gap: 2px; }
+.result-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 7px 2px; border-bottom: 1px solid rgba(255, 200, 120, 0.12);
+  transition: opacity 220ms var(--ease), transform 220ms var(--ease);
+}
+.result-row:last-child { border-bottom: 0; }
+.result-row.is-in { transform: none; }
+.result-label { font-size: 12px; color: var(--text-dim); }
+.result-value { font-size: 16px; }
+.result-row--new .result-value { color: var(--amber); }
+.result-row--rank .result-value { color: var(--sonar); font-size: 20px; }
+.deck--result { justify-content: center; gap: 10px; }
+.deck--result .btn { flex: 1; max-width: 200px; }
+
+body[data-layout='wide'] .party-body,
+body[data-layout='wide'] .dex-body { left: 14vw; right: 14vw; }
+body[data-layout='wide'] .party-field { grid-template-columns: repeat(3, 180px); justify-content: center; }
+
+/* 情報を読ませる画面では、3D の背景を暗幕で沈める。
+   パネルを半透明にするのではなく、背景側を落とすのが正しい */
+.screen--party, .screen--dex, .screen--home { }
+.screen--party::before, .screen--dex::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(15, 11, 7, 0.94) 0%, rgba(15, 11, 7, 0.88) 60%, rgba(15, 11, 7, 0.94) 100%);
+  pointer-events: none;
+}
+.screen--party > *, .screen--dex > * { position: relative; }

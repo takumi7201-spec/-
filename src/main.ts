@@ -5,17 +5,25 @@ import { GameRenderer } from './core/GameRenderer';
 import { InputManager } from './core/Input';
 import { UIRoot } from './ui/UIRoot';
 import { TitleScreen } from './ui/screens/TitleScreen';
+import { HomeScreen } from './ui/screens/HomeScreen';
 import { DigScreen } from './ui/screens/DigScreen';
-import { DigScene } from './scenes/DigScene';
-import { BattleScene } from './scenes/BattleScene';
-import { CleanScene } from './scenes/CleanScene';
 import { CleanScreen } from './ui/screens/CleanScreen';
 import { BattleScreen } from './ui/screens/BattleScreen';
+import { PartyScreen } from './ui/screens/PartyScreen';
+import { DexScreen } from './ui/screens/DexScreen';
+import { ResultScreen, type ResultData } from './ui/screens/ResultScreen';
+import { DigScene } from './scenes/DigScene';
+import { CleanScene } from './scenes/CleanScene';
+import { BattleScene } from './scenes/BattleScene';
+import { HomeScene } from './scenes/HomeScene';
 import { BattlePlayer } from './game/battle/BattlePlayer';
 import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil } from './game/party';
 import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
-import { load as loadSave, save as writeSave, defaultSave, dropDecay, addExp, type SaveData } from './core/Save';
+import {
+  load as loadSave, save as writeSave, defaultSave, dropDecay, addExp,
+  type SaveData,
+} from './core/Save';
 import type { BiomeId } from './voxel/palette';
 
 const boot = document.getElementById('boot')!;
@@ -27,6 +35,10 @@ function progress(p: number, label: string): Promise<void> {
   bootStatus.textContent = label;
   // ブラウザに描画の隙を与える。一気に走らせると進捗が一切見えない
   return new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+}
+
+function label(defId: string): string {
+  return REVOS.find((r) => r.id === defId)?.name ?? defId;
 }
 
 async function main(): Promise<void> {
@@ -43,55 +55,152 @@ async function main(): Promise<void> {
   renderer.onContextLost = () => { lostOverlay = ui.showContextLost(); };
   renderer.onContextRestored = () => { lostOverlay?.remove(); lostOverlay = null; };
 
-  await progress(0.22, '地層をスキャンしています…');
+  await progress(0.2, 'セーブデータを読み込んでいます…');
   let data: SaveData = loadSave();
 
+  await progress(0.34, '拠点を組み立てています…');
+  const home = new HomeScene(renderer.quality);
   const dig = new DigScene(renderer.quality);
-  const battle = new BattleScene(renderer.quality);
   const clean = new CleanScene(renderer.quality);
+  const battle = new BattleScene(renderer.quality);
   battle.reducedShake = data.settings.reducedShake;
+
   let player: BattlePlayer | null = null;
-  /** この周回で回収した化石 */
   let runFossils: { defId: string; rarity: number }[] = [];
-  const speciesPool = REVOS.map((r) => ({ id: r.id, rarity: r.rarity, weight: r.rarity === 1 ? 10 : r.rarity === 2 ? 6 : r.rarity === 3 ? 3 : 1 }));
+  /** 直前の周回の成果。リザルトで見せる */
+  let pendingResult: ResultData | null = null;
+
+  const speciesPool = REVOS.map((r) => ({
+    id: r.id,
+    rarity: r.rarity,
+    weight: r.rarity === 1 ? 10 : r.rarity === 2 ? 6 : r.rarity === 3 ? 3 : 1,
+  }));
+
+  // ---------------------------------------------------------------- 画面
 
   const title = new TitleScreen();
+  const homeScreen = new HomeScreen();
   const digScreen = new DigScreen(dig);
-  const battleScreen = new BattleScreen();
   const cleanScreen = new CleanScreen(clean);
-  ui.register(title);
-  ui.register(digScreen);
-  ui.register(cleanScreen);
-  ui.register(battleScreen);
+  const battleScreen = new BattleScreen();
+  const partyScreen = new PartyScreen();
+  const dexScreen = new DexScreen();
+  const resultScreen = new ResultScreen();
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, resultScreen]) {
+    ui.register(s);
+  }
 
   input.onStickChange = (a, ox, oy, dx, dy) => digScreen.setStick(a, ox, oy, dx, dy);
 
+  // ---------------------------------------------------------------- 遷移
+
+  function goHome(): void {
+    home.setGuest(data.party.order?.[0]
+      ? data.roster.find((r) => r.uid === data.party.order?.[0])?.defId ?? data.roster[0]?.defId ?? null
+      : data.roster[0]?.defId ?? null);
+    home.resize(renderer.aspect);
+    renderer.setScene(home.scene, home.camera);
+    renderer.invalidateShadows();
+    homeScreen.setData(data);
+    ui.show('home');
+    audio.startMusic('calm');
+  }
+
+  async function startRun(biome: BiomeId): Promise<void> {
+    runFossils = [];
+    boot.classList.remove('hidden');
+    await progress(0.35, 'エリアを生成しています…');
+    const seed = (Date.now() ^ (data.daily.runs * 7919)) >>> 0;
+    dig.load(biome, seed, speciesPool, dropDecay(data.daily.runs));
+    await progress(0.85, 'メッシュを構築しています…');
+    dig.resize(renderer.aspect);
+    renderer.setScene(dig.scene, dig.camera);
+    renderer.invalidateShadows();
+    await progress(1, '準備完了');
+    ui.show('dig');
+    audio.startMusic('dig');
+    setTimeout(() => boot.classList.add('hidden'), 240);
+  }
+
+  async function startClean(defId: string, rarity: number): Promise<void> {
+    boot.classList.remove('hidden');
+    await progress(0.5, '母岩を切り出しています…');
+    clean.resize(renderer.aspect);
+    renderer.setScene(clean.scene, clean.camera);
+    await progress(1, '');
+    ui.show('clean', { defId, rarity, seed: (Date.now() ^ 0x51ed) >>> 0 });
+    audio.startMusic('calm');
+    setTimeout(() => boot.classList.add('hidden'), 200);
+  }
+
+  async function startBattle(): Promise<void> {
+    const mine = buildTeamSetup(data.roster, data.party.order, data.party.formation);
+    if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); goHome(); return; }
+    boot.classList.remove('hidden');
+    await progress(0.4, '闘技場を生成しています…');
+    const seed = (Date.now() ^ (data.stageProgress * 104729)) >>> 0;
+    battle.buildArena(data.unlockedBiomes[0] ?? 'canyon', seed);
+    player = new BattlePlayer(seed, mine, buildEnemyTeam(data.stageProgress, seed), battle);
+    battleScreen.setPlayer(player);
+    player.speed = data.settings.battleSpeed;
+    await progress(0.9, 'リヴォスを復元しています…');
+    battle.resize(renderer.aspect);
+    renderer.setScene(battle.scene, battle.camera);
+    renderer.invalidateShadows();
+    player.start();
+    ui.show('battle');
+    audio.startMusic('battle');
+    await progress(1, '');
+    setTimeout(() => boot.classList.add('hidden'), 200);
+  }
+
+  function showResult(r: ResultData): void {
+    pendingResult = r;
+    renderer.setScene(home.scene, home.camera);
+    ui.show('result', r);
+  }
+
+  // ---------------------------------------------------------------- 配線
+
   title.onStart = (fresh) => {
-    if (fresh) { data = defaultSave(); }
+    if (fresh) data = defaultSave();
     grantStarters(data);
     writeSave(data);
-    void startRun(data.unlockedBiomes[0] ?? 'canyon');
+    goHome();
   };
-  title.onBattle = () => {
-    grantStarters(data);
-    writeSave(data);
-    void startBattle();
-  };
+  title.onBattle = () => { grantStarters(data); writeSave(data); void startBattle(); };
+  title.onSettings = () => ui.toast('設定は準備中', 'info');
   title.setHasSave(data.stats.runs > 0 || data.roster.length > 0);
 
-  digScreen.onExit = () => {
-    audio.uiBack();
-    dig.setMode('explore');
-    ui.show('title');
-    audio.startMusic('calm');
+  homeScreen.onGo = (where) => {
+    switch (where) {
+      case 'dig': void startRun(data.unlockedBiomes[0] ?? 'canyon'); break;
+      case 'clean': {
+        const s = data.stock.shift();
+        if (!s) { ui.toast('精錬できる化石がない', 'warn'); return; }
+        writeSave(data);
+        void startClean(s.defId, s.rarity);
+        break;
+      }
+      case 'battle': void startBattle(); break;
+      case 'party': partyScreen.setData(data); ui.show('party'); break;
+      case 'dex': dexScreen.setData(data); ui.show('dex'); break;
+      case 'title': ui.show('title'); break;
+    }
   };
+
+  dig.events.onCollect = (n) => {
+    if (n.kind === 'fossil') runFossils.push({ defId: n.speciesId, rarity: n.rarity });
+  };
+
+  digScreen.onExit = () => { audio.uiBack(); dig.setMode('explore'); goHome(); };
   digScreen.onFinish = () => {
     data.stats.runs++;
     data.daily.runs++;
     if (runFossils.length === 0) {
       writeSave(data);
-      ui.toast('収穫なし。拠点に戻ります', 'warn');
-      setTimeout(() => { ui.show('title'); audio.startMusic('calm'); }, 1200);
+      ui.toast('収穫なし', 'warn');
+      setTimeout(goHome, 1000);
       return;
     }
     // 精錬は1周につき1体だけ。残りはストックに積む
@@ -108,100 +217,87 @@ async function main(): Promise<void> {
     const { isNew } = addFossil(data, defId, score.clean);
     data.stats.fossils++;
     writeSave(data);
-    ui.toast(
-      `${revosLabel(defId)} — ランク ${score.rank}（クリーン度 ${score.clean}）` +
-      (isNew ? ' / 新種' : ' / スキルLv上昇'),
-      score.rank === 'D' ? 'warn' : 'info', 3400,
-    );
-    if (score.rank === 'S') ui.toast('Sランク：スキルスロット3枠目を開放', 'info', 3000);
-    setTimeout(() => void startBattle(), 1800);
+    showResult({
+      title: '精錬完了',
+      subtitle: `${label(defId)} の化石`,
+      good: score.rank !== 'D',
+      rows: [
+        { label: 'ランク', value: score.rank, kind: 'rank' },
+        { label: 'クリーン度', value: `${score.clean}`, kind: 'exp' },
+        { label: '岩の除去', value: `${Math.round(score.rockRatio * 100)}%` },
+        { label: '骨の損傷', value: score.boneDamage > 0 ? `-${score.boneDamage.toFixed(1)}` : 'なし' },
+        ...(score.rank === 'S' ? [{ label: '解放', value: 'スキルスロット3枠目', kind: 'new' as const }] : []),
+        { label: isNew ? '新種' : '重複', value: isNew ? label(defId) : 'スキルLv上昇', kind: 'new' },
+      ],
+    });
   };
-
-  async function startClean(defId: string, rarity: number): Promise<void> {
-    boot.classList.remove('hidden');
-    await progress(0.5, '母岩を切り出しています…');
-    clean.resize(renderer.aspect);
-    renderer.setScene(clean.scene, clean.camera);
-    await progress(1, '');
-    ui.show('clean', { defId, rarity, seed: (Date.now() ^ 0x51ed) >>> 0 });
-    audio.startMusic('calm');
-    setTimeout(() => boot.classList.add('hidden'), 200);
-  }
 
   battleScreen.onFinish = (winner) => {
     data.stats.battles++;
+    const rows: ResultData['rows'] = [];
     if (winner === 0) {
       data.stats.wins++;
       data.stageProgress++;
-      data.player.coins += 120 + data.stageProgress * 40;
-      // EXPは前列に厚く配る。さらに未育成ユニットにはキャッチアップ補正
+      const coins = 120 + data.stageProgress * 40;
+      data.player.coins += coins;
+      rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
+
       const setup = buildTeamSetup(data.roster, data.party.order, data.party.formation);
       const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
       setup?.members.forEach((m, i) => {
         const unit = data.roster.find((r) => r.uid === m.uid);
         if (!unit) return;
+        // 前列に厚く配る。未育成にはキャッチアップ補正をかけないと
+        // 「最初に育てた3体しか使えない」状態に固定される
         const share = i === 0 ? 0.5 : 0.25;
         const catchUp = unit.level < maxLv - 2 ? 2.0 : 1;
-        const { leveled } = addExp(unit, Math.round(1800 * share * catchUp));
-        if (leveled > 0) ui.toast(`${revosLabel(unit.defId)} が Lv${unit.level} に`, 'info', 2400);
+        const gain = Math.round(1800 * share * catchUp);
+        const { leveled } = addExp(unit, gain);
+        rows.push({
+          label: label(unit.defId),
+          value: leveled > 0 ? `+${gain} EXP → Lv${unit.level}` : `+${gain} EXP`,
+          kind: 'exp',
+        });
       });
+      rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
+    } else {
+      rows.push({ label: '結果', value: winner === 1 ? '敗北' : '引き分け' });
+      rows.push({ label: '助言', value: '編成と陣形を見直そう' });
     }
     writeSave(data);
-    setTimeout(() => {
-      ui.show('title');
-      title.setHasSave(true);
-      audio.startMusic('calm');
-      renderer.setScene(titleScene, titleCam);
-    }, 600);
+    showResult({
+      title: winner === 0 ? 'VICTORY' : winner === 1 ? 'DEFEAT' : 'DRAW',
+      subtitle: `${player?.sim.turnCount ?? 0} 行動`,
+      good: winner === 0,
+      rows,
+    });
   };
 
-  function revosLabel(defId: string): string {
-    return REVOS.find((r) => r.id === defId)?.name ?? defId;
-  }
-
-  async function startBattle(): Promise<void> {
-    const mine = buildTeamSetup(data.roster, data.party.order, data.party.formation);
-    if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); return; }
-    boot.classList.remove('hidden');
-    await progress(0.4, '闘技場を生成しています…');
-    const seed = (Date.now() ^ (data.stageProgress * 104729)) >>> 0;
-    battle.buildArena(data.unlockedBiomes[0] ?? 'canyon', seed);
-    const foes = buildEnemyTeam(data.stageProgress, seed);
-    player = new BattlePlayer(seed, mine, foes, battle);
-    battleScreen.setPlayer(player);
-    player.speed = data.settings.battleSpeed;
-    await progress(0.9, 'リヴォスを復元しています…');
-    battle.resize(renderer.aspect);
-    renderer.setScene(battle.scene, battle.camera);
-    renderer.invalidateShadows();
-    player.start();
-    ui.show('battle');
-    audio.startMusic('battle');
-    await progress(1, '');
-    setTimeout(() => boot.classList.add('hidden'), 200);
-  }
-
-  dig.events.onCollect = (n) => {
-    if (n.kind === 'fossil') runFossils.push({ defId: n.speciesId, rarity: n.rarity });
+  partyScreen.onBack = () => goHome();
+  partyScreen.onApply = (order, formation) => {
+    data.party.order = order;
+    data.party.formation = formation;
+    writeSave(data);
+    ui.toast('編成を保存した', 'info', 1600);
+    goHome();
   };
 
-  async function startRun(biome: BiomeId): Promise<void> {
-    runFossils = [];
-    boot.classList.remove('hidden');
-    await progress(0.35, 'エリアを生成しています…');
-    const seed = (Date.now() ^ (data.daily.runs * 7919)) >>> 0;
-    dig.load(biome, seed, speciesPool, dropDecay(data.daily.runs));
-    await progress(0.85, 'メッシュを構築しています…');
-    dig.resize(renderer.aspect);
-    renderer.setScene(dig.scene, dig.camera);
-    renderer.invalidateShadows();
-    await progress(1, '準備完了');
-    ui.show('dig');
-    audio.startMusic('dig');
-    setTimeout(() => boot.classList.add('hidden'), 260);
-  }
+  dexScreen.onBack = () => goHome();
 
-  // --- タイトル背景用の軽いシーン ---
+  resultScreen.onNext = () => goHome();
+  resultScreen.onAgain = () => {
+    const t = pendingResult?.title ?? '';
+    if (t === '精錬完了') {
+      const s = data.stock.shift();
+      if (s) { writeSave(data); void startClean(s.defId, s.rarity); return; }
+      void startBattle();
+    } else {
+      void startBattle();
+    }
+  };
+
+  // ---------------------------------------------------------------- タイトル背景
+
   const titleScene = new THREE.Scene();
   const titleCam = new THREE.PerspectiveCamera(48, 1, 0.1, 200);
   titleCam.position.set(0, 3, 8);
@@ -215,38 +311,42 @@ async function main(): Promise<void> {
   renderer.setScene(titleScene, titleCam);
   ui.show('title');
 
-  // 開発用の直接遷移。?screen=clean / ?screen=battle で各画面を単体確認できる
+  // 開発用の直接遷移
   const jump = new URLSearchParams(location.search).get('screen');
-  if (jump === 'clean') {
+  if (jump) {
     grantStarters(data);
-    void startClean('ignirapt', 2);
-  } else if (jump === 'battle') {
-    grantStarters(data);
-    void startBattle();
+    if (jump === 'clean') void startClean('ignirapt', 2);
+    else if (jump === 'battle') void startBattle();
+    else if (jump === 'home') goHome();
+    else if (jump === 'party') { partyScreen.setData(data); ui.show('party'); }
+    else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
+    else if (jump === 'dig') void startRun('canyon');
   }
 
-  // --- 入力の解錠（iOSはユーザージェスチャが要る）---
-  const unlock = () => {
+  // ---------------------------------------------------------------- 環境
+
+  const unlock = (): void => {
     void audio.unlock();
     audio.setVolumes(data.settings.sfx, data.settings.bgm);
-    audio.startMusic('calm');
+    if (ui.currentName === 'title') audio.startMusic('calm');
     removeEventListener('pointerdown', unlock);
     removeEventListener('keydown', unlock);
   };
-  addEventListener('pointerdown', unlock, { once: false });
-  addEventListener('keydown', unlock, { once: false });
+  addEventListener('pointerdown', unlock);
+  addEventListener('keydown', unlock);
 
-  // --- リサイズ ---
   let resizeTimer: number | undefined;
-  const onResize = () => {
+  const onResize = (): void => {
     if (resizeTimer !== undefined) clearTimeout(resizeTimer);
     // URLバーの出入りで resize が連発するのでデバウンスする
     resizeTimer = setTimeout(() => {
       renderer.resize();
-      dig.resize(renderer.aspect);
-      battle.resize(renderer.aspect);
-      clean.resize(renderer.aspect);
-      titleCam.aspect = renderer.aspect;
+      const a = renderer.aspect;
+      dig.resize(a);
+      battle.resize(a);
+      clean.resize(a);
+      home.resize(a);
+      titleCam.aspect = a;
       titleCam.updateProjectionMatrix();
     }, 120) as unknown as number;
   };
@@ -255,15 +355,27 @@ async function main(): Promise<void> {
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(onResize).observe(document.body);
   onResize();
 
-  // --- 中断でポーズ ---
   let paused = false;
   document.addEventListener('visibilitychange', () => {
     paused = document.hidden;
     if (paused) audio.stopMusic();
-    else if (ui.currentName === 'dig') audio.startMusic('dig');
+    else {
+      const s = ui.currentName;
+      audio.startMusic(s === 'battle' ? 'battle' : s === 'dig' ? 'dig' : 'calm');
+    }
   });
 
-  // --- デバッグHUD ---
+  // ブラウザの戻る／Androidのバックジェスチャをゲーム内の戻るとして受ける
+  history.pushState({ guard: true }, '');
+  addEventListener('popstate', () => {
+    history.pushState({ guard: true }, '');
+    const s = ui.currentName;
+    if (s === 'home' || s === 'title') return;
+    if (s === 'dig') { dig.setMode('explore'); goHome(); }
+    else if (s === 'battle') return; // 戦闘中は抜けさせない
+    else goHome();
+  });
+
   const debug = document.createElement('div');
   debug.className = 'debug-hud';
   uiEl.appendChild(debug);
@@ -271,7 +383,8 @@ async function main(): Promise<void> {
   debug.hidden = !showDebug;
   let debugTimer = 0;
 
-  // --- ループ ---
+  // ---------------------------------------------------------------- ループ
+
   let last = performance.now();
   const loop = (now: number): void => {
     requestAnimationFrame(loop);
@@ -281,19 +394,28 @@ async function main(): Promise<void> {
     if (paused) return;
 
     input.beginFrame();
-    const screen = ui.currentName;
-    if (screen === 'dig') {
-      dig.update(dt, input, true);
-      if (dig.consumeShadowDirty()) renderer.invalidateShadows();
-    } else if (screen === 'battle') {
-      player?.update(dt);
-      battle.update(dt);
-    } else if (screen === 'clean') {
-      // 更新は CleanScreen.update から駆動する（入力と時間が結び付くため）
-    } else {
-      titleCam.position.x = Math.sin(now * 0.00012) * 9;
-      titleCam.position.z = Math.cos(now * 0.00012) * 9;
-      titleCam.lookAt(0, 1.2, 0);
+    switch (ui.currentName) {
+      case 'dig':
+        dig.update(dt, input, true);
+        if (dig.consumeShadowDirty()) renderer.invalidateShadows();
+        break;
+      case 'battle':
+        player?.update(dt);
+        battle.update(dt);
+        break;
+      case 'clean':
+        // 更新は CleanScreen.update から駆動する（入力と時間が結び付くため）
+        break;
+      case 'home':
+      case 'party':
+      case 'dex':
+      case 'result':
+        home.update(dt);
+        break;
+      default:
+        titleCam.position.x = Math.sin(now * 0.00012) * 9;
+        titleCam.position.z = Math.cos(now * 0.00012) * 9;
+        titleCam.lookAt(0, 1.2, 0);
     }
     ui.update(dt);
     renderer.render(dt);
@@ -309,8 +431,7 @@ async function main(): Promise<void> {
           `${(1 / Math.max(dt, 1e-4)).toFixed(0)} fps  ${i.tier} x${i.scale.toFixed(2)}\n` +
           `calls ${i.calls}  tris ${(i.triangles / 1000).toFixed(0)}k\n` +
           `geo ${i.geometries}  prog ${i.programs}\n` +
-          `css ${cv.clientWidth}x${cv.clientHeight} buf ${cv.width}x${cv.height}\n` +
-          `win ${innerWidth}x${innerHeight} dpr ${devicePixelRatio}`;
+          `css ${cv.clientWidth}x${cv.clientHeight} buf ${cv.width}x${cv.height}`;
       }
     }
   };
