@@ -70,7 +70,7 @@ export class DigScene {
   private digCooldown = 0;
   private digging = false;
   /** 一時的に開いている穴。時間が来たら埋め戻す */
-  private holes: { cells: { x: number; y: number; z: number; v: number }[]; t: number; life: number }[] = [];
+  private holes: { key: number; cells: { x: number; y: number; z: number; v: number }[]; t: number; life: number }[] = [];
   /** 地点ごとの掘削深度（ボクセル単位）。地形は変えずここだけを進める */
   private digDepth = new Map<number, number>();
   /** 回収済みで埋め戻してはいけない化石ボクセル */
@@ -265,10 +265,15 @@ export class DigScene {
     const speedMul = this.charging > 0 ? 0.6 : 1;
 
     if (len > 0.08) {
-      // カメラ基準の移動。画面の上＝奥に進む
+      // カメラ基準の移動。画面の上＝奥、画面の右＝A/D の D。
+      //
+      // カメラはプレイヤーの手前（-forward 側）にいるので
+      //   forward = ( sin(camYaw), 0, cos(camYaw) )
+      //   right   = forward × up = ( -cos(camYaw), 0, sin(camYaw) )
+      // right の X 符号を落とすと左右が入れ替わる（実際そうなっていた）。
       const sin = Math.sin(this.camYaw);
       const cos = Math.cos(this.camYaw);
-      const wx = mx * cos - mz * sin;
+      const wx = -mx * cos + mz * sin;
       const wz = mx * sin + mz * cos;
       const l = Math.hypot(wx, wz) || 1;
       this.tmpDir.set(wx / l, 0, wz / l);
@@ -450,11 +455,15 @@ export class DigScene {
     const key = gx + gz * AREA_VOX;
     const depth = (this.digDepth.get(key) ?? 0) + 1;
 
-    // 掘り進める先のボクセル。空振りなら空振りと伝える
     const targetY = surface - depth;
     if (targetY < 2) { audio.uiError(); this.events.onDigBlocked?.(); return; }
-    const slot = this.world.grid.get(gx, targetY, gz);
-    if (slot === 0) { audio.uiError(); return; }
+
+    // 前回の穴がまだ埋まっていないと、その地点は空洞になっている。
+    // ここで「空だから掘れない」と弾くと同じ場所を2回以上掘れなくなる
+    // （＝どれだけ連打しても深度が 1 で止まり、化石に永久に届かない）。
+    // 空洞なら元の地層から硬さを推定して掘り進める。
+    let slot = this.world.grid.get(gx, targetY, gz);
+    if (slot === 0) slot = strataAt(surface - targetY);
 
     this.digDepth.set(key, depth);
     this.stamina = Math.max(0, this.stamina - 1);
@@ -476,7 +485,7 @@ export class DigScene {
     for (const n of this.site.nodes) {
       if (n.collected) continue;
       const planar = Math.hypot(n.cx - gx, n.cz - gz);
-      if (planar > n.radius + 1.6) continue;
+      if (planar > n.radius + 2.6) continue;
       const needed = Math.max(1, Math.round((this.site.heights[n.cx + n.cz * AREA_VOX] - n.cy)));
       if (depth + 1 < needed) {
         // 近いが浅い。手応えだけ返して「もう一掘り」を促す
@@ -511,7 +520,15 @@ export class DigScene {
         }
       }
     if (cells.length === 0) return;
-    this.holes.push({ cells, t: 0, life: 2.6 });
+    // 同じ地点を掘り続けている間は埋め戻さない。掘るたびに猶予を作り直す
+    const key = gx + gz * AREA_VOX;
+    const existing = this.holes.find((x) => x.key === key);
+    if (existing) {
+      existing.cells.push(...cells);
+      existing.t = 0;
+    } else {
+      this.holes.push({ key, cells, t: 0, life: 2.6 });
+    }
   }
 
   /** 穴を埋め戻す。掘った直後は見えていて、数秒で崩れて元に戻る */
@@ -526,6 +543,7 @@ export class DigScene {
         this.world.set(c.x, c.y, c.z, c.v);
       }
       this.holes.splice(i, 1);
+      this.digDepth.delete(hole.key);
       this.shadowDirty = true;
     }
   }
@@ -580,8 +598,20 @@ export class DigScene {
     this.events.onCollect?.(n);
   }
 
+  /** 開発用。指定ボクセル座標へ移動する */
+  teleportTo(gx: number, gz: number): void {
+    const h = this.site.heights[gx + gz * AREA_VOX];
+    this.pos.set((gx + 0.5) * VOXEL_SIZE, (h + 1) * VOXEL_SIZE, (gz + 0.5) * VOXEL_SIZE);
+    this.camPos.copy(this.resolveCameraOcclusion(this.cameraGoal()));
+  }
+
   get remainingFinds(): number {
     return this.site.nodes.filter((n) => !n.collected).length;
+  }
+
+  /** 化石だけの残数。鉱石は取りこぼしても発掘を終えてよい */
+  get remainingFossils(): number {
+    return this.site.nodes.filter((n) => !n.collected && n.kind === 'fossil').length;
   }
 
   // ------------------------------------------------------------ カメラ
@@ -665,6 +695,14 @@ export class DigScene {
     this.material.dispose();
     this.charMaterial.dispose();
   }
+}
+
+/** 地表からの深さに対応する地層。穴の中を掘るときの硬さ推定に使う */
+function strataAt(depthFromSurface: number): number {
+  if (depthFromSurface < 2) return T.SAND_DARK;
+  if (depthFromSurface < 5) return T.DIRT;
+  if (depthFromSurface < 9) return T.CLAY;
+  return T.ROCK;
 }
 
 function colorForSlot(slot: number, _biome: BiomeId): number {

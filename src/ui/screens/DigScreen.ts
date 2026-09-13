@@ -32,6 +32,13 @@ export class DigScreen extends Screen {
 
   onExit?: () => void;
   onFinish?: () => void;
+  /**
+   * 回収した埋蔵物をゲーム側へ渡す。
+   * DigScene.events は単一ハンドラなので、画面とゲームの両方が
+   * 直接代入すると後勝ちで一方が消える。所有は画面側に統一し、
+   * ゲームへはこのコールバックで流す。
+   */
+  onCollectFossil?: (node: BuriedNode) => void;
 
   constructor(private scene: DigScene) {
     super('dig');
@@ -85,6 +92,7 @@ export class DigScreen extends Screen {
     const deck = h('div', { class: 'deck deck--dig' },
       h('div', { class: 'deck-left' },
         button('俯瞰', () => this.toggleScan(), { class: 'btn--sm btn--ghost', key: 'Q' }),
+        button('引き上げる', () => this.leave(), { class: 'btn--sm btn--ghost' }),
       ),
       h('div', { class: 'deck-right' }, this.echoBtn, this.digBtn),
     );
@@ -117,6 +125,7 @@ export class DigScreen extends Screen {
       this.ui.flash('#f4a23c', 0.3);
     };
     this.scene.events.onCollect = (n) => {
+      this.onCollectFossil?.(n);
       this.onCollect(n);
       this.updateFinds();
     };
@@ -145,8 +154,10 @@ export class DigScreen extends Screen {
       this.ui.toast('鉱石を回収（強化素材）', 'info', 2200);
     }
     this.ui.flash('#ffffff', 0.22);
-    if (this.scene.remainingFinds === 0) {
-      setTimeout(() => this.onFinish?.(), 1400);
+    // 鉱石の取りこぼしで足止めしない。化石が尽きたら引き上げる
+    if (this.scene.remainingFossils === 0) {
+      this.ui.toast('化石をすべて掘り出した', 'info', 2000);
+      setTimeout(() => this.onFinish?.(), 1600);
     }
   }
 
@@ -159,6 +170,12 @@ export class DigScreen extends Screen {
   private fireEcho(): void {
     if (this.echoRemain > 0) { audio.uiError(); return; }
     this.scene.requestEcho();
+  }
+
+  private leave(): void {
+    audio.uiTap();
+    void this.ui.confirm('発掘を終える', '掘り出した化石を持って引き上げます。', '引き上げる')
+      .then((ok) => { if (ok) this.onExit?.(); });
   }
 
   private toggleScan(): void {

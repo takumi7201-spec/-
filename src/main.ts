@@ -204,11 +204,17 @@ async function main(): Promise<void> {
     }
   };
 
-  dig.events.onCollect = (n) => {
+  digScreen.onCollectFossil = (n) => {
     if (n.kind === 'fossil') runFossils.push({ defId: n.speciesId, rarity: n.rarity });
+    else data.player.coins += 40 + n.rarity * 20;
   };
-
-  digScreen.onExit = () => { audio.uiBack(); dig.setMode('explore'); goHome(); };
+  digScreen.onExit = () => {
+    audio.uiBack();
+    dig.setMode('explore');
+    // 途中で抜けても拾ったものは失わせない
+    if (runFossils.length > 0) { digScreen.onFinish?.(); return; }
+    goHome();
+  };
   digScreen.onFinish = () => {
     data.stats.runs++;
     data.daily.runs++;
@@ -229,7 +235,7 @@ async function main(): Promise<void> {
   };
 
   cleanScreen.onFinish = (score, defId) => {
-    const { isNew } = addFossil(data, defId, score.clean);
+    const { isNew, unit } = addFossil(data, defId, score.clean);
     data.stats.fossils++;
     writeSave(data);
     showResult({
@@ -242,7 +248,12 @@ async function main(): Promise<void> {
         { label: '岩の除去', value: `${Math.round(score.rockRatio * 100)}%` },
         { label: '骨の損傷', value: score.boneDamage > 0 ? `-${score.boneDamage.toFixed(1)}` : 'なし' },
         ...(score.rank === 'S' ? [{ label: '解放', value: 'スキルスロット3枠目', kind: 'new' as const }] : []),
-        { label: isNew ? '新種' : '重複', value: isNew ? label(defId) : 'スキルLv上昇', kind: 'new' },
+        isNew
+          ? { label: '新種を入手', value: label(defId), kind: 'new' as const }
+          : { label: `${label(defId)}（所持済み）`, value: `スキルLv ${unit.skillLevel}`, kind: 'new' as const },
+        ...(data.stock.length > 0
+          ? [{ label: '未精錬のストック', value: `${data.stock.length} 個` }]
+          : []),
       ],
     });
   };
@@ -395,6 +406,9 @@ async function main(): Promise<void> {
   debug.className = 'debug-hud';
   uiEl.appendChild(debug);
   const showDebug = new URLSearchParams(location.search).has('debug');
+  if (showDebug) {
+    (window as unknown as { __game: unknown }).__game = { dig, clean, battle, home, ui, get data() { return data; } };
+  }
   debug.hidden = !showDebug;
   let debugTimer = 0;
 

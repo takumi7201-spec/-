@@ -96,7 +96,17 @@ export function load(): SaveData {
     // 日付が変わっていたら周回数をリセット（逓減ドロップの基準）
     const t = todayKey();
     if (data.daily?.date !== t) data.daily = { date: t, runs: 0 };
-    return { ...defaultSave(), ...data };
+    const base = defaultSave();
+    // 浅いマージだと、後から足した設定キーが既存プレイヤーに一生届かない。
+    // settings と party はネストしているので個別に埋める
+    return {
+      ...base,
+      ...data,
+      settings: { ...base.settings, ...(data.settings ?? {}) },
+      player: { ...base.player, ...(data.player ?? {}) },
+      party: { ...base.party, ...(data.party ?? {}) },
+      stats: { ...base.stats, ...(data.stats ?? {}) },
+    };
   } catch {
     return defaultSave();
   }
