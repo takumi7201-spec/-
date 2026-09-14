@@ -1,49 +1,105 @@
 /* =========================================================================
-   STRATA CORE — UI レイヤ
-   
-   方針（UI設計より）:
+   STRATA CORE — UI レイヤ（フィールドノート）
+
+   方針:
    - 画面を上下に割らない。L0ステージは常に全画面、UIはその上に浮くだけ
    - L1（情報）は pointer-events:none、L2（操作）だけが触れる
-   - ボクセルの物理に従う：面は平ら・エッジは立つ・影は単色・角丸は小さい
-   - 彩度の高いアクセント上の文字は必ず暗色（白抜きは1.9:1で読めない）
-   - 日本語Webフォントは読み込まない（初回DL予算を3Dに回す）
+   - UI は「発掘者の野帳」。紙・罫線・ペン・蛍光ペン・テープで構成する。
+     3D の地層は写真、UI はその上に貼った書き込み——という関係にする
+   - 面の言語は「押し出し」ではなく「紙の重なり」。硬いオフセット影をやめ、
+     やわらかい落ち影に変える。角丸は手描きの歪みで代用する
+   - インクは紙より濃い。彩度ではなく明度差でコントラストを取る
    ========================================================================= */
 
+/* 手書きの2書体。Google Fonts から取らず、このゲームが実際に出す字だけを
+   焼いたサブセットを同梱する（tools/subset-fonts.py）。
+   ネットワークに依存しないぶん、初回から書体が揃った状態で出せる */
+@font-face {
+  font-family: 'Zen Kurenaido';
+  src: url('./fonts/zen-kurenaido.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Yusei Magic';
+  src: url('./fonts/yusei-magic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  /* --- 地層の明度軸 --- */
-  --obsidian: #14100b;
-  --strata: #2a1f16;
-  --bedrock: #473424;
-  --clay: #6f5237;
-  --sandstone: #e5d2ae;
-  --bone: #f8f2e4;
+  /* --- 紙 --- */
+  --paper: #f1e9d6;
+  --paper-card: #f6f0e1;
+  --paper-shade: #e6dcc3;
+  --paper-edge: #cfc0a0;
+  --paper-deep: #d8cbac;
 
-  /* --- アクセント（面積比5%以下で使う） --- */
-  --amber: #f4a23c;
-  --ember: #c96f14;
-  --magma: #d9512f;
-  --magma-dark: #a63a1c;
-  --sonar: #2dc6a4;
-  --lagoon: #4ba6e2;
-  --relic: #b173dc;
-  --relic-dark: #7e4aa8;
-  --loam: #c98c2e;
-  --ash: #9c9086;
+  /* --- 罫線 --- */
+  --rule: rgba(58, 106, 150, 0.2);
+  --rule-strong: rgba(58, 106, 150, 0.3);
+  --margin-rule: rgba(190, 84, 74, 0.42);
 
-  /* --- 属性 --- */
-  --el-flame: #d9512f;
-  --el-aqua: #4ba6e2;
-  --el-terra: #c98c2e;
-  --el-gale: #2dc6a4;
-  --el-null: #9c9086;
+  /* --- インク --- */
+  --ink: #232c38;
+  --ink-line: #3a4352;
+  --ink-soft: #55606e;
+  --ink-faint: #8b8778;
+  --pencil: #6d675c;
 
-  --text: var(--bone);
-  --text-dim: #b8ad98;
-  --text-faint: #8a8071;
+  /* --- ペンの色（面積比5%以下で使う） --- */
+  --pen-red: #bf4038;
+  --pen-red-deep: #96291f;
+  --pen-blue: #2f5f9c;
+  --pen-green: #2f7a5c;
+  --pen-brown: #8a5f2b;
+  --pen-violet: #6f4a97;
 
-  --r-sm: 6px;
-  --r-md: 12px;
-  --r-lg: 20px;
+  /* --- 蛍光ペン --- */
+  --hl-amber: #ffd873;
+  --hl-amber-deep: #f0b53c;
+  --hl-mint: #9fe3c8;
+  --hl-rose: #f7b9ac;
+
+  /* 旧トークン名の互換。画面側の参照を一斉に書き換えないための橋 */
+  --obsidian: var(--ink);
+  --strata: var(--paper-card);
+  --bedrock: var(--paper-edge);
+  --clay: var(--pencil);
+  --sandstone: var(--paper-shade);
+  --bone: var(--paper-card);
+  --amber: var(--hl-amber);
+  --ember: var(--hl-amber-deep);
+  --magma: var(--pen-red);
+  --magma-dark: var(--pen-red-deep);
+  --sonar: var(--pen-green);
+  --lagoon: var(--pen-blue);
+  --relic: var(--pen-violet);
+  --relic-dark: #503271;
+  --loam: var(--pen-brown);
+  --ash: var(--ink-faint);
+
+  /* --- 属性（紙の上で読める濃さに落とす）--- */
+  --el-flame: #bf4038;
+  --el-aqua: #2f5f9c;
+  --el-terra: #9a6a16;
+  --el-gale: #2f7a5c;
+  --el-null: #6f6a60;
+
+  --text: var(--ink);
+  --text-dim: var(--ink-soft);
+  --text-faint: var(--ink-faint);
+
+  /* 紙に大きな角丸はない。歪みで手描きを出す */
+  --r-sm: 3px;
+  --r-md: 5px;
+  --r-lg: 8px;
+  /* ペンで囲うときの震え。大きく取ると細長い箱がレンズ型に潰れるので、
+     見た目が歪んで見える最小限（10〜18px）にとどめる */
+  --r-hand: 15px 5px 13px 7px / 6px 14px 5px 16px;
+  --r-hand-2: 5px 15px 7px 13px / 14px 6px 16px 5px;
 
   --dur-fast: 120ms;
   --dur: 220ms;
@@ -55,7 +111,6 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
-  /* ホームインジケータのスワイプ誤爆を避ける最低クリアランス */
   --deck-bottom: calc(var(--safe-b) + 12px);
 
   --gutter: 16px;
@@ -66,11 +121,23 @@
   --fs-display: 28px;
   --fs-num: 18px;
 
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
-    'Noto Sans JP', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+  /* 手書き。読み込み中は font-display:swap でシステムの丸ゴシックに退避する */
+  --font-hand: 'Zen Kurenaido', 'Klee One', 'Hiragino Maru Gothic ProN', 'Yu Gothic',
+    'Noto Sans JP', system-ui, sans-serif;
+  --font-marker: 'Yusei Magic', var(--font-hand);
+  --font-ui: var(--font-hand);
+
+  /* 紙の繊維。1枚だけ定義して大きな面にだけ敷く */
+  --fiber: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='4'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23f)' opacity='.5'/%3E%3C/svg%3E");
+  /* 罫線。カードの中でも同じピッチを使い、ページの一部に見せる */
+  --ruled: repeating-linear-gradient(180deg, transparent 0 25px, var(--rule) 25px 26px);
+
+  /* 紙の落ち影。硬いオフセットではなく浮きで出す */
+  --lift-1: 0 1px 2px rgba(74, 60, 38, 0.22), 0 3px 8px rgba(74, 60, 38, 0.12);
+  --lift-2: 0 2px 4px rgba(74, 60, 38, 0.24), 0 8px 18px rgba(74, 60, 38, 0.16);
+  --lift-3: 0 3px 6px rgba(74, 60, 38, 0.26), 0 16px 34px rgba(74, 60, 38, 0.2);
 }
 
-/* 密度。幅で文字と余白だけを変える（レイアウト型は別軸） */
 @media (min-width: 600px) {
   :root { --ui-scale: 1.08; --fs-body: 16px; --fs-label: 14px; --gutter: 20px; }
 }
@@ -88,7 +155,7 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--obsidian);
+  background: #2b2418;
   color: var(--text);
   font-family: var(--font-ui);
   font-size: var(--fs-body);
@@ -113,10 +180,40 @@ html, body {
 #ui .interactive, #ui button, #ui [data-ui-block] { pointer-events: auto; }
 
 /* =========================================================================
+   紙のユーティリティ
+   ========================================================================= */
+
+/* 罫線つきの紙。ページにも小さなカードにも同じピッチで敷く */
+.paper {
+  background-color: var(--paper-card);
+  background-image: var(--ruled);
+}
+
+/* 手描きの枠。角丸の非対称でペンの震えを出す */
+.sketch {
+  border: 1.5px solid var(--ink-line);
+  border-radius: var(--r-hand);
+}
+
+/* テープ。写真やメモを留める */
+.tape::before {
+  content: '';
+  position: absolute;
+  top: -9px; left: 50%;
+  width: 56px; height: 17px;
+  transform: translateX(-50%) rotate(-2.2deg);
+  background: rgba(246, 233, 190, 0.72);
+  border-left: 1px solid rgba(206, 188, 144, 0.6);
+  border-right: 1px solid rgba(206, 188, 144, 0.6);
+  box-shadow: 0 1px 2px rgba(74, 60, 38, 0.18);
+  pointer-events: none;
+}
+
+/* =========================================================================
    共通部品
    ========================================================================= */
 
-/* ボクセルの押し出しと同じ言語。押下で沈む */
+/* ペンで囲った語。押すと紙が沈む（影が縮む） */
 .btn {
   position: relative;
   display: inline-flex;
@@ -125,92 +222,138 @@ html, body {
   gap: 8px;
   min-height: 56px;
   padding: 0 20px;
-  border: 2px solid var(--obsidian);
-  border-radius: var(--r-md);
-  background: var(--sandstone);
-  color: var(--obsidian);
+  border: 1.5px solid var(--ink-line);
+  border-radius: var(--r-hand);
+  background: var(--paper-card);
+  color: var(--ink);
   font: inherit;
+  font-family: var(--font-hand);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.04em;
   cursor: pointer;
-  box-shadow: 0 4px 0 var(--bedrock);
+  box-shadow: var(--lift-1);
   transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
   -webkit-appearance: none;
   appearance: none;
 }
+/* 隣り合うボタンで歪みの向きを変える。同じ枠が並ぶと印刷に見える */
+.btn:nth-child(even) { border-radius: var(--r-hand-2); }
 .btn:active, .btn.is-pressed {
-  transform: translateY(4px);
-  box-shadow: 0 0 0 var(--bedrock);
+  transform: translate(1px, 2px);
+  box-shadow: 0 1px 1px rgba(74, 60, 38, 0.18);
 }
-.btn:disabled { opacity: 0.42; box-shadow: 0 4px 0 var(--bedrock); pointer-events: none; }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
 
-.btn--primary { background: var(--amber); box-shadow: 0 4px 0 var(--ember); min-height: 64px; font-size: 15px; }
-.btn--ghost { background: transparent; color: var(--bone); border-color: var(--clay); box-shadow: 0 4px 0 #241a12; }
-.btn--danger { background: var(--magma-dark); color: var(--bone); box-shadow: 0 4px 0 #6e2512; }
-.btn--sm { min-height: 44px; padding: 0 12px; font-size: 12px; border-radius: var(--r-sm); box-shadow: 0 3px 0 var(--bedrock); }
-.btn--sm:active { transform: translateY(3px); }
+/* 主アクションは蛍光ペンで塗る。塗り残しからは紙が見えるべきで、
+   背景が透けてはいけない——下地に紙を必ず敷く */
+.btn--primary {
+  background-color: var(--paper-card);
+  background-image:
+    linear-gradient(100deg, transparent 0 1%, var(--hl-amber) 3% 97%, transparent 99%);
+  border-width: 2px;
+  min-height: 64px;
+  font-size: 15px;
+}
+/* 3D の上に浮くこともあるので、下地は薄く残す。完全な透明にすると
+   砂色の地層に文字が沈む */
+.btn--ghost {
+  background: var(--paper-shade);
+  border-color: var(--pencil); border-style: dashed;
+  box-shadow: none;
+}
+.btn--danger {
+  background-color: var(--paper-card);
+  background-image: linear-gradient(100deg, transparent 0 1%, var(--hl-rose) 3% 97%, transparent 99%);
+  border-color: var(--pen-red);
+}
+.btn--sm { min-height: 44px; padding: 0 12px; font-size: 12px; }
 .btn--icon { min-width: 56px; padding: 0; flex-direction: column; gap: 2px; }
-.btn--round { border-radius: 50%; min-width: 72px; min-height: 72px; padding: 0; }
+.btn--round { border-radius: 49% 51% 47% 53% / 52% 48% 53% 47%; min-width: 72px; min-height: 72px; padding: 0; }
 .btn--wide { width: 100%; }
 
-.btn .k { font-size: 10px; font-weight: 700; opacity: 0.55; letter-spacing: 0.1em; }
+.btn .k { font-size: 10px; opacity: 0.5; letter-spacing: 0.1em; }
+.btn-label { font-family: var(--font-hand); }
 
-/* パネルは不透明。背後のボクセルの原色が透けると文字が読めない */
-.panel {
-  background: var(--strata);
-  border: 2px solid var(--obsidian);
-  border-radius: var(--r-md);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45);
+/* 選択中は蛍光ペンでなぞった状態。枠の塗りつぶしにしない——
+   塗りつぶすと「印刷されたボタン」になり、書き込みに見えなくなる */
+.is-on, .btn.is-on {
+  background-color: var(--paper-card);
+  background-image:
+    linear-gradient(100deg, transparent 0 2%, var(--hl-amber) 4% 96%, transparent 98%);
+  border-color: var(--ink);
+  border-width: 2px;
 }
-.panel--sunk { background: var(--obsidian); border-color: var(--bedrock); box-shadow: none; }
-.panel--light { background: var(--sandstone); color: var(--obsidian); }
 
+/* 紙。背後のボクセルを透かさない。透かすと書き込みが読めない */
+.panel {
+  position: relative;
+  background-color: var(--paper-card);
+  background-image: var(--ruled);
+  border: 1.5px solid var(--ink-line);
+  border-radius: var(--r-hand);
+  box-shadow: var(--lift-2);
+}
+.panel--sunk {
+  background-color: var(--paper-shade);
+  background-image: none;
+  border-style: dashed;
+  border-color: var(--pencil);
+  box-shadow: none;
+}
+.panel--light { background-color: var(--paper); color: var(--ink); }
+
+/* 手描きのゲージ。枠はペン、中身はインクを流し込む */
 .bar {
   position: relative;
-  height: 10px;
-  background: var(--obsidian);
-  border: 2px solid var(--obsidian);
-  border-radius: var(--r-sm);
+  height: 11px;
+  background: var(--paper-shade);
+  border: 1.5px solid var(--ink-line);
+  border-radius: 2px;
   overflow: hidden;
 }
 .bar > i {
   display: block;
   height: 100%;
   width: 0%;
-  background: var(--sonar);
+  background-color: var(--pen-green);
+  /* インクのムラ。均一な帯だと印刷に見える */
+  background-image: repeating-linear-gradient(
+    -52deg, rgba(255, 255, 255, 0.22) 0 3px, transparent 3px 7px);
   transition: width var(--dur) var(--ease);
 }
-.bar--hp > i { background: var(--sonar); }
-.bar--hp.is-low > i { background: var(--magma); }
-.bar--hp.is-mid > i { background: var(--amber); }
-.bar--od > i { background: var(--amber); }
-.bar--exp > i { background: var(--lagoon); }
-.bar--slim { height: 6px; }
-/* シールドは本体バーの上に重ねる */
-.bar > .shield { position: absolute; inset: 0 auto 0 0; background: var(--lagoon); opacity: 0.55; }
+.bar--hp > i { background-color: var(--pen-green); }
+.bar--hp.is-low > i { background-color: var(--pen-red); }
+.bar--hp.is-mid > i { background-color: var(--hl-amber-deep); }
+.bar--od > i { background-color: var(--hl-amber-deep); }
+.bar--exp > i { background-color: var(--pen-blue); }
+.bar--slim { height: 7px; }
+.bar > .shield { position: absolute; inset: 0 auto 0 0; background: var(--pen-blue); opacity: 0.5; }
 
-.num { font-variant-numeric: tabular-nums; font-weight: 700; }
+.num { font-variant-numeric: tabular-nums; font-family: var(--font-marker); letter-spacing: 0.02em; }
+
+/* 見出しは赤ペンの書き込み。小文字の間延びを避けて短く置く */
 .label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  color: var(--text-faint);
+  font-family: var(--font-marker);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--pen-red);
   text-transform: uppercase;
 }
 
+/* 属性は丸で囲った注記。四角い箱にすると印刷物に見える */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   height: 22px;
-  padding: 0 8px;
-  border-radius: var(--r-sm);
-  background: var(--obsidian);
-  border: 1px solid currentColor;
+  padding: 0 9px;
+  border-radius: 48% 52% 47% 53% / 56% 44% 58% 42%;
+  background: transparent;
+  border: 1.5px solid currentColor;
+  font-family: var(--font-hand);
   font-size: 11px;
-  font-weight: 700;
   letter-spacing: 0.06em;
 }
 .chip--flame { color: var(--el-flame); }
@@ -234,21 +377,30 @@ html, body {
 }
 .screen.is-active { opacity: 1; }
 
-/* L1: 上端の常時情報。旧「上画面」の役割 */
+/* L1: 上端の常時情報。ページの端が写真の上にめくれている見立て */
 .status-strip {
   position: absolute;
   top: 0; left: 0; right: 0;
-  padding: calc(var(--safe-t) + 8px) calc(var(--gutter) + var(--safe-l)) 8px
+  padding: calc(var(--safe-t) + 8px) calc(var(--gutter) + var(--safe-l)) 10px
     calc(var(--gutter) + var(--safe-r));
   display: flex;
   align-items: center;
   gap: 12px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(20, 16, 11, 0.92) 0%, rgba(20, 16, 11, 0) 100%);
+  background:
+    linear-gradient(180deg, var(--paper) 0 62%, rgba(241, 233, 214, 0) 100%);
+}
+/* めくれた紙の切り口 */
+.status-strip::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: calc(var(--safe-t) + 52px);
+  height: 1px;
+  background: var(--rule-strong);
+  opacity: 0.7;
 }
 .status-strip > .interactive { pointer-events: auto; }
 
-/* L1: 周縁情報 */
 .rail {
   position: absolute;
   pointer-events: none;
@@ -259,7 +411,7 @@ html, body {
 .rail--l { left: calc(var(--gutter) + var(--safe-l)); top: 50%; transform: translateY(-50%); }
 .rail--r { right: calc(var(--gutter) + var(--safe-r)); top: 96px; }
 
-/* L2: 親指デッキ。旧「下画面」の役割 */
+/* L2: 親指デッキ。ページの下端 */
 .deck {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -269,11 +421,11 @@ html, body {
   align-items: flex-end;
   gap: 12px;
   pointer-events: none;
-  background: linear-gradient(0deg, rgba(20, 16, 11, 0.9) 30%, rgba(20, 16, 11, 0) 100%);
+  background: linear-gradient(0deg, var(--paper) 34%, rgba(241, 233, 214, 0) 100%);
 }
 .deck > * { pointer-events: auto; }
 
-/* L2: トースト */
+/* L2: トースト。付箋を1枚貼る */
 .toast-area {
   position: absolute;
   left: 50%;
@@ -288,67 +440,72 @@ html, body {
 }
 .toast {
   padding: 10px 18px;
-  background: var(--strata);
-  border: 2px solid var(--obsidian);
-  border-left: 4px solid var(--sonar);
-  border-radius: var(--r-sm);
+  background: var(--hl-amber);
+  color: var(--ink);
+  border: 0;
+  border-left: 5px solid var(--pen-green);
+  border-radius: 2px 10px 3px 8px / 8px 3px 10px 2px;
+  font-family: var(--font-hand);
   font-size: var(--fs-label);
-  font-weight: 700;
   animation: toast-in var(--dur) var(--ease-back);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: var(--lift-2);
+  transform: rotate(-0.7deg);
   max-width: 100%;
 }
-.toast--warn { border-left-color: var(--amber); }
-.toast--bad { border-left-color: var(--magma); }
+.toast--warn { border-left-color: var(--hl-amber-deep); background: #ffe9a8; }
+.toast--bad { border-left-color: var(--pen-red); background: var(--hl-rose); }
 .toast.is-out { animation: toast-out var(--dur) var(--ease) forwards; }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(14px) scale(0.96); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translateY(14px) rotate(-3deg) scale(0.96); }
+  to { opacity: 1; transform: rotate(-0.7deg); }
 }
 @keyframes toast-out {
-  to { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 0; transform: translateY(-8px) rotate(-2deg); }
 }
 
 /* L3: モーダル／シート */
 .scrim {
   position: absolute;
   inset: 0;
-  background: rgba(10, 8, 5, 0.62);
+  background: rgba(48, 38, 24, 0.46);
   pointer-events: auto;
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
 .scrim.is-open { opacity: 1; }
 
+/* 差し込んだ別紙 */
 .sheet {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   max-height: 78dvh;
   display: flex;
   flex-direction: column;
-  background: var(--strata);
-  border-top: 2px solid var(--obsidian);
+  background-color: var(--paper-card);
+  background-image: var(--ruled);
+  border-top: 1.5px solid var(--ink-line);
   border-radius: var(--r-lg) var(--r-lg) 0 0;
   padding: 8px calc(var(--gutter) + var(--safe-l)) var(--deck-bottom)
     calc(var(--gutter) + var(--safe-r));
   transform: translateY(100%);
   transition: transform var(--dur-slow) var(--ease);
   pointer-events: auto;
+  box-shadow: var(--lift-3);
 }
 .sheet.is-open { transform: none; }
 .sheet .grabber {
-  width: 44px; height: 4px;
-  background: var(--clay);
+  width: 44px; height: 3px;
+  background: var(--pencil);
   border-radius: 2px;
   margin: 6px auto 12px;
   flex: none;
+  opacity: 0.5;
 }
 .sheet .sheet-body { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 
 /* =========================================================================
    レイアウト型: WIDE（スマホ横 / PC）
-   縦持ちで完結させ、横持ちでは「おまけ」だけを足す
    ========================================================================= */
 body[data-layout='wide'] .deck { justify-content: center; }
 body[data-layout='wide'] .side-only { display: flex; }
@@ -369,7 +526,7 @@ body[data-layout='tower'] .side-only { display: none; }
 .side-panel--r { right: calc(var(--gutter) + var(--safe-r)); }
 
 /* =========================================================================
-   ブート
+   ブート — 表紙を開く
    ========================================================================= */
 #boot {
   position: absolute;
@@ -377,43 +534,54 @@ body[data-layout='tower'] .side-only { display: none; }
   z-index: 100;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at 50% 42%, #241a12 0%, #0c0907 72%);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, transparent 0 38px, var(--margin-rule) 38px 39px, transparent 39px),
+    var(--ruled),
+    var(--fiber);
+  background-blend-mode: normal, normal, multiply;
   transition: opacity var(--dur-slow) var(--ease);
 }
 #boot.hidden { opacity: 0; pointer-events: none; }
 .boot-inner { text-align: center; width: min(420px, 76vw); }
 .boot-logo { display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; }
 .boot-logo-main {
+  font-family: var(--font-marker);
   font-size: clamp(30px, 9vw, 52px);
-  font-weight: 800;
-  color: var(--bone);
-  letter-spacing: 0.16em;
-  text-shadow: 0 3px 0 var(--bedrock);
+  color: var(--ink);
+  letter-spacing: 0.1em;
 }
 .boot-logo-sub {
+  font-family: var(--font-hand);
   font-size: clamp(11px, 3.2vw, 15px);
-  font-weight: 700;
-  color: var(--amber);
-  letter-spacing: 0.54em;
-  margin-top: 6px;
-  margin-left: 0.54em;
+  color: var(--pen-red);
+  letter-spacing: 0.5em;
+  margin-top: 4px;
+  margin-left: 0.5em;
 }
-.boot-bar { height: 4px; width: 100%; background: var(--strata); border-radius: 2px; overflow: hidden; }
+.boot-bar {
+  height: 9px; width: 100%;
+  background: var(--paper-shade);
+  border: 1.5px solid var(--ink-line);
+  border-radius: 2px;
+  overflow: hidden;
+}
 .boot-bar i {
   display: block; height: 100%; width: 0%;
-  background: var(--amber);
+  background-color: var(--pen-blue);
+  background-image: repeating-linear-gradient(-52deg, rgba(255,255,255,.25) 0 3px, transparent 3px 7px);
   transition: width var(--dur) var(--ease);
 }
 .boot-status {
   margin-top: 14px;
   font-size: 12px;
-  color: var(--text-faint);
-  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  letter-spacing: 0.06em;
   min-height: 1.3em;
 }
 
 /* =========================================================================
-   フラッシュ（ポスプロ0パスのティア用にCSSで代替）
+   最上層のオーバレイ
    ========================================================================= */
 #flash {
   position: absolute;
@@ -424,22 +592,23 @@ body[data-layout='tower'] .side-only { display: none; }
   mix-blend-mode: screen;
 }
 
-/* 砂の質感。個別パーツに貼らず最上層に1枚だけ */
+/* 紙の繊維。個別パーツに貼らず最上層に1枚だけ */
 #grain {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 60;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
+  opacity: 0.075;
+  mix-blend-mode: multiply;
+  background-image: var(--fiber);
 }
-/* 周縁減光。GPUを使わないビネット */
+/* 周縁減光。紙の陰りとして温色で落とす */
 #vignette {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 55;
-  background: radial-gradient(ellipse at 50% 46%, transparent 52%, rgba(8, 6, 4, 0.26) 100%);
+  background: radial-gradient(ellipse at 50% 46%, transparent 54%, rgba(92, 72, 42, 0.24) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -450,4 +619,4 @@ body[data-layout='tower'] .side-only { display: none; }
   }
 }
 
-:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+:focus-visible { outline: 2.5px solid var(--pen-red); outline-offset: 2px; }
