@@ -374,6 +374,10 @@ html, body {
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
+  /* 画面内の z-index を画面の中で閉じる。閉じないと、たとえば図鑑の
+     ページを前に出すための z-index が、あとから開くシートより前に
+     出てしまい、詳細の上にグリッドが乗る */
+  isolation: isolate;
 }
 .screen.is-active { opacity: 1; }
 

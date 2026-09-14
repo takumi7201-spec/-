@@ -680,10 +680,13 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 }
 .dex-stat .num { font-size: 15px; }
 .dex-skill { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink-soft); line-height: 1.7; }
-.dex-skill b { font-size: 12px; color: var(--ink); font-weight: 400; }
+/* 技名は行の幅いっぱいの箱になるので、蛍光ペンが行全体に伸びてしまう。
+   文字ぶんだけに縮めてから引く */
+.dex-skill b { font-size: 12px; color: var(--ink); font-weight: 400; align-self: flex-start; }
 .dex-skill b.od {
   color: var(--ink);
-  background: linear-gradient(180deg, transparent 58%, var(--hl-amber) 58% 96%, transparent 96%);
+  padding: 0 3px;
+  background: linear-gradient(180deg, transparent 12%, var(--hl-amber) 12% 92%, transparent 92%);
 }
 .dex-owned, .dex-habitat { font-size: 12px; color: var(--ink-soft); display: flex; gap: 8px; align-items: center; }
 
