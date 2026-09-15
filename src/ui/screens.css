@@ -897,6 +897,11 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
   display: block;
   object-fit: contain;
 }
+/* ★5 は img ではなくキャンバスで返る。キャンバスには object-fit が効かず、
+   横長の枠に入れると絵が伸びる。高さ基準にして正方形を保つ */
+canvas.slot-icon, canvas.roster-icon, canvas.dex-icon {
+  width: auto; aspect-ratio: 1; margin-left: auto; margin-right: auto;
+}
 .slot-icon { width: 100%; height: 46px; margin-bottom: 2px; }
 .roster-icon { width: 100%; height: 36px; }
 .dex-icon { width: 100%; height: 52px; }

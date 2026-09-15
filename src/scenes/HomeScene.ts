@@ -164,6 +164,7 @@ export class HomeScene {
       height: 2.6 * (def.build.scale ?? 1),
       facingRight: true,
       shadow: 0.34,
+      holo: def.rarity >= 5,
     });
     this.guest.root.position.set(2.1, 0.62, -0.4);
     this.scene.add(this.guest.root);

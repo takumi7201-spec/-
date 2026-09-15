@@ -181,6 +181,7 @@ export class BattleScene {
         height: 1.95 * (def.build.scale ?? 1),
         facingRight: f.side === 0,
         shadow: 0.3,
+        holo: def.rarity >= 5,
       });
       const [px, pz] = SLOT_POS[f.side][f.slot];
       unit.root.position.set(px, 0, pz);

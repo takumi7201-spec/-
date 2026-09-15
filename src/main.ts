@@ -18,6 +18,7 @@ import { BattleScene } from './scenes/BattleScene';
 import { HomeScene } from './scenes/HomeScene';
 import { BattlePlayer } from './game/battle/BattlePlayer';
 import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil } from './game/party';
+import { advanceHoloTime } from './fx/SpriteUnit';
 import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
 import {
@@ -452,6 +453,8 @@ async function main(): Promise<void> {
         titleCam.position.z = Math.cos(now * 0.00012) * 9;
         titleCam.lookAt(0, 1.2, 0);
     }
+    // ホロ表現の時間はシーンに属さない。どの画面でも同じ速さで流す
+    advanceHoloTime(dt);
     ui.update(dt);
     renderer.render(dt);
     input.endFrame();
