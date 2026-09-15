@@ -102,8 +102,9 @@ export function buildFossilBlock(defId: string, rarity: number, seed: number): F
   seedNoise(seed ^ 0x1234);
   const rng = new Rng(seed ^ 0x77);
 
-  // 骨の周囲を岩で埋める。レアほど硬い岩の割合が高い
-  const hardBias = 0.18 + rarity * 0.1;
+  // 骨の周囲を岩で埋める。レアほど硬い岩の割合が高い。
+  // 上限を置かないと ★5 で母岩がほぼ全部硬岩になり、削る計画が立たなくなる
+  const hardBias = Math.min(0.62, 0.18 + rarity * 0.1);
   let boneTotal = 0;
   let rockTotal = 0;
   for (let z = 0; z < SIZE.z; z++) {

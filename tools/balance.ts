@@ -26,9 +26,15 @@ function mkTeam(
   };
 }
 
+/**
+ * 線形合同法の下位ビットは周期が極端に短い（下位2ビットは周期4）。
+ * `% n` で取り出すと n が 4 の倍数を含むときに標本が強く偏り、
+ * ロスター数を 12→14 に変えただけで勝率が10pt単位で動いてしまう。
+ * 上位ビットから取り出すこと。
+ */
 function rngInt(s: { v: number }, n: number): number {
   s.v = (s.v * 1664525 + 1013904223) >>> 0;
-  return s.v % n;
+  return Math.floor((s.v / 0x100000000) * n);
 }
 
 const N = Number(process.argv[2] ?? 20000);

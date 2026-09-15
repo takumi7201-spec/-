@@ -2,7 +2,7 @@ import { Screen, type LayoutKind } from '../UIRoot';
 import { h, button, bar, clear } from '../dom';
 import type { BattlePlayer, Speed } from '../../game/battle/BattlePlayer';
 import type { BattleEvent, Side } from '../../game/battle/types';
-import { getRevos } from '../../game/data/revos';
+import { getRevos, revosShortName } from '../../game/data/revos';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
@@ -151,7 +151,7 @@ export class BattleScreen extends Screen {
             icon,
             h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
           ),
-          h('span', { class: 'card-name', text: def.name }),
+          h('span', { class: 'card-name', text: revosShortName(def.id) }),
           hp.el,
           h('div', { class: 'card-row' }, hpText, h('span', { class: 'card-od-label', text: 'OD' }), od.el),
         );
@@ -163,7 +163,7 @@ export class BattleScreen extends Screen {
             icon,
             h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
           ),
-          h('span', { class: 'card-name', text: def.name }),
+          h('span', { class: 'card-name', text: revosShortName(def.id) }),
           hp.el,
         );
         this.enemyRow.appendChild(el);

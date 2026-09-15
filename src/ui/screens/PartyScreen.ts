@@ -1,7 +1,7 @@
 import { Screen } from '../UIRoot';
 import { h, button, bar, clear } from '../dom';
 import type { SaveData, OwnedRevos } from '../../core/Save';
-import { getRevos } from '../../game/data/revos';
+import { getRevos, revosShortName } from '../../game/data/revos';
 import { FORMATIONS, TARGET_PREFS, type FormationId, type TargetPref } from '../../game/battle/types';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
@@ -114,7 +114,7 @@ export class PartyScreen extends Screen {
         slot.append(
           revosIcon(u.defId, 'slot-icon'),
           h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
-          h('span', { class: 'slot-name', text: def.name }),
+          h('span', { class: 'slot-name', text: revosShortName(def.id) }),
           h('span', { class: 'slot-sub num', text: `Lv${u.level} / ${cleanRank(u.clean)}ランク` }),
           h('span', { class: 'slot-sub num', text: `ATK ${Math.round(def.atk * mc * (1 + 0.055 * (u.level - 1)))}` }),
         );
@@ -155,7 +155,7 @@ export class PartyScreen extends Screen {
       const row = h('div', { class: 'tactic-row' });
       const head = h('div', { class: 'tactic-head' });
       if (u) {
-        head.append(revosIcon(u.defId, 'tactic-icon'), h('span', { class: 'tactic-name', text: getRevos(u.defId).name }));
+        head.append(revosIcon(u.defId, 'tactic-icon'), h('span', { class: 'tactic-name', text: revosShortName(u.defId) }));
       } else {
         head.append(h('span', { class: 'tactic-name dim', text: `スロット${i + 1}` }));
       }
@@ -201,7 +201,7 @@ export class PartyScreen extends Screen {
       card.append(
         revosIcon(u.defId, 'roster-icon'),
         h('span', { class: `chip chip--${d.element}`, text: ELEMENT_NAMES[d.element] }),
-        h('span', { class: 'roster-name', text: d.name }),
+        h('span', { class: 'roster-name', text: revosShortName(d.id) }),
         h('span', { class: 'roster-sub num', text: `Lv${u.level} ${cleanRank(u.clean)}` }),
         hpBar.el,
       );

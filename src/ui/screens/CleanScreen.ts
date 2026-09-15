@@ -195,7 +195,7 @@ export class CleanScreen extends Screen {
     const p = params as { defId: string; rarity: number; seed: number } | undefined;
     if (!p) return;
     this.defId = p.defId;
-    this.limit = p.rarity >= 3 ? 75 : 60;
+    this.limit = p.rarity >= 5 ? 95 : p.rarity >= 3 ? 75 : 60;
     this.remain = this.limit;
     this.running = true;
     this.idleSpin = 1;

@@ -36,6 +36,7 @@ const OD_RECOVERY: Record<string, number> = {
   faultcrush: 0.5, flamevolley: 0.5, vortexfang: 0.5, obsidiancut: 0.5, faulthaul: 0.55,
   // 全体
   galerend: 0.9, scorchring: 0.8, erosionstorm: 0.8, greateruption: 0.85,
+  crushbite: 0.5, abyssalmaw: 0.85,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28,
 };
@@ -205,10 +206,21 @@ export class BattleSim {
         this.addMod(actor, { kind: 'def', value: 0.09, turns: 999, source: 'sediment' }, ev, '堆積');
       }
     }
+    // 「潮汐」: 行動のたびに、いちばん傷んだ味方へ手を回す。
+    // 味方の撃破を待つだけでは、短い戦闘で回復役の出番が来ない
+    if (passiveOf(actor) === 'tide') {
+      const hurt = this.alive(actor.side)
+        .slice()
+        .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      if (hurt && hurt.hp < hurt.maxHp) {
+        ev.push({ t: 'passive', uid: actor.uid, label: '潮汐' });
+        this.heal(actor, hurt, Math.round(actor.atk * 0.46), ev);
+      }
+    }
     // 「共鳴」: 味方全体の OD を押し上げる
     if (passiveOf(actor) === 'resonance') {
       ev.push({ t: 'passive', uid: actor.uid, label: '共鳴' });
-      for (const a of this.alive(actor.side)) this.gainOd(a, 8, ev);
+      for (const a of this.alive(actor.side)) this.gainOd(a, 10, ev);
     }
 
     // --- OD か通常攻撃か ---
@@ -383,7 +395,7 @@ export class BattleSim {
         const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
         if (!t) break;
         ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
-        this.heal(actor, t, Math.round(actor.atk * 1.9 * mod), ev);
+        this.heal(actor, t, Math.round(actor.atk * 2.6 * mod), ev);
         const i = t.mods.findIndex((m) => m.value < 0);
         if (i >= 0) t.mods.splice(i, 1);
         break;
@@ -422,6 +434,17 @@ export class BattleSim {
           t.draggedTurns = 2;
           ev.push({ t: 'promote', uid: t.uid, from: 'back', to: 'front' });
         }
+        break;
+      }
+      case 'crushbite': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev, true);
+        break;
+      }
+      case 'abyssalmaw': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
+        for (const e of enemies) this.dealDamage(actor, e, power, ev, true);
         break;
       }
       case 'greateruption': {
@@ -498,13 +521,15 @@ export class BattleSim {
     return { amount: Math.max(1, Math.round(base)), crit, eff };
   }
 
-  private dealDamage(atk: Fighter, target: Fighter, power: number, ev: BattleEvent[]): number {
+  private dealDamage(
+    atk: Fighter, target: Fighter, power: number, ev: BattleEvent[], pierceShield = false,
+  ): number {
     if (!target.alive || !atk.alive) return 0;
     const { amount, crit, eff } = this.computeDamage(atk, target, power, true);
 
     let remaining = amount;
     let shielded = 0;
-    if (target.shield) {
+    if (target.shield && !pierceShield) {
       shielded = Math.min(target.shield.amount, remaining);
       target.shield.amount -= shielded;
       remaining -= shielded;
@@ -525,7 +550,7 @@ export class BattleSim {
 
     // 「熱反射」
     if (passiveOf(target) === 'heatreflect' && remaining > 0 && atk.alive && atk !== target) {
-      const back = Math.max(1, Math.round(remaining * 0.15));
+      const back = Math.max(1, Math.round(remaining * 0.2));
       atk.hp = Math.max(0, atk.hp - back);
       ev.push({ t: 'passive', uid: target.uid, label: '熱反射' });
       ev.push({ t: 'damage', uid: atk.uid, from: target.uid, amount: back, crit: false, eff: 1, hp: atk.hp, shielded: 0 });
@@ -550,6 +575,12 @@ export class BattleSim {
     target.hp = 0;
     if (by !== target) by.kills++;
     ev.push({ t: 'ko', uid: target.uid, by: by.uid });
+
+    // 「追い波」: 仕留めた側が、その勢いのまま次の行動に入る
+    if (by !== target && by.alive && passiveOf(by) === 'pursuit') {
+      by.av += 3800;
+      ev.push({ t: 'passive', uid: by.uid, label: '追い波' });
+    }
 
     // 「地盤沈下」: 倒れると味方の OD を押し上げる
     if (passiveOf(target) === 'subsidence') {
@@ -582,7 +613,10 @@ export class BattleSim {
 
   private gainOd(f: Fighter, amount: number, ev: BattleEvent[]): void {
     if (!f.alive) return;
-    const mul = this.formations[f.side].odGainMul * (f.row === 'front' ? 1.2 : 1);
+    let mul = this.formations[f.side].odGainMul * (f.row === 'front' ? 1.2 : 1);
+    // 「制海」: 海の主が生きている間、向かいの側は必殺技が溜まらない。
+    // 与ダメージを押し上げないので、盾役や回復役の居場所を潰さずに強い
+    if (this.alive(other(f.side)).some((e) => passiveOf(e) === 'deepreign')) mul *= 0.8;
     const before = f.od;
     f.od = clamp(f.od + amount * mul, 0, 150);
     if (Math.round(f.od) !== Math.round(before)) ev.push({ t: 'od', uid: f.uid, value: f.od });

@@ -33,7 +33,7 @@ export interface BuriedNode {
   radius: number;
   /** fossil のみ */
   speciesId: string;
-  rarity: 1 | 2 | 3 | 4;
+  rarity: 1 | 2 | 3 | 4 | 5;
   /** エコーで位置が判明済みか */
   revealed: boolean;
   collected: boolean;
@@ -54,7 +54,7 @@ export interface DigSiteData {
 
 export interface SpeciesEntry {
   id: string;
-  rarity: 1 | 2 | 3 | 4;
+  rarity: 1 | 2 | 3 | 4 | 5;
   weight: number;
 }
 
@@ -235,7 +235,7 @@ export function generateDigSite(opts: TerrainOptions): DigSiteData {
 
 function makeNode(
   id: number, kind: FindKind, cx: number, cy: number, cz: number,
-  radius: number, speciesId: string, rarity: 1 | 2 | 3 | 4, depth: number,
+  radius: number, speciesId: string, rarity: 1 | 2 | 3 | 4 | 5, depth: number,
 ): BuriedNode {
   return { id, kind, cx, cy, cz, radius, speciesId, rarity, revealed: false, collected: false, depth, total: 0, exposed: 0 };
 }
@@ -260,20 +260,28 @@ function stamp(world: VoxelWorld, node: BuriedNode, heights: Int16Array, sx: num
   return node.total > 5;
 }
 
-/** コモン60 / レア30 / エピック9 / レジェンド1。周回数で上位だけが逓減する */
-function rollRarity(rng: Rng, scale: number): 1 | 2 | 3 | 4 {
+/**
+ * コモン60 / レア30 / エピック9 / レジェンド0.8 / ホロタイプ0.2。
+ * 周回数で上位だけが逓減する。
+ * ★5 は「たまたま出る」であってはいけない一方、絶対に出ないのも困る。
+ * 200回に1回＝数日遊べば当たる、くらいに置く。
+ */
+function rollRarity(rng: Rng, scale: number): 1 | 2 | 3 | 4 | 5 {
   const r = rng.next();
-  const legend = 0.01 * scale;
+  const holotype = 0.002 * scale;
+  const legend = 0.008 * scale;
   const epic = 0.09 * scale;
   const rare = 0.3 * scale;
-  if (r < legend) return 4;
-  if (r < legend + epic) return 3;
-  if (r < legend + epic + rare) return 2;
+  if (r < holotype) return 5;
+  if (r < holotype + legend) return 4;
+  if (r < holotype + legend + epic) return 3;
+  if (r < holotype + legend + epic + rare) return 2;
   return 1;
 }
 
 function depthForRarity(rarity: number, rng: Rng): number {
   switch (rarity) {
+    case 5: return rng.range(2.9, 3.4);
     case 4: case 3: return rng.range(2.2, 3.0);
     case 2: return rng.range(1.2, 2.2);
     default: return rng.range(0.5, 1.2);

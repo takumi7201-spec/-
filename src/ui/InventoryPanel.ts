@@ -1,6 +1,6 @@
 import { h, clear, bar } from './dom';
 import { revosIcon } from './revosIcon';
-import { getRevos } from '../game/data/revos';
+import { getRevos, revosShortName } from '../game/data/revos';
 import { BIOMES, ELEMENT_NAMES, type BiomeId } from '../voxel/palette';
 import { FORMATIONS } from '../game/battle/types';
 import type { SaveData } from '../core/Save';
@@ -157,7 +157,7 @@ export class InventoryPanel {
         h('div', { class: `inv-form-row ${i === 0 ? 'is-front' : ''}` },
           revosIcon(u.defId, 'inv-silho'),
           h('div', { class: 'inv-form-main' },
-            h('div', { class: 'inv-form-name', text: def.name },
+            h('div', { class: 'inv-form-name', text: revosShortName(def.id) },
               h('span', { class: `dot dot--${def.element}`, title: ELEMENT_NAMES[def.element] }),
             ),
             h('div', { class: 'inv-form-sub num', text: `${i === 0 ? '前列' : '後列'} · Lv${u.level} · ${cleanRank(u.clean)}` }),

@@ -3,7 +3,7 @@ import type { Archetype } from '../../voxel/CreatureBuilder';
 import type { TargetPref } from '../battle/types';
 
 /**
- * ローンチ・ロスター 12体。
+ * ローンチ・ロスター 14体。
  *
  * 名称は実在分類群の語根（Ignis / Abyssus / Terra / Zephyrus 等）からの
  * 合成語で、原作固有の造語は使わない。
@@ -12,21 +12,28 @@ import type { TargetPref } from '../battle/types';
 
 export type Role =
   | 'Tank' | 'Striker' | 'Breaker' | 'Sprinter' | 'Guardian'
-  | 'Healer' | 'Debuffer' | 'All-round' | 'Buffer' | 'Technical' | 'Finisher';
+  | 'Healer' | 'Debuffer' | 'All-round' | 'Buffer' | 'Technical' | 'Finisher'
+  | 'Apex';
 
 export type PassiveId =
   | 'subsidence' | 'embers' | 'deeppressure' | 'vanguard' | 'sediment'
   | 'heatreflect' | 'tide' | 'shearwind' | 'immutable' | 'resonance'
-  | 'traction' | 'overheat';
+  | 'traction' | 'overheat' | 'pursuit' | 'deepreign';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
   | 'scorchring' | 'tideheal' | 'erosionstorm' | 'obsidiancut' | 'resonantlight'
-  | 'faulthaul' | 'greateruption';
+  | 'faulthaul' | 'greateruption' | 'crushbite' | 'abyssalmaw';
 
 export interface RevosDef {
   id: string;
   name: string;
+  /**
+   * カードや編成スロットのような幅の狭い場所で使う短縮名。
+   * 省略記号で切ると「プリオサウルス …」と「プリオサウルス」が
+   * 見分けられなくなるので、切るのではなく別名を持たせる。
+   */
+  short?: string;
   en: string;
   element: ElementId;
   role: Role;
@@ -55,14 +62,14 @@ export interface RevosDef {
   };
   /** 出やすいバイオーム */
   habitat: ('canyon' | 'frostpeak' | 'emberfield' | 'tidehollow')[];
-  rarity: 1 | 2 | 3 | 4;
+  rarity: 1 | 2 | 3 | 4 | 5;
   flavor: string;
 }
 
 export const REVOS: RevosDef[] = [
   {
     id: 'ankylosaurus', name: 'アンキロサウルス', en: 'Ankylosaurus', element: 'terra', role: 'Tank',
-    hp: 1610, atk: 88, def: 144, spd: 72, basicPower: 85,
+    hp: 1610, atk: 96, def: 144, spd: 74, basicPower: 87,
     passive: { id: 'subsidence', name: '地盤沈下', desc: '前列にいる間、被ダメージ −15%。撃破されると味方全体の OD +40。' },
     od: { id: 'faultcrush', name: '断層圧壊', desc: '単体に大ダメージ。対象の昇格を1行動遅延させる。', power: 185 },
     defaultPref: 'front',
@@ -84,7 +91,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'kronosaurus', name: 'クロノサウルス', en: 'Kronosaurus', element: 'aqua', role: 'Breaker',
-    hp: 1420, atk: 126, def: 106, spd: 68, basicPower: 96,
+    hp: 1420, atk: 142, def: 106, spd: 78, basicPower: 100,
     passive: { id: 'deeppressure', name: '深圧', desc: '自分より SPD が 20 以上高い相手への与ダメージ +14%。' },
     od: { id: 'vortexfang', name: '渦潮牙', desc: '単体に大ダメージ ＋ 対象の SPD −20%（3行動）。', power: 165 },
     defaultPref: 'defense',
@@ -106,7 +113,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'triceratops', name: 'トリケラトプス', en: 'Triceratops', element: 'terra', role: 'Guardian',
-    hp: 1340, atk: 108, def: 128, spd: 84, basicPower: 90,
+    hp: 1340, atk: 108, def: 122, spd: 84, basicPower: 90,
     passive: { id: 'sediment', name: '堆積', desc: '行動するたび自身の DEF +9%（最大 +45%、戦闘中持続）。' },
     od: { id: 'rockaegis', name: '岩盾展開', desc: '味方全体に DEF 基準の厚い吸収シールド（4行動）。', power: 0 },
     defaultPref: 'front',
@@ -117,7 +124,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'goyocephale', name: 'ゴヨケファレ', en: 'Goyocephale', element: 'flame', role: 'Tank',
-    hp: 1440, atk: 104, def: 130, spd: 70, basicPower: 86,
+    hp: 1500, atk: 116, def: 130, spd: 74, basicPower: 90,
     passive: { id: 'heatreflect', name: '熱反射', desc: '被物理ダメージの 15% を攻撃者に返す。' },
     od: { id: 'scorchring', name: '焦熱環', desc: '敵全体を焼き、60% で火傷を付与。', power: 95 },
     defaultPref: 'front',
@@ -128,8 +135,8 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'shonisaurus', name: 'ショニサウルス', en: 'Shonisaurus', element: 'aqua', role: 'Healer',
-    hp: 1260, atk: 100, def: 114, spd: 96, basicPower: 82,
-    passive: { id: 'tide', name: '潮汐', desc: '味方が撃破されたとき、生存者を ATK×1.2 回復。' },
+    hp: 1370, atk: 106, def: 126, spd: 100, basicPower: 84,
+    passive: { id: 'tide', name: '潮汐', desc: '行動のたび、最も傷ついた味方を ATK×0.46 回復。味方が撃破されたときは生存者全員を ATK×1.2 回復。' },
     od: { id: 'tideheal', name: '潮癒', desc: 'HP割合が最も低い味方を大回復 ＋ デバフを1つ解除。', power: 0 },
     defaultPref: 'lowhp',
     sprite: 'shonisaurus',
@@ -139,7 +146,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'velociraptor', name: 'ヴェロキラプトル', en: 'Velociraptor', element: 'gale', role: 'Debuffer',
-    hp: 1120, atk: 114, def: 92, spd: 132, basicPower: 84,
+    hp: 1120, atk: 108, def: 92, spd: 132, basicPower: 82,
     passive: { id: 'shearwind', name: '削風', desc: '通常攻撃の命中時、対象の DEF −8%（累積3回まで）。' },
     od: { id: 'erosionstorm', name: '風蝕嵐', desc: '敵全体にダメージ ＋ 全体の DEF −25%（4行動）。', power: 70 },
     defaultPref: 'back',
@@ -150,7 +157,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'tyrannosaurus', name: 'ティラノサウルス', en: 'Tyrannosaurus', element: 'null', role: 'All-round',
-    hp: 1250, atk: 118, def: 112, spd: 98, basicPower: 88,
+    hp: 1250, atk: 134, def: 112, spd: 98, basicPower: 90,
     passive: { id: 'immutable', name: '不変', desc: '属性相性を受けない（与・被ともに ×1.0 固定）。基礎値 +8% 込み。' },
     od: { id: 'obsidiancut', name: '黒曜断', desc: '単体に大ダメージ。対象のHPが50%未満ならさらに威力上昇。', power: 175 },
     defaultPref: 'lowhp',
@@ -160,9 +167,9 @@ export const REVOS: RevosDef[] = [
     flavor: '白亜紀末の頂点捕食者。骨が黒曜石に置換されており、どの属性の力も通り抜けていく。',
   },
   {
-    id: 'pachycephalosaurus', name: 'パキケファロサウルス', en: 'Pachycephalosaurus', element: 'null', role: 'Buffer',
-    hp: 1160, atk: 108, def: 110, spd: 116, basicPower: 82,
-    passive: { id: 'resonance', name: '共鳴', desc: '自分の行動時、味方全体の OD +8。' },
+    id: 'pachycephalosaurus', name: 'パキケファロサウルス', short: 'パキケファロ', en: 'Pachycephalosaurus', element: 'null', role: 'Buffer',
+    hp: 1160, atk: 118, def: 110, spd: 116, basicPower: 86,
+    passive: { id: 'resonance', name: '共鳴', desc: '自分の行動時、味方全体の OD +10。' },
     od: { id: 'resonantlight', name: '共鳴光', desc: '味方全体の ATK +18%（4行動）＋ 全体の OD +15。', power: 0 },
     defaultPref: 'support',
     sprite: 'pachycephalosaurus',
@@ -192,9 +199,37 @@ export const REVOS: RevosDef[] = [
     habitat: ['emberfield'], rarity: 4,
     flavor: '背の帆が体温を制御する最大級の肉食竜。瀕死になるほど熱が上がる。',
   },
+  {
+    id: 'pliosaurus', name: 'プリオサウルス', en: 'Pliosaurus', element: 'aqua', role: 'Striker',
+    hp: 1210, atk: 134, def: 96, spd: 106, basicPower: 90,
+    passive: { id: 'pursuit', name: '追い波', desc: '自分が敵を撃破すると AV +3800。倒した勢いのまま次へ入る。' },
+    od: { id: 'crushbite', name: '圧砕顎', desc: '単体に大ダメージ。シールドを貫通する。', power: 168 },
+    defaultPref: 'lowhp',
+    sprite: 'pliosaurus',
+    build: { archetype: 'aquatic', seed: 13141, bulk: 1.06, scale: 1.04 },
+    habitat: ['tidehollow', 'frostpeak'], rarity: 4,
+    flavor: '四枚のひれで水を掴む短首の首長竜。噛む力は顎の骨そのものを変形させるほどで、獲物の殻ごと砕く。',
+  },
+  {
+    id: 'pliosaurus-funkei', name: 'プリオサウルス フンケイ', short: 'フンケイ', en: 'Pliosaurus funkei', element: 'aqua', role: 'Apex',
+    hp: 1310, atk: 132, def: 114, spd: 100, basicPower: 90,
+    passive: { id: 'deepreign', name: '制海', desc: '自分が生きている間、敵全体の OD 獲得 −15%。' },
+    od: { id: 'abyssalmaw', name: '絶海断', desc: '敵全体に大ダメージ。シールドを貫通する。', power: 104 },
+    defaultPref: 'front',
+    sprite: 'pliosaurus-funkei',
+    build: { archetype: 'aquatic', seed: 14151, bulk: 1.24, scale: 1.14, spikes: true },
+    habitat: ['tidehollow'], rarity: 5,
+    flavor: '全長12mを超える最大級の首長竜。スヴァールバルの凍った泥から2体ぶんだけ見つかっている。海に出た捕食者の到達点で、同じ海に二番手はいなかった。',
+  },
 ];
 
 export const REVOS_BY_ID = new Map(REVOS.map((r) => [r.id, r]));
+
+/** 幅の狭い UI 用の名前。短縮名がなければ正式名をそのまま返す */
+export function revosShortName(id: string): string {
+  const r = getRevos(id);
+  return r.short ?? r.name;
+}
 
 export function getRevos(id: string): RevosDef {
   const r = REVOS_BY_ID.get(id);
@@ -202,5 +237,6 @@ export function getRevos(id: string): RevosDef {
   return r;
 }
 
-export const RARITY_NAMES = ['', 'コモン', 'レア', 'エピック', 'レジェンド'] as const;
-export const RARITY_COLORS = ['', '#c8c2b4', '#6fc8e8', '#c898f0', '#ffc84a'] as const;
+/** ★5 は「ホロタイプ」——その種を定義する、ただ1つの標本 */
+export const RARITY_NAMES = ['', 'コモン', 'レア', 'エピック', 'レジェンド', 'ホロタイプ'] as const;
+export const RARITY_COLORS = ['', '#c8c2b4', '#6fc8e8', '#c898f0', '#ffc84a', '#e8623c'] as const;
