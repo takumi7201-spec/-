@@ -3,6 +3,7 @@ import { h, button, bar, clear } from '../dom';
 import type { BattlePlayer, Speed } from '../../game/battle/BattlePlayer';
 import type { BattleEvent, Side } from '../../game/battle/types';
 import { getRevos, revosShortName } from '../../game/data/revos';
+import { AV_THRESHOLD } from '../../game/battle/simulate';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
@@ -22,9 +23,6 @@ interface UnitCard {
   cd: number;
   cdReady: boolean;
 }
-
-/** 行動が回る AV のしきい値（simulate.ts と同じ） */
-const AV_THRESHOLD = 10000;
 
 /**
  * クールタイム表示つきのアイコン。
@@ -338,9 +336,9 @@ export class BattleScreen extends Screen {
   /**
    * 攻撃間隔の可視化。
    *
-   * シミュレータの AV は1行動ぶんまとめて進むので、そのまま流すと段階的に跳ねる。
-   * 指数補間で追従させて、見かけ上は連続的に溜まるようにする。
-   * 必殺技のあとに大きく戻るのも、この減る向きの補間でそのまま伝わる。
+   * 値は BattlePlayer の表示用 AV を使う。シミュレータの生の AV を読むと、
+   * 1行動ぶんの時間がまとめて進むせいで、全員のリングが同じ瞬間に跳ねる。
+   * 指数補間はそのうえで、行動直後の落ち込みを角なく見せるために残す。
    */
   private updateCooldowns(dt: number): void {
     const k = 1 - Math.exp(-dt * 7);
@@ -348,7 +346,7 @@ export class BattleScreen extends Screen {
       const f = this.player.sim.fighters.find((x) => x.uid === c.uid);
       if (!f) continue;
 
-      const target = f.alive ? clamp01(f.av / AV_THRESHOLD) : 0;
+      const target = f.alive ? this.player.displayCharge(f.uid) : 0;
       c.cd += (target - c.cd) * k;
       if (Math.abs(target - c.cd) < 0.002) c.cd = target;
       c.icon.style.setProperty('--cd', c.cd.toFixed(3));
@@ -368,9 +366,11 @@ export class BattleScreen extends Screen {
    * サプライズはその予測を裏切るときにだけ効く。
    */
   private renderOrder(): void {
+    // 並べ替えも表示用の AV で行う。生の AV で並べると、リングが満ちるより
+    // 先に順番だけが入れ替わり、2つの表示が食い違って見える
     const list = this.player.sim.fighters
       .filter((f) => f.alive)
-      .map((f) => ({ f, t: (10000 - f.av) / Math.max(1, f.spd) }))
+      .map((f) => ({ f, t: (AV_THRESHOLD - this.player.displayAv(f.uid)) / Math.max(1, f.spd) }))
       .sort((a, b) => a.t - b.t)
       .slice(0, 6);
 
@@ -395,6 +395,3 @@ export class BattleScreen extends Screen {
   }
 }
 
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}

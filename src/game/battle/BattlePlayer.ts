@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BattleSim } from './simulate';
+import { AV_THRESHOLD, BattleSim } from './simulate';
 import type { BattleEvent, Side, TeamSetup } from './types';
 import type { BattleScene } from '../../scenes/BattleScene';
 import { audio } from '../../core/Audio';
@@ -39,6 +39,23 @@ export class BattlePlayer {
   private odFired = false;
   private tmpVec = new THREE.Vector3();
 
+  /*
+   * 表示用の AV。
+   *
+   * シミュレータは1行動ぶんの時間をまとめて進める（step の中で全員の AV に
+   * 一気に加算する）ので、その値をそのまま UI に流すと、行動順もクール
+   * タイムも「step の瞬間に全員が同時に動く」ことになる。見ている側には
+   * 溜まっていく過程がなく、代わりに全部が同時に跳ねる。
+   *
+   * そこで step の前後を記録しておき、その行動を再生している間に割り付ける。
+   * 加算量は SPD に比例するので、割り付ければ速い個体ほど速く溜まる——
+   * 本来見えるべき差がそこで初めて出る。
+   */
+  private avFrom = new Map<string, number>();
+  private avTo = new Map<string, number>();
+  private avPhase = 1;
+  private avSpan = 1;
+
   constructor(
     seed: number,
     teamA: TeamSetup,
@@ -77,6 +94,9 @@ export class BattlePlayer {
   update(dt: number): void {
     if (this.finished || this.paused) return;
 
+    // 表示用の割り付けは、待ち時間の有無に関わらず進める
+    this.avPhase = Math.min(1, this.avPhase + dt / this.avSpan);
+
     this.wait -= dt;
     if (this.wait > 0) return;
 
@@ -86,7 +106,7 @@ export class BattlePlayer {
         this.events.onEnd?.(this.sim.currentWinner);
         return;
       }
-      this.queue = this.sim.step();
+      this.beginStep();
       if (this.queue.length === 0) {
         this.finished = true;
         this.events.onEnd?.(this.sim.currentWinner);
@@ -97,6 +117,39 @@ export class BattlePlayer {
     const e = this.queue.shift()!;
     this.wait = this.present(e);
     this.events.onEvent?.(e);
+  }
+
+  /** 1行動ぶん進め、その間に配る AV の始点と終点を控える */
+  private beginStep(): void {
+    this.avFrom = new Map(this.sim.fighters.map((f) => [f.uid, f.av]));
+    this.queue = this.sim.step();
+
+    const begin = this.queue.find((e) => e.t === 'turnBegin');
+    const actor = begin && begin.t === 'turnBegin' ? begin.uid : null;
+    this.avTo = new Map(this.sim.fighters.map((f) => [
+      f.uid,
+      // 行動した本人は、この行動の再生中は「満ちている」ままにする。
+      // OD の反動でどれだけ戻されたかは、次の行動の始点として現れる
+      f.uid === actor ? AV_THRESHOLD : f.av,
+    ]));
+    this.avPhase = 0;
+    this.avSpan = Math.max(0.12, SLOT[this.speed]);
+  }
+
+  /** 表示用の AV。再生の進みに合わせて補間した値 */
+  displayAv(uid: string): number {
+    const a = this.avFrom.get(uid);
+    const b = this.avTo.get(uid);
+    if (a === undefined || b === undefined) {
+      return this.sim.fighters.find((f) => f.uid === uid)?.av ?? 0;
+    }
+    return a + (b - a) * this.avPhase;
+  }
+
+  /** 攻撃間隔の充填率 0..1 */
+  displayCharge(uid: string): number {
+    const v = this.displayAv(uid) / AV_THRESHOLD;
+    return v < 0 ? 0 : v > 1 ? 1 : v;
   }
 
   /** 1イベントを演出し、次までの待ち時間を返す */

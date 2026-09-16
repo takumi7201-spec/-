@@ -28,7 +28,8 @@ class Prng {
   chance(p: number): boolean { return this.next() < p; }
 }
 
-const AV_THRESHOLD = 10000;
+/** 行動が回る AV のしきい値 */
+export const AV_THRESHOLD = 10000;
 
 /** OD技を撃った後に空く追加の間隔（通常攻撃1回ぶんを1.0として） */
 const OD_RECOVERY: Record<string, number> = {
