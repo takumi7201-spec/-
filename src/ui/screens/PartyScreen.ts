@@ -6,6 +6,7 @@ import { FORMATIONS, TARGET_PREFS, type FormationId, type TargetPref } from '../
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
 import { revosIcon } from '../revosIcon';
+import { revosDetailBody } from '../revosDetail';
 import { audio } from '../../core/Audio';
 
 /**
@@ -78,6 +79,7 @@ export class PartyScreen extends Screen {
       h('div', { class: 'label party-label', text: '作戦' }),
       this.tacticEl,
       h('div', { class: 'label party-label', text: '手持ち' }),
+      h('div', { class: 'party-hint', text: '長押しで詳細' }),
       this.rosterEl,
     );
 
@@ -105,7 +107,10 @@ export class PartyScreen extends Screen {
       const slot = button(
         '',
         () => this.tapSlot(i),
-        { class: `party-slot ${u ? '' : 'is-empty'} ${i === 0 ? 'is-front' : ''}` },
+        {
+          class: `party-slot ${u ? '' : 'is-empty'} ${i === 0 ? 'is-front' : ''}`,
+          onLongPress: u ? () => this.openDetail(u) : undefined,
+        },
       );
       slot.append(h('span', { class: 'slot-label', text: labels[i] }));
       if (u) {
@@ -196,6 +201,7 @@ export class PartyScreen extends Screen {
       const inParty = this.order.includes(u.uid);
       const card = button('', () => this.tapRoster(u.uid), {
         class: `roster-card ${inParty ? 'is-in' : ''} ${this.selected === u.uid ? 'is-sel' : ''}`,
+        onLongPress: () => this.openDetail(u),
       });
       const hpBar = bar('bar--slim', u.clean / 100);
       card.append(
@@ -207,6 +213,17 @@ export class PartyScreen extends Screen {
       );
       this.rosterEl.appendChild(card);
     }
+  }
+
+  /** 長押しで開く1体ぶんの詳細。編成を組みながら性能を確かめられるようにする */
+  private openDetail(u: OwnedRevos): void {
+    audio.uiTap();
+    navigator.vibrate?.(12);
+    const def = getRevos(u.defId);
+    this.ui.sheet(def.name, revosDetailBody(u.defId, {
+      unit: u,
+      owned: this.data.roster.filter((r) => r.defId === u.defId),
+    }));
   }
 
   private tapSlot(i: number): void {

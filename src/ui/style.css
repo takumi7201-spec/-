@@ -245,6 +245,8 @@ html, body {
   box-shadow: 0 1px 1px rgba(74, 60, 38, 0.18);
 }
 .btn:disabled { opacity: 0.4; pointer-events: none; }
+/* 長押しの受付中。押し込んでいる間だけ紙がたわむ */
+.btn.is-holding { transform: translate(1px, 2px) scale(0.985); }
 
 /* 主アクションは蛍光ペンで塗る。塗り残しからは紙が見えるべきで、
    背景が透けてはいけない——下地に紙を必ず敷く */

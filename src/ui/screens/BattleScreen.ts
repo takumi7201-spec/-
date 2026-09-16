@@ -3,7 +3,6 @@ import { h, button, bar, clear } from '../dom';
 import type { BattlePlayer, Speed } from '../../game/battle/BattlePlayer';
 import type { BattleEvent, Side } from '../../game/battle/types';
 import { getRevos, revosShortName } from '../../game/data/revos';
-import { AV_THRESHOLD } from '../../game/battle/simulate';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
@@ -56,13 +55,11 @@ export class BattleScreen extends Screen {
   private allyCards: UnitCard[] = [];
   private enemyCards: UnitCard[] = [];
   private enemyTotal = bar('bar--hp', 1);
-  private orderEl!: HTMLElement;
   private logEl!: HTMLElement;
   private logLines: string[] = [];
   private speedBtn!: HTMLButtonElement;
   private roundEl!: HTMLElement;
   private bannerEl!: HTMLElement;
-  private orderTimer = 0;
   /**
    * 決着を一度だけ通す。スキップは sim を直接回して決着させるので、
    * その後で再生側も終端に達し、onEnd が2回飛ぶ。2回目は「通常戦の勝利」
@@ -92,9 +89,6 @@ export class BattleScreen extends Screen {
       h('div', { class: 'enemy-cards' }),
     );
 
-    // ---- 右: 行動順 ----
-    this.orderEl = h('div', { class: 'battle-order' });
-
     // ---- 中央バナー（開始・決着）----
     this.bannerEl = h('div', { class: 'battle-banner' });
 
@@ -117,7 +111,7 @@ export class BattleScreen extends Screen {
       ),
     );
 
-    this.el.append(enemyStrip, this.orderEl, this.bannerEl, deck);
+    this.el.append(enemyStrip, this.bannerEl, deck);
     this.allyRow = allyRow;
     this.enemyRow = enemyStrip.querySelector('.enemy-cards') as HTMLElement;
   }
@@ -326,11 +320,6 @@ export class BattleScreen extends Screen {
 
   update(dt: number): void {
     this.updateCooldowns(dt);
-
-    this.orderTimer += dt;
-    if (this.orderTimer < 0.12) return;
-    this.orderTimer = 0;
-    this.renderOrder();
   }
 
   /**
@@ -361,30 +350,6 @@ export class BattleScreen extends Screen {
     }
   }
 
-  /**
-   * 行動順の予告。予測できることが面白さの源で、
-   * サプライズはその予測を裏切るときにだけ効く。
-   */
-  private renderOrder(): void {
-    // 並べ替えも表示用の AV で行う。生の AV で並べると、リングが満ちるより
-    // 先に順番だけが入れ替わり、2つの表示が食い違って見える
-    const list = this.player.sim.fighters
-      .filter((f) => f.alive)
-      .map((f) => ({ f, t: (AV_THRESHOLD - this.player.displayAv(f.uid)) / Math.max(1, f.spd) }))
-      .sort((a, b) => a.t - b.t)
-      .slice(0, 6);
-
-    clear(this.orderEl);
-    list.forEach((it, i) => {
-      const def = getRevos(it.f.defId);
-      this.orderEl.appendChild(
-        h('div', {
-          class: `order-pip order-pip--${def.element} ${it.f.side === 0 ? 'is-ally' : 'is-foe'} ${i === 0 ? 'is-next' : ''}`,
-          title: def.name,
-        }, revosIcon(def.id)),
-      );
-    });
-  }
 
   onLayout(kind: LayoutKind): void {
     this.el.dataset.layout = kind;

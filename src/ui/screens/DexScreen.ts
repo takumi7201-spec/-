@@ -1,10 +1,11 @@
 import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
 import type { SaveData } from '../../core/Save';
-import { REVOS, RARITY_NAMES, getRevos } from '../../game/data/revos';
+import { REVOS, getRevos } from '../../game/data/revos';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
+import { revosDetailBody } from '../revosDetail';
 
 /** 図鑑。未取得はシルエットで見せ、「あと何が居るか」を常に示す */
 export class DexScreen extends Screen {
@@ -72,51 +73,8 @@ export class DexScreen extends Screen {
   private openDetail(id: string): void {
     audio.uiTap();
     const r = getRevos(id);
-    const owned = this.data.roster.filter((u) => u.defId === id);
-    const body = h('div', { class: 'dex-detail' },
-      h('div', { class: 'dex-hero' }, revosIcon(r.id, 'dex-hero-img')),
-      h('div', { class: 'dex-detail-head' },
-        h('span', { class: `chip chip--${r.element}`, text: ELEMENT_NAMES[r.element] }),
-        h('span', { class: 'dex-detail-role', text: r.role }),
-        h('span', { class: 'dex-detail-rarity', text: RARITY_NAMES[r.rarity] }),
-      ),
-      h('p', { class: 'dex-flavor', text: r.flavor }),
-      h('div', { class: 'dex-stats' },
-        ...([['HP', r.hp], ['ATK', r.atk], ['DEF', r.def], ['SPD', r.spd]] as const).map(([k, v]) =>
-          h('div', { class: 'dex-stat' },
-            h('span', { class: 'label', text: k }),
-            h('span', { class: 'num', text: String(v) }),
-          ),
-        ),
-      ),
-      h('div', { class: 'dex-skill' },
-        h('b', { text: `特性 · ${r.passive.name}` }),
-        h('span', { text: r.passive.desc }),
-      ),
-      h('div', { class: 'dex-skill' },
-        h('b', { class: 'od', text: `OD · ${r.od.name}` }),
-        h('span', { text: r.od.desc }),
-      ),
-      h('div', { class: 'dex-owned' },
-        owned.length === 0
-          ? h('span', { class: 'dim', text: '未所持' })
-          : h('span', { text: `所持 ${owned.length} 体 — 最高クリーン度 ${Math.max(...owned.map((u) => u.clean))}` }),
-      ),
-      h('div', { class: 'dex-habitat' },
-        h('span', { class: 'label', text: '産出' }),
-        h('span', { text: r.habitat.length > 0 ? r.habitat.map(habitatName).join(' / ') : 'イベント戦の記録から' }),
-      ),
-    );
-    this.ui.sheet(r.name, body);
-  }
-}
-
-function habitatName(id: string): string {
-  switch (id) {
-    case 'canyon': return 'ソルト・キャニオン';
-    case 'frostpeak': return 'フロストピーク';
-    case 'emberfield': return 'エンバーフィールド';
-    case 'tidehollow': return 'タイドホロウ';
-    default: return id;
+    this.ui.sheet(r.name, revosDetailBody(id, {
+      owned: this.data.roster.filter((u) => u.defId === id),
+    }));
   }
 }

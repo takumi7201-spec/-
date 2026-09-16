@@ -55,6 +55,23 @@ export class BattlePlayer {
   private avTo = new Map<string, number>();
   private avPhase = 1;
   private avSpan = 1;
+  /**
+   * 撃ち終えた個体。
+   *
+   * 溜まりきってから撃つ、という順序が見えないと「間隔が終わった直後に
+   * もう一度動いた」ように読めてしまう。行動の頭までに満たしきり、
+   * 技を出した瞬間に空ける——ここから先は実際の AV をそのまま映す。
+   */
+  private released: string | null = null;
+  /**
+   * 直前の行動を終えた時点の AV。リングの 0 をここに置く。
+   *
+   * 重い OD はしきい値を大きく割り込むので、0 で切ってしまうと
+   * 「空のまま何も起きない」時間ができて、ただ固まって見える。
+   * 起点をずらせば、同じ 0→1 のあいだを“ゆっくり”進むことで
+   * 反動の重さが伝わる。
+   */
+  private floor = new Map<string, number>();
 
   constructor(
     seed: number,
@@ -133,11 +150,25 @@ export class BattlePlayer {
       f.uid === actor ? AV_THRESHOLD : f.av,
     ]));
     this.avPhase = 0;
-    this.avSpan = Math.max(0.12, SLOT[this.speed]);
+    // 行動の頭（turnBegin の間）で満ちきらせる。技が出るころには満杯で、
+    // 「溜まった → 撃った → 空いた」の順に見える
+    this.avSpan = Math.max(0.06, (SLOT[this.speed] / 1.25) * 0.16);
+    this.released = null;
+  }
+
+  /** 溜めを使い切った瞬間を記録する */
+  private release(uid: string): void {
+    if (this.released === uid) return;
+    this.released = uid;
+    this.floor.set(uid, this.sim.fighters.find((f) => f.uid === uid)?.av ?? 0);
   }
 
   /** 表示用の AV。再生の進みに合わせて補間した値 */
   displayAv(uid: string): number {
+    // 撃ったあとは補間をやめ、実際に空になった値へ落とす
+    if (uid === this.released) {
+      return this.sim.fighters.find((f) => f.uid === uid)?.av ?? 0;
+    }
     const a = this.avFrom.get(uid);
     const b = this.avTo.get(uid);
     if (a === undefined || b === undefined) {
@@ -148,7 +179,9 @@ export class BattlePlayer {
 
   /** 攻撃間隔の充填率 0..1 */
   displayCharge(uid: string): number {
-    const v = this.displayAv(uid) / AV_THRESHOLD;
+    // 追撃で AV が残っている場合は、その残りを縮めない（起点は 0 のまま）
+    const floor = Math.min(0, this.floor.get(uid) ?? 0);
+    const v = (this.displayAv(uid) - floor) / (AV_THRESHOLD - floor);
     return v < 0 ? 0 : v > 1 ? 1 : v;
   }
 
@@ -164,10 +197,13 @@ export class BattlePlayer {
         this.odFired = false;
         this.scene.focus(e.uid);
         this.events.onSlotBegin?.(e.uid);
-        return 0.16 * beat;
+        // 満ちきった状態を一拍見せてから技に入る
+        return 0.22 * beat;
       }
 
       case 'action': {
+        // 技を出した＝溜めを使い切った
+        this.release(e.uid);
         this.pendingTarget = e.targets[0] ?? null;
         if (this.pendingTarget) this.scene.focus(e.uid, this.pendingTarget);
         if (e.kind === 'od') {
@@ -229,6 +265,8 @@ export class BattlePlayer {
       }
 
       case 'turnEnd':
+        // 技が出ないまま終わる行動（対象なしなど）の保険
+        this.release(e.uid);
         this.currentActor = null;
         return 0.08 * beat;
 

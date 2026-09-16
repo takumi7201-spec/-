@@ -56,7 +56,11 @@ export function clear(el: HTMLElement): void {
 export function button(
   label: string,
   onTap: () => void,
-  opts: { class?: string; icon?: string; sub?: string; disabled?: boolean; key?: string } = {},
+  opts: {
+    class?: string; icon?: string; sub?: string; disabled?: boolean; key?: string;
+    /** 長押し。発火したら、その指を離しても onTap は呼ばない */
+    onLongPress?: () => void;
+  } = {},
 ): HTMLButtonElement {
   const el = h('button', {
     class: `btn interactive ${opts.class ?? ''}`,
@@ -70,12 +74,46 @@ export function button(
   if (opts.key) el.appendChild(h('span', { class: 'k', text: opts.key }));
 
   let armed = false;
+  // 長押し。発火したぶんのタップは飲み込む——押し込んだ指を離したときに
+  // 詳細が開いて、さらに本来の動作まで走ると事故になる
+  let holdTimer: number | undefined;
+  let held = false;
+  let startX = 0;
+  let startY = 0;
+
+  const cancelHold = (): void => {
+    if (holdTimer !== undefined) { clearTimeout(holdTimer); holdTimer = undefined; }
+    el.classList.remove('is-holding');
+  };
+
   el.addEventListener('pointerdown', (e) => {
     if (el.disabled) return;
     armed = true;
-    try { el.setPointerCapture?.((e as PointerEvent).pointerId); } catch { /* 取得済み/無効なID */ }
+    held = false;
+    const pe = e as PointerEvent;
+    startX = pe.clientX;
+    startY = pe.clientY;
+    try { el.setPointerCapture?.(pe.pointerId); } catch { /* 取得済み/無効なID */ }
+    if (opts.onLongPress) {
+      el.classList.add('is-holding');
+      holdTimer = setTimeout(() => {
+        holdTimer = undefined;
+        held = true;
+        armed = false;
+        el.classList.remove('is-holding');
+        opts.onLongPress?.();
+      }, 420) as unknown as number;
+    }
+  });
+  // スクロールや滑りは長押しとみなさない
+  el.addEventListener('pointermove', (e) => {
+    if (holdTimer === undefined) return;
+    const pe = e as PointerEvent;
+    if (Math.abs(pe.clientX - startX) > 10 || Math.abs(pe.clientY - startY) > 10) cancelHold();
   });
   el.addEventListener('pointerup', (e) => {
+    cancelHold();
+    if (held) { held = false; return; }
     if (!armed || el.disabled) return;
     armed = false;
     const r = el.getBoundingClientRect();
@@ -85,7 +123,7 @@ export function button(
         pe.clientY < r.top - 12 || pe.clientY > r.bottom + 12) return;
     onTap();
   });
-  el.addEventListener('pointercancel', () => { armed = false; });
+  el.addEventListener('pointercancel', () => { armed = false; held = false; cancelHold(); });
   el.addEventListener('keydown', (e) => {
     const ke = e as KeyboardEvent;
     if (ke.key === 'Enter' || ke.key === ' ') { e.preventDefault(); onTap(); }

@@ -332,33 +332,6 @@ body[data-layout='wide'] .home-grid { grid-template-columns: repeat(6, 1fr); }
   pointer-events: none;
 }
 
-/* 行動順。誰が次に動くかを常に見せる */
-.battle-order {
-  position: absolute;
-  right: calc(var(--gutter) + var(--safe-r));
-  top: 168px;
-  display: flex; flex-direction: column; gap: 5px;
-  pointer-events: none;
-}
-/* 順番待ちの一覧。ページ端に貼った小さなインデックス */
-.order-pip {
-  width: 34px; height: 30px;
-  display: grid; place-items: center;
-  background: var(--paper-card);
-  border: 1px solid var(--ink-line);
-  border-left-width: 4px;
-  border-radius: 2px 6px 2px 6px / 6px 2px 6px 2px;
-  box-shadow: var(--lift-1);
-  font-size: 10px;
-  color: var(--ink-soft);
-  opacity: 0.78;
-}
-.order-pip.is-ally { border-left-color: var(--pen-green); }
-.order-pip.is-foe { border-left-color: var(--pen-red); }
-.order-pip.is-next { opacity: 1; transform: scale(1.12) rotate(-1.5deg); }
-.order-pip .revos-icon { width: 26px; height: 24px; }
-
-/* 大書き。太字ではなくマーカーの字面そのもので強さを出す */
 .battle-banner {
   position: absolute; left: 0; right: 0; top: 38%;
   text-align: center;
@@ -425,7 +398,6 @@ body[data-layout='wide'] .deck--battle { padding-left: 5vw; padding-right: 5vw; 
 body[data-layout='wide'] .battle-deck-inner { flex-direction: row; align-items: flex-end; gap: 12px; }
 body[data-layout='wide'] .ally-cards { flex: 1; }
 body[data-layout='wide'] .battle-log { display: block; width: 320px; max-height: 96px; }
-body[data-layout='wide'] .battle-order { top: 96px; left: calc(var(--gutter) + var(--safe-l)); right: auto; }
 
 /* =========================================================================
    精錬（クリーニング）
@@ -543,6 +515,7 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
   pointer-events: auto;
 }
 .party-label { margin-top: 6px; }
+.party-hint { font-size: 10px; color: var(--ink-faint); margin: -4px 0 2px 2px; }
 .party-field { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 /* 標本を貼り付ける枠。中身は写真、まわりに手書きの注記 */
 .party-slot {
@@ -765,6 +738,14 @@ body[data-layout='wide'] .screen--event::after { left: 2.2vw; }
 
 .dex-detail { display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
 .dex-detail-head { display: flex; align-items: center; gap: 8px; }
+/* この個体の育成状況。種の基準値より前に、手元の1体の話を置く */
+.dex-unit {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  padding: 5px 8px;
+  background: rgba(230, 220, 195, 0.55);
+  border-left: 3px solid var(--pen-red);
+  font-size: 12px;
+}
 .dex-detail-role { font-size: 11px; letter-spacing: .12em; color: var(--ink-faint); }
 .dex-detail-rarity { font-size: 11px; color: var(--pen-brown); margin-left: auto; }
 /* 所見。罫線の上に流し書きする */
