@@ -703,6 +703,76 @@ body[data-layout='wide'] .event-body { left: 18vw; right: 18vw; }
 .screen--event > * { z-index: 1; }
 body[data-layout='wide'] .screen--event::after { left: 2.2vw; }
 
+/* =========================================================================
+   未精錬の一覧
+   削る前に、何を持って帰ってきたのかを並べて見せる
+   ========================================================================= */
+.stock-body {
+  position: absolute;
+  top: calc(var(--safe-t) + 56px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l) + 28px); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 8px;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+.stock-card {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 68px; padding: 8px 10px;
+  background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-1);
+  text-align: left;
+}
+.stock-icon { width: 46px; height: 46px; flex: none; }
+.stock-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.stock-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.stock-head .chip { height: 18px; font-size: 10px; padding: 0 6px; flex: none; }
+.stock-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 1行に収める。折り返すと「レジェン／ド」のように名前が割れる */
+.stock-sub {
+  display: flex; gap: 8px; min-width: 0;
+  font-size: 10px; color: var(--ink-soft);
+  white-space: nowrap;
+}
+.stock-rarity { color: var(--pen-brown); letter-spacing: 0.04em; flex: none; }
+.stock-sub .dim { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 「削る」は赤ペンの書き込み。ボタンの中のボタンには見せない */
+.stock-go {
+  flex: none;
+  font-family: var(--font-marker); font-size: 12px;
+  color: var(--pen-red);
+  border-bottom: 2px solid var(--pen-red);
+  padding-bottom: 1px;
+}
+.stock-empty { padding: 24px 6px; }
+.stock-empty-line { font-size: 13px; line-height: 2; }
+
+body[data-layout='wide'] .stock-body { left: 18vw; right: 18vw; }
+
+.screen--stock .status-strip { background: none; }
+.screen--stock .status-strip::after { display: none; }
+.screen--stock::before {
+  content: ''; position: absolute; inset: 0;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, transparent 0 34px, var(--margin-rule) 34px 35px, transparent 35px),
+    var(--ruled),
+    var(--fiber);
+  background-blend-mode: normal, normal, multiply;
+  pointer-events: none;
+}
+.screen--stock::after {
+  content: ''; position: absolute;
+  left: 7px; top: 22%; height: 384px; width: 14px;
+  background-image: radial-gradient(circle at 50% 22px, rgba(120, 104, 74, 0.3) 0 6.5px, transparent 7.5px);
+  background-size: 14px 128px;
+  background-repeat: repeat-y;
+  pointer-events: none;
+}
+.screen--stock > * { z-index: 1; }
+body[data-layout='wide'] .screen--stock::after { left: 2.2vw; }
+
 /* ---- 図鑑 ---- */
 .dex-count { font-size: 13px; color: var(--ink-soft); }
 .dex-body {

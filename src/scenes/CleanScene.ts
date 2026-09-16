@@ -22,6 +22,8 @@ export interface ToolSpec {
   rate: number;
   /** 硬岩を割れるか */
   breaksHard: boolean;
+  /** 硬岩に当てたときの進みの遅さ（連続ツールのみ。1 で等速） */
+  hardRate?: number;
   /** 骨に当てたときのペナルティ */
   bonePenalty: number;
   /** 表層1層だけを剥がす */
@@ -29,10 +31,16 @@ export interface ToolSpec {
 }
 
 export const TOOLS: Record<ToolId, ToolSpec> = {
-  // 速さと安全のトレードオフ。硬岩はピックでしか壊せないので、
-  // 骨に隣接した硬岩をどう処理するかが毎回の小さな判断になる
+  /*
+   * 速さと安全のトレードオフ。
+   *
+   * ドリルは「細い範囲を削る道具」なので、硬岩も削れる。ただし遅い。
+   * 割れないことにしていた時期があったが、母岩の半分以上は硬岩なので、
+   * それだと当てるたびに弾かれるだけの道具になっていた。
+   * 硬岩はピックのほうが圧倒的に速い——その関係は残っている。
+   */
   pick: { id: 'pick', name: 'ピック', radius: 2.4, continuous: false, rate: 0, breaksHard: true, bonePenalty: 4, surfaceOnly: false },
-  drill: { id: 'drill', name: 'ドリル', radius: 1.5, continuous: true, rate: 22, breaksHard: false, bonePenalty: 1, surfaceOnly: false },
+  drill: { id: 'drill', name: 'ドリル', radius: 1.5, continuous: true, rate: 22, breaksHard: true, hardRate: 0.34, bonePenalty: 1, surfaceOnly: false },
   brush: { id: 'brush', name: 'ブラシ', radius: 3.2, continuous: true, rate: 12, breaksHard: false, bonePenalty: 0, surfaceOnly: true },
 };
 
@@ -70,6 +78,8 @@ export class CleanScene {
   private cursor: THREE.Mesh;
   private dirty = false;
   private drillAccum = 0;
+  /** 硬岩に弾かれた音を鳴らした時刻。連打を抑える */
+  private blockedAt = 0;
   private lastHitPos: THREE.Vector3 | null = null;
   private ray = new THREE.Ray();
   private invMatrix = new THREE.Matrix4();
@@ -150,7 +160,11 @@ export class CleanScene {
     this.root.add(this.mesh);
   }
 
-  setTool(t: ToolId): void { this.tool = t; }
+  setTool(t: ToolId): void {
+    this.tool = t;
+    // 道具を持ち替えたら溜めは引き継がない
+    this.drillAccum = 0;
+  }
 
   rotate(dx: number, dy: number): void {
     this.yaw += dx;
@@ -212,9 +226,12 @@ export class CleanScene {
     this.cursor.lookAt(this.camera.position);
 
     if (spec.continuous) {
-      this.drillAccum += spec.rate * dt;
+      // 硬岩に当てている間は進みが遅い
+      const slow = hit.value === F.HARD ? (spec.hardRate ?? 1) : 1;
+      this.drillAccum += spec.rate * slow * dt;
       if (this.drillAccum < 1) return 0;
-      this.drillAccum = 0;
+      // 端数は次に持ち越す。0 に戻すと、フレーム落ちのたびに削りが目減りする
+      this.drillAccum -= 1;
     }
 
     return this.carve(hit.x, hit.y, hit.z, spec, hit.world);
@@ -269,7 +286,11 @@ export class CleanScene {
         speed: 1.1, up: 1.5, life: 0.55, size: 0.6,
       });
     } else if (hardBlocked) {
-      audio.uiError();
+      // 連続ツールを硬岩の上で滑らせている間、毎フレーム鳴らさない
+      if (this.blockedAt < performance.now() - 420) {
+        this.blockedAt = performance.now();
+        audio.uiError();
+      }
     }
 
     this.lastHitPos = world;

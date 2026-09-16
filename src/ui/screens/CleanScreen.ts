@@ -88,7 +88,7 @@ export class CleanScreen extends Screen {
       const spec = TOOLS[id];
       const b = button(spec.name, () => this.selectTool(id), {
         class: 'btn--tool',
-        sub: id === 'pick' ? '硬岩を割る' : id === 'drill' ? '速いが骨に弱い' : '骨に安全',
+        sub: id === 'pick' ? '硬岩を一撃で' : id === 'drill' ? '細かく削る' : '骨に安全',
         key: String(i + 1),
       });
       this.toolBtns.set(id, b);

@@ -21,6 +21,7 @@ import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil } from './game
 import { advanceHoloTime } from './fx/SpriteUnit';
 import { buildEventTeam, type EventDef } from './game/data/events';
 import { EventScreen } from './ui/screens/EventScreen';
+import { StockScreen } from './ui/screens/StockScreen';
 import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
 import {
@@ -94,8 +95,9 @@ async function main(): Promise<void> {
   const partyScreen = new PartyScreen();
   const dexScreen = new DexScreen();
   const eventScreen = new EventScreen();
+  const stockScreen = new StockScreen();
   const resultScreen = new ResultScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, stockScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -203,13 +205,7 @@ async function main(): Promise<void> {
   homeScreen.onGo = (where) => {
     switch (where) {
       case 'dig': void startRun(data.unlockedBiomes[0] ?? 'canyon'); break;
-      case 'clean': {
-        const s = data.stock.shift();
-        if (!s) { ui.toast('精錬できる化石がない', 'warn'); return; }
-        writeSave(data);
-        void startClean(s.defId, s.rarity);
-        break;
-      }
+      case 'clean': stockScreen.setData(data); ui.show('stock'); break;
       case 'battle': void startBattle(); break;
       case 'event': eventScreen.setData(data); ui.show('event'); break;
       case 'party': partyScreen.setData(data); ui.show('party'); break;
@@ -239,14 +235,13 @@ async function main(): Promise<void> {
       setTimeout(goHome, 1000);
       return;
     }
-    // 精錬は1周につき1体だけ。残りはストックに積む
-    const best = runFossils.slice().sort((a, b) => b.rarity - a.rarity)[0];
+    // 持ち帰ったぶんはすべてストックへ。どれから削るかは一覧で選ぶ
     for (const f of runFossils) {
-      if (f === best) continue;
       data.stock.push({ defId: f.defId, rarity: f.rarity, biome: data.unlockedBiomes[0] ?? 'canyon' });
     }
     writeSave(data);
-    void startClean(best.defId, best.rarity);
+    stockScreen.setData(data);
+    ui.show('stock');
   };
 
   cleanScreen.onFinish = (score, defId) => {
@@ -333,6 +328,14 @@ async function main(): Promise<void> {
     });
   };
 
+  stockScreen.onBack = () => goHome();
+  stockScreen.onClean = (entry) => {
+    const [s] = data.stock.splice(entry.index, 1);
+    if (!s) { ui.toast('その化石はもう無い', 'warn'); stockScreen.setData(data); return; }
+    writeSave(data);
+    void startClean(s.defId, s.rarity);
+  };
+
   eventScreen.onBack = () => goHome();
   eventScreen.onChallenge = (ev) => { void startBattle(ev); };
 
@@ -352,8 +355,7 @@ async function main(): Promise<void> {
   resultScreen.onAgain = () => {
     const t = pendingResult?.title ?? '';
     if (t === '精錬完了') {
-      const s = data.stock.shift();
-      if (s) { writeSave(data); void startClean(s.defId, s.rarity); return; }
+      if (data.stock.length > 0) { stockScreen.setData(data); ui.show('stock'); return; }
       void startBattle();
     } else {
       void startBattle(lastEvent);
@@ -385,6 +387,7 @@ async function main(): Promise<void> {
     else if (jump === 'party') { partyScreen.setData(data); ui.show('party'); }
     else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
     else if (jump === 'event') { eventScreen.setData(data); ui.show('event'); }
+    else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
     else if (jump === 'dig') void startRun('canyon');
   }
 
