@@ -17,7 +17,7 @@ import { CleanScene } from './scenes/CleanScene';
 import { BattleScene } from './scenes/BattleScene';
 import { HomeScene } from './scenes/HomeScene';
 import { BattlePlayer } from './game/battle/BattlePlayer';
-import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil } from './game/party';
+import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, teamAnchor } from './game/party';
 import { advanceHoloTime } from './fx/SpriteUnit';
 import { buildEventTeam, type EventDef } from './game/data/events';
 import { EventScreen } from './ui/screens/EventScreen';
@@ -161,7 +161,7 @@ async function main(): Promise<void> {
     await progress(0.4, ev ? '記録を読み出しています…' : '闘技場を生成しています…');
     const seed = (Date.now() ^ (data.stageProgress * 104729)) >>> 0;
     battle.buildArena(ev ? ev.biome : (data.unlockedBiomes[0] ?? 'canyon'), seed);
-    const foes = ev ? buildEventTeam(ev) : buildEnemyTeam(data.stageProgress, seed);
+    const foes = ev ? buildEventTeam(ev) : buildEnemyTeam(data.stageProgress, seed, teamAnchor(mine));
     player = new BattlePlayer(seed, mine, foes, battle);
     battleScreen.setPlayer(player);
     player.speed = data.settings.battleSpeed;
@@ -284,7 +284,8 @@ async function main(): Promise<void> {
           data.events.cleared.push(ev.id);
           const { isNew, unit } = addFossil(data, ev.reward.defId, ev.reward.clean);
           if (isNew) {
-            unit.level = ev.reward.level;
+            // 加入レベルのほうが高いことがある。報酬で下げない
+            unit.level = Math.max(unit.level, ev.reward.level);
             rows.push({ label: '記録を確保', value: `${label(ev.reward.defId)} Lv${unit.level}`, kind: 'new' });
           } else {
             rows.push({ label: '記録を確保', value: `${label(ev.reward.defId)} スキルLv ${unit.skillLevel}`, kind: 'new' });
@@ -296,29 +297,41 @@ async function main(): Promise<void> {
       }
       data.player.coins += coins;
       rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
-
-      const setup = buildTeamSetup(data.roster, data.party.order, data.party.formation, data.party.targetPrefs);
-      const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
-      setup?.members.forEach((m, i) => {
-        const unit = data.roster.find((r) => r.uid === m.uid);
-        if (!unit) return;
-        // 前列に厚く配る。未育成にはキャッチアップ補正をかけないと
-        // 「最初に育てた3体しか使えない」状態に固定される
-        const share = i === 0 ? 0.5 : 0.25;
-        const catchUp = unit.level < maxLv - 2 ? 2.0 : 1;
-        const gain = Math.round(1800 * share * catchUp);
-        const { leveled } = addExp(unit, gain);
-        rows.push({
-          label: label(unit.defId),
-          value: leveled > 0 ? `+${gain} EXP → Lv${unit.level}` : `+${gain} EXP`,
-          kind: 'exp',
-        });
-      });
-      if (!ev) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
     } else {
       rows.push({ label: '結果', value: winner === 1 ? '敗北' : '引き分け' });
       rows.push({ label: '助言', value: '編成と陣形を見直そう' });
     }
+
+    /*
+     * EXP は勝敗に関わらず入る。
+     *
+     * 以前は勝ったときだけだった。負けた編成は何も得ないまま同じ相手に
+     * 挑み続けることになり、一度差が開くと二度と埋まらない——「勝てない
+     * から育たない、育たないから勝てない」で詰む。負けでも通常の4割弱を
+     * 渡す。3回負ければ1つぶん近づく、という程度には動く。
+     *
+     * 配分も前列0.5/後列0.25をやめた。同じ戦いに出た3体なので同額。
+     * 半分しか入らない後列は、いつまでも前列の半分のレベルで固定され、
+     * 編成を組み替えた瞬間に壊れる。
+     */
+    const setup = buildTeamSetup(data.roster, data.party.order, data.party.formation, data.party.targetPrefs);
+    const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
+    const base = winner === 0 ? 900 : 340;
+    setup?.members.forEach((m) => {
+      const unit = data.roster.find((r) => r.uid === m.uid);
+      if (!unit) return;
+      // 未育成にはキャッチアップ補正をかけないと
+      // 「最初に育てた3体しか使えない」状態に固定される
+      const catchUp = unit.level < maxLv - 2 ? 2.0 : 1;
+      const gain = Math.round(base * catchUp);
+      const { leveled } = addExp(unit, gain);
+      rows.push({
+        label: label(unit.defId),
+        value: leveled > 0 ? `+${gain} EXP → Lv${unit.level}` : `+${gain} EXP`,
+        kind: 'exp',
+      });
+    });
+    if (winner === 0 && !ev) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
     writeSave(data);
     showResult({
       title: winner === 0 ? 'VICTORY' : winner === 1 ? 'DEFEAT' : 'DRAW',

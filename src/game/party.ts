@@ -43,13 +43,39 @@ export function buildTeamSetup(
 }
 
 /**
- * 敵編成。ステージ進行に応じてレベルと構成が上がる。
- * 「次のステージを抜けるには地属性が要る」という因果を作るため、
- * 進行度ごとに寄せる属性を決めておく。
+ * 敵の強さを合わせるための、出撃する編成の基準値。
+ *
+ * レベルは切り捨てる。四捨五入すると Lv9/7/7 の編成が「Lv8 の相手」を
+ * 引き当てて、3体中2体が格下という状態になる。レベル差は3つのステータスに
+ * 同時に効くので、平均より上に置くだけで勝率が 81% → 60% まで落ちる。
  */
-export function buildEnemyTeam(stage: number, seed: number): TeamSetup {
+export function teamAnchor(setup: TeamSetup): TeamAnchor {
+  const n = Math.max(1, setup.members.length);
+  const avg = (f: (m: TeamSetup['members'][number]) => number): number =>
+    setup.members.reduce((a, m) => a + f(m), 0) / n;
+  return { level: Math.floor(avg((m) => m.level)), clean: Math.round(avg((m) => m.clean)) };
+}
+
+export interface TeamAnchor { level: number; clean: number; }
+
+/**
+ * 敵編成。
+ *
+ * レベルは「出撃した編成の平均」に合わせる。以前は 3 + stage*2 という
+ * 絶対の階段だったが、敵が1ステージで +2 上がるのに対して、こちらは
+ * 1勝でおよそ +1、しかも必要EXPが level^1.55 で伸びるので、進むほど
+ * 差が開く一方だった。レベル差はHP・ATK・DEFの三方向に同時に効くので、
+ * 実測で +2 差 → 勝率39%、+4 差 → 10%、+6 差 → 0%。つまり数戦で
+ * 数学的に追いつけなくなる階段を登らされていた。
+ *
+ * ステージが担うのは「誰と当たるか」——レア度の上限・属性の寄せ方・陣形——
+ * であって、素のステータス差ではない。レベルの上乗せは 0 にしてある。
+ * 実測でこの置き方の勝率は 61〜81%、終盤ほど低いが、それは相手の
+ * レア度が上がるからで、編成を組み替えれば戻せる範囲に収まる。
+ */
+export function buildEnemyTeam(stage: number, seed: number, anchor: TeamAnchor): TeamSetup {
   const rng = new Rng(seed ^ 0x9e3779b9);
-  const level = Math.max(1, 3 + stage * 2);
+  const level = Math.max(1, anchor.level);
   const themes = ['flame', 'aqua', 'terra', 'gale', 'null'] as const;
   const theme = themes[stage % themes.length];
 
@@ -75,7 +101,8 @@ export function buildEnemyTeam(stage: number, seed: number): TeamSetup {
       uid: `foe${i}`,
       defId,
       level,
-      clean: 55 + Math.min(35, stage * 4),
+      // クリーン度も同じ理由で味方基準。素の育成差で殴らない
+      clean: Math.max(45, Math.min(95, anchor.clean + Math.min(10, stage * 2))),
       skillLevel: 1,
     })),
     order: [0, 1, 2],
@@ -101,6 +128,19 @@ export function grantStarters(data: SaveData): void {
   }
 }
 
+/**
+ * 新しく加わる個体の開始レベル。
+ *
+ * Lv1 で渡していたが、進行が進んだ後半に掘り当てた化石は、削り終えた
+ * そばから編成に入れられない置物になる。手持ちの中央値の一歩手前から
+ * 始める——追いつく手間は残しつつ、出せはする位置。
+ */
+export function joinLevel(data: SaveData): number {
+  if (data.roster.length === 0) return 1;
+  const lv = data.roster.map((r) => r.level).sort((a, b) => a - b);
+  return Math.max(1, lv[Math.floor(lv.length / 2)] - 1);
+}
+
 /** 化石を所持ユニットに変換する。同種を持っていればスキルレベルに還元 */
 export function addFossil(data: SaveData, defId: string, clean: number): { isNew: boolean; unit: OwnedRevos } {
   const existing = data.roster.find((r) => r.defId === defId);
@@ -113,7 +153,7 @@ export function addFossil(data: SaveData, defId: string, clean: number): { isNew
   const unit: OwnedRevos = {
     uid: makeUid(),
     defId,
-    level: 1,
+    level: joinLevel(data),
     exp: 0,
     clean,
     skillLevel: 1,
