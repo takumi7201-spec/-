@@ -3,7 +3,7 @@ import type { Archetype } from '../../voxel/CreatureBuilder';
 import type { TargetPref } from '../battle/types';
 
 /**
- * ローンチ・ロスター 14体。
+ * ローンチ・ロスター 16体。
  *
  * 名称は実在分類群の語根（Ignis / Abyssus / Terra / Zephyrus 等）からの
  * 合成語で、原作固有の造語は使わない。
@@ -18,12 +18,14 @@ export type Role =
 export type PassiveId =
   | 'subsidence' | 'embers' | 'deeppressure' | 'vanguard' | 'sediment'
   | 'heatreflect' | 'tide' | 'shearwind' | 'immutable' | 'resonance'
-  | 'traction' | 'overheat' | 'pursuit' | 'deepreign';
+  | 'traction' | 'overheat' | 'pursuit' | 'deepreign'
+  | 'oldtyrant' | 'archivesail';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
   | 'scorchring' | 'tideheal' | 'erosionstorm' | 'obsidiancut' | 'resonantlight'
-  | 'faulthaul' | 'greateruption' | 'crushbite' | 'abyssalmaw';
+  | 'faulthaul' | 'greateruption' | 'crushbite' | 'abyssalmaw'
+  | 'galemaw' | 'stratarecord';
 
 export interface RevosDef {
   id: string;
@@ -63,6 +65,11 @@ export interface RevosDef {
   /** 出やすいバイオーム */
   habitat: ('canyon' | 'frostpeak' | 'emberfield' | 'tidehollow')[];
   rarity: 1 | 2 | 3 | 4 | 5;
+  /**
+   * 発掘では出ない個体。イベント戦の報酬だけで手に入る。
+   * 地層に埋まっていない＝図鑑の産出欄も「産出なし」になる。
+   */
+  eventOnly?: boolean;
   flavor: string;
 }
 
@@ -220,6 +227,30 @@ export const REVOS: RevosDef[] = [
     build: { archetype: 'aquatic', seed: 14151, bulk: 1.24, scale: 1.14, spikes: true },
     habitat: ['tidehollow'], rarity: 5,
     flavor: '全長12mを超える最大級の首長竜。スヴァールバルの凍った泥から2体ぶんだけ見つかっている。海に出た捕食者の到達点で、同じ海に二番手はいなかった。',
+  },
+  {
+    id: 'tyrannosaurus-1915', name: 'ティラノサウルス 1915', short: 'ティラノ1915',
+    en: 'Tyrannosaurus (1915)', element: 'gale', role: 'Striker',
+    hp: 1180, atk: 128, def: 92, spd: 110, basicPower: 90,
+    passive: { id: 'oldtyrant', name: '旧き暴君', desc: '自分より HP 割合が高い敵への与ダメージ +16%。傷のない相手から順に潰す。' },
+    od: { id: 'galemaw', name: '烈風顎', desc: '単体に大ダメージ ＋ 自分の次の行動を早める。', power: 160 },
+    defaultPref: 'front',
+    sprite: 'tyrannosaurus-1915',
+    build: { archetype: 'theropod', seed: 15161, bulk: 1.02, scale: 1.04 },
+    habitat: [], rarity: 4, eventOnly: true,
+    flavor: '1915年に組み上げられた姿。尾を引きずり、身を起こして立つ——いまは誤りとされた復元だが、その時代の博物館ではこれが暴君の全てだった。',
+  },
+  {
+    id: 'spinosaurus-1915', name: 'スピノサウルス 1915', short: 'スピノ1915',
+    en: 'Spinosaurus (1915)', element: 'terra', role: 'Buffer',
+    hp: 1380, atk: 120, def: 128, spd: 94, basicPower: 88,
+    passive: { id: 'archivesail', name: '記録の帆', desc: '味方が特殊攻撃を撃つたび、その味方の ATK +12%（1体につき3回まで、戦闘中持続）。' },
+    od: { id: 'stratarecord', name: '古層の記録', desc: '味方全体の OD +25 ＋ 全体の与ダメージ +20%（4行動）。', power: 0 },
+    defaultPref: 'support',
+    sprite: 'spinosaurus-1915',
+    build: { archetype: 'theropod', seed: 16171, bulk: 1.1, scale: 1.08, sail: true },
+    habitat: [], rarity: 4, eventOnly: true,
+    flavor: '1915年、ストローマーが記載した最初の姿。原標本は戦火で焼け、残ったのは図版と記述だけ。いま復元されるどの姿より、この一枚のほうが長く生きている。',
   },
 ];
 

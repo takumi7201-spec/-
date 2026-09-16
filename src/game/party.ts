@@ -53,8 +53,11 @@ export function buildEnemyTeam(stage: number, seed: number): TeamSetup {
   const themes = ['flame', 'aqua', 'terra', 'gale', 'null'] as const;
   const theme = themes[stage % themes.length];
 
-  // ★5 は終盤まで敵にも出さない。初見で「これは別格」と分かる位置に置く
-  const pool = REVOS.filter((r) => r.rarity <= (stage < 3 ? 2 : stage < 6 ? 3 : stage < 10 ? 4 : 5));
+  // ★5 は終盤まで敵にも出さない。初見で「これは別格」と分かる位置に置く。
+  // イベント個体は通常戦には出さない——出会う場所を1か所に限る
+  const pool = REVOS.filter(
+    (r) => !r.eventOnly && r.rarity <= (stage < 3 ? 2 : stage < 6 ? 3 : stage < 10 ? 4 : 5),
+  );
   const themed = pool.filter((r) => r.element === theme);
   const pick = (): string => {
     const list = rng.chance(0.55) && themed.length > 0 ? themed : pool;

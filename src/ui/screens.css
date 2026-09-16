@@ -630,6 +630,106 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 .screen--party .status-strip::after,
 .screen--dex .status-strip::after { display: none; }
 
+/* =========================================================================
+   イベント戦
+   野帳に挟んだ「調査依頼」の束。1件を1枚の紙にまとめる
+   ========================================================================= */
+.event-body {
+  position: absolute;
+  top: calc(var(--safe-t) + 56px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l) + 28px); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+.event-card {
+  position: relative;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 12px 14px 14px;
+  background-color: var(--paper-card);
+  border: 1.5px solid var(--ink-line);
+  border-radius: var(--r-hand);
+  box-shadow: var(--lift-2);
+}
+.event-card:nth-child(even) { border-radius: var(--r-hand-2); transform: rotate(0.35deg); }
+.event-card:nth-child(odd) { transform: rotate(-0.3deg); }
+.event-card.is-locked { opacity: 0.66; border-style: dashed; border-color: var(--pencil); box-shadow: none; }
+
+.event-head { display: flex; align-items: center; gap: 8px; }
+/* 踏破印。赤インクの角判を斜めに捺す */
+.event-stamp {
+  margin-left: auto;
+  font-family: var(--font-marker);
+  font-size: 12px; letter-spacing: 0.18em;
+  color: var(--pen-red);
+  border: 2px solid var(--pen-red);
+  border-radius: 3px;
+  padding: 1px 8px 2px;
+  transform: rotate(-6deg);
+  opacity: 0.8;
+}
+.event-name { font-family: var(--font-marker); font-size: 18px; }
+.event-desc { margin: 2px 0 6px; font-size: 12px; color: var(--ink-soft); line-height: 1.85; }
+.event-sub { margin-top: 4px; }
+
+.event-foes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.event-foe {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 5px 3px 6px;
+  background: rgba(230, 220, 195, 0.5);
+  border: 1px dashed var(--paper-edge);
+  min-width: 0;
+}
+.event-foe-icon { width: 100%; height: 40px; }
+.event-foe .chip { height: 17px; font-size: 9px; padding: 0 5px; }
+.event-foe-name { font-size: 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.event-meta { font-size: 11px; color: var(--ink-faint); text-align: right; }
+
+/* 報酬は貼り付けた標本写真として出す */
+.event-reward { display: flex; align-items: center; gap: 10px; }
+.event-reward-icon {
+  width: 54px; height: 54px; flex: none;
+  background: #fbf7ec; border: 1px solid var(--paper-edge); padding: 2px;
+  box-shadow: var(--lift-1);
+}
+.event-reward-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.event-reward-name { font-size: 13px; }
+.event-reward-sub { font-size: 11px; color: var(--pen-brown); }
+.event-go { margin-top: 8px; }
+.event-locked {
+  margin-top: 8px; padding: 7px 2px;
+  font-size: 11px; color: var(--ink-faint);
+  border-top: 1px dashed var(--paper-edge);
+}
+
+body[data-layout='wide'] .event-body { left: 18vw; right: 18vw; }
+
+/* ページを開いている画面では、ストリップ側の紙は要らない */
+.screen--event .status-strip { background: none; }
+.screen--event .status-strip::after { display: none; }
+.screen--event::before {
+  content: ''; position: absolute; inset: 0;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, transparent 0 34px, var(--margin-rule) 34px 35px, transparent 35px),
+    var(--ruled),
+    var(--fiber);
+  background-blend-mode: normal, normal, multiply;
+  pointer-events: none;
+}
+.screen--event::after {
+  content: ''; position: absolute;
+  left: 7px; top: 22%; height: 384px; width: 14px;
+  background-image: radial-gradient(circle at 50% 22px, rgba(120, 104, 74, 0.3) 0 6.5px, transparent 7.5px);
+  background-size: 14px 128px;
+  background-repeat: repeat-y;
+  pointer-events: none;
+}
+.screen--event > * { z-index: 1; }
+body[data-layout='wide'] .screen--event::after { left: 2.2vw; }
+
 /* ---- 図鑑 ---- */
 .dex-count { font-size: 13px; color: var(--ink-soft); }
 .dex-body {

@@ -3,6 +3,7 @@ import { h, button, bar, clear, fmtNum } from '../dom';
 import type { SaveData } from '../../core/Save';
 import { expToNext, dropDecay } from '../../core/Save';
 import { audio } from '../../core/Audio';
+import { EVENTS } from '../../game/data/events';
 
 /**
  * 拠点。導線は下部のグリッドに集約する。
@@ -18,7 +19,7 @@ export class HomeScreen extends Screen {
   private noticeEl!: HTMLElement;
   private tiles = new Map<string, HTMLButtonElement>();
 
-  onGo?: (where: 'dig' | 'clean' | 'battle' | 'party' | 'dex' | 'title') => void;
+  onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'party' | 'dex' | 'title') => void;
 
   constructor() { super('home'); }
 
@@ -57,6 +58,7 @@ export class HomeScreen extends Screen {
     tile('dig', '発掘', '⛏', () => this.onGo?.('dig'));
     tile('clean', '精錬', '✦', () => this.onGo?.('clean'));
     tile('battle', 'バトル', '⚔', () => this.onGo?.('battle'));
+    tile('event', 'イベント', '✉', () => this.onGo?.('event'));
     tile('party', '編成', '❖', () => this.onGo?.('party'));
     tile('dex', '図鑑', '☰', () => this.onGo?.('dex'));
     tile('title', 'タイトル', '⌂', () => this.onGo?.('title'));
@@ -82,6 +84,11 @@ export class HomeScreen extends Screen {
     };
     badge('clean', stock);
     badge('dex', 0);
+    // 挑めるのに手を付けていないイベントだけ数える。
+    // 「まだ届かない依頼」を数に入れると、ただの不安になる
+    badge('event', EVENTS.filter(
+      (e) => this.data.stageProgress >= e.requires && !this.data.events.cleared.includes(e.id),
+    ).length);
 
     // 逓減は隠さず見せる。同じ数字でも提示の有無で体感が変わる
     const decay = dropDecay(this.data.daily.runs);

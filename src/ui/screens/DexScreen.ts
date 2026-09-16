@@ -104,7 +104,7 @@ export class DexScreen extends Screen {
       ),
       h('div', { class: 'dex-habitat' },
         h('span', { class: 'label', text: '産出' }),
-        h('span', { text: r.habitat.map(habitatName).join(' / ') }),
+        h('span', { text: r.habitat.length > 0 ? r.habitat.map(habitatName).join(' / ') : 'イベント戦の記録から' }),
       ),
     );
     this.ui.sheet(r.name, body);

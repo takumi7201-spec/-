@@ -19,6 +19,8 @@ import { HomeScene } from './scenes/HomeScene';
 import { BattlePlayer } from './game/battle/BattlePlayer';
 import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil } from './game/party';
 import { advanceHoloTime } from './fx/SpriteUnit';
+import { buildEventTeam, type EventDef } from './game/data/events';
+import { EventScreen } from './ui/screens/EventScreen';
 import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
 import {
@@ -68,10 +70,15 @@ async function main(): Promise<void> {
 
   let player: BattlePlayer | null = null;
   let runFossils: { defId: string; rarity: number }[] = [];
+  /** 挑戦中のイベント。通常バトルなら null */
+  let activeEvent: EventDef | null = null;
+  /** 直前に挑んだイベント。リザルトの「もう一度」で同じ相手へ戻す */
+  let lastEvent: EventDef | null = null;
   /** 直前の周回の成果。リザルトで見せる */
   let pendingResult: ResultData | null = null;
 
-  const speciesPool = REVOS.map((r) => ({
+  // イベント専用の個体は地層に埋まっていない。発掘の抽選から外す
+  const speciesPool = REVOS.filter((r) => !r.eventOnly).map((r) => ({
     id: r.id,
     rarity: r.rarity,
     weight: r.rarity === 1 ? 10 : r.rarity === 2 ? 6 : r.rarity === 3 ? 3 : 1,
@@ -86,8 +93,9 @@ async function main(): Promise<void> {
   const battleScreen = new BattleScreen();
   const partyScreen = new PartyScreen();
   const dexScreen = new DexScreen();
+  const eventScreen = new EventScreen();
   const resultScreen = new ResultScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -142,14 +150,17 @@ async function main(): Promise<void> {
     setTimeout(() => boot.classList.add('hidden'), 200);
   }
 
-  async function startBattle(): Promise<void> {
+  async function startBattle(ev: EventDef | null = null): Promise<void> {
     const mine = buildTeamSetup(data.roster, data.party.order, data.party.formation, data.party.targetPrefs);
     if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); goHome(); return; }
+    activeEvent = ev;
+    lastEvent = ev;
     boot.classList.remove('hidden');
-    await progress(0.4, '闘技場を生成しています…');
+    await progress(0.4, ev ? '記録を読み出しています…' : '闘技場を生成しています…');
     const seed = (Date.now() ^ (data.stageProgress * 104729)) >>> 0;
-    battle.buildArena(data.unlockedBiomes[0] ?? 'canyon', seed);
-    player = new BattlePlayer(seed, mine, buildEnemyTeam(data.stageProgress, seed), battle);
+    battle.buildArena(ev ? ev.biome : (data.unlockedBiomes[0] ?? 'canyon'), seed);
+    const foes = ev ? buildEventTeam(ev) : buildEnemyTeam(data.stageProgress, seed);
+    player = new BattlePlayer(seed, mine, foes, battle);
     battleScreen.setPlayer(player);
     player.speed = data.settings.battleSpeed;
     await progress(0.9, 'リヴォスを復元しています…');
@@ -200,6 +211,7 @@ async function main(): Promise<void> {
         break;
       }
       case 'battle': void startBattle(); break;
+      case 'event': eventScreen.setData(data); ui.show('event'); break;
       case 'party': partyScreen.setData(data); ui.show('party'); break;
       case 'dex': dexScreen.setData(data); ui.show('dex'); break;
       case 'title': ui.show('title'); break;
@@ -263,11 +275,30 @@ async function main(): Promise<void> {
 
   battleScreen.onFinish = (winner) => {
     data.stats.battles++;
+    const ev = activeEvent;
+    activeEvent = null;
     const rows: ResultData['rows'] = [];
     if (winner === 0) {
       data.stats.wins++;
-      data.stageProgress++;
-      const coins = 120 + data.stageProgress * 40;
+      let coins: number;
+      if (ev) {
+        // イベントは進行度を進めない。編成を試す場としていつでも戻れるようにする
+        const first = !data.events.cleared.includes(ev.id);
+        coins = first ? ev.coins : Math.round(ev.coins / 4);
+        if (first) {
+          data.events.cleared.push(ev.id);
+          const { isNew, unit } = addFossil(data, ev.reward.defId, ev.reward.clean);
+          if (isNew) {
+            unit.level = ev.reward.level;
+            rows.push({ label: '記録を確保', value: `${label(ev.reward.defId)} Lv${unit.level}`, kind: 'new' });
+          } else {
+            rows.push({ label: '記録を確保', value: `${label(ev.reward.defId)} スキルLv ${unit.skillLevel}`, kind: 'new' });
+          }
+        }
+      } else {
+        data.stageProgress++;
+        coins = 120 + data.stageProgress * 40;
+      }
       data.player.coins += coins;
       rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
 
@@ -288,7 +319,7 @@ async function main(): Promise<void> {
           kind: 'exp',
         });
       });
-      rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
+      if (!ev) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
     } else {
       rows.push({ label: '結果', value: winner === 1 ? '敗北' : '引き分け' });
       rows.push({ label: '助言', value: '編成と陣形を見直そう' });
@@ -296,11 +327,14 @@ async function main(): Promise<void> {
     writeSave(data);
     showResult({
       title: winner === 0 ? 'VICTORY' : winner === 1 ? 'DEFEAT' : 'DRAW',
-      subtitle: `${player?.sim.turnCount ?? 0} 行動`,
+      subtitle: ev ? `${ev.name} — ${player?.sim.turnCount ?? 0} 行動` : `${player?.sim.turnCount ?? 0} 行動`,
       good: winner === 0,
       rows,
     });
   };
+
+  eventScreen.onBack = () => goHome();
+  eventScreen.onChallenge = (ev) => { void startBattle(ev); };
 
   partyScreen.onBack = () => goHome();
   partyScreen.onApply = (order, formation, prefs) => {
@@ -322,7 +356,7 @@ async function main(): Promise<void> {
       if (s) { writeSave(data); void startClean(s.defId, s.rarity); return; }
       void startBattle();
     } else {
-      void startBattle();
+      void startBattle(lastEvent);
     }
   };
 
@@ -350,6 +384,7 @@ async function main(): Promise<void> {
     else if (jump === 'home') goHome();
     else if (jump === 'party') { partyScreen.setData(data); ui.show('party'); }
     else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
+    else if (jump === 'event') { eventScreen.setData(data); ui.show('event'); }
     else if (jump === 'dig') void startRun('canyon');
   }
 

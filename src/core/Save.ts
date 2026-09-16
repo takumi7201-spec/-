@@ -36,6 +36,8 @@ export interface SaveData {
   dex: string[];
   unlockedBiomes: BiomeId[];
   stageProgress: number;
+  /** クリア済みイベントの id。報酬のリヴォスは初回だけ配る */
+  events: { cleared: string[] };
   stats: { runs: number; fossils: number; battles: number; wins: number; voxelsDug: number };
   daily: { date: string; runs: number };
   settings: {
@@ -73,6 +75,7 @@ export function defaultSave(): SaveData {
     dex: [],
     unlockedBiomes: ['canyon'],
     stageProgress: 0,
+    events: { cleared: [] },
     stats: { runs: 0, fossils: 0, battles: 0, wins: 0, voxelsDug: 0 },
     daily: { date: todayKey(), runs: 0 },
     settings: {
@@ -132,6 +135,7 @@ export function load(): SaveData {
       settings: { ...base.settings, ...(data.settings ?? {}) },
       player: { ...base.player, ...(data.player ?? {}) },
       party: { ...base.party, ...(data.party ?? {}) },
+      events: { ...base.events, ...(data.events ?? {}) },
       stats: { ...base.stats, ...(data.stats ?? {}) },
     };
   } catch {

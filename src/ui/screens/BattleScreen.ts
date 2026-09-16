@@ -65,6 +65,12 @@ export class BattleScreen extends Screen {
   private roundEl!: HTMLElement;
   private bannerEl!: HTMLElement;
   private orderTimer = 0;
+  /**
+   * 決着を一度だけ通す。スキップは sim を直接回して決着させるので、
+   * その後で再生側も終端に達し、onEnd が2回飛ぶ。2回目は「通常戦の勝利」
+   * として処理され、ステージも報酬も二重に入る
+   */
+  private ended = false;
 
   onFinish?: (winner: Side | -1) => void;
 
@@ -122,6 +128,7 @@ export class BattleScreen extends Screen {
   private enemyRow!: HTMLElement;
 
   enter(): void {
+    this.ended = false;
     this.buildCards();
     this.logLines = [];
     this.renderLog();
@@ -279,6 +286,9 @@ export class BattleScreen extends Screen {
       .then((ok) => {
         if (!ok) return;
         while (!this.player.sim.isOver) this.player.sim.step();
+        // 再生側も止める。止めないと、このあと再生が終端に達して
+        // もう一度 onEnd が飛ぶ
+        this.player.finished = true;
         this.onEnd(this.player.sim.currentWinner);
       });
   }
@@ -309,6 +319,8 @@ export class BattleScreen extends Screen {
   }
 
   private onEnd(winner: Side | -1): void {
+    if (this.ended) return;
+    this.ended = true;
     this.banner(winner === 0 ? 'VICTORY' : winner === 1 ? 'DEFEAT' : 'DRAW', 1600);
     for (const x of [...this.allyCards, ...this.enemyCards]) x.el.classList.remove('is-acting');
     setTimeout(() => this.onFinish?.(winner), 1700);

@@ -36,7 +36,8 @@ const OD_RECOVERY: Record<string, number> = {
   faultcrush: 0.5, flamevolley: 0.5, vortexfang: 0.5, obsidiancut: 0.5, faulthaul: 0.55,
   // 全体
   galerend: 0.9, scorchring: 0.8, erosionstorm: 0.8, greateruption: 0.85,
-  crushbite: 0.5, abyssalmaw: 0.85,
+  crushbite: 0.5, abyssalmaw: 0.85, galemaw: 0.5,
+  stratarecord: 0.28,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28,
 };
@@ -447,6 +448,21 @@ export class BattleSim {
         for (const e of enemies) this.dealDamage(actor, e, power, ev, true);
         break;
       }
+      case 'galemaw': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        actor.av += 2200;
+        break;
+      }
+      case 'stratarecord': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: allies.map((a) => a.uid) });
+        for (const a of allies) {
+          this.gainOd(a, 25, ev);
+          this.addMod(a, { kind: 'dealt', value: 0.20, turns: 4, source: 'stratarecord' }, ev, '与ダメ上昇');
+        }
+        break;
+      }
       case 'greateruption': {
         ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
         for (const e of enemies) {
@@ -459,6 +475,20 @@ export class BattleSim {
         break;
       }
     }
+    // 「記録の帆」: 誰かが特殊攻撃を撃つたび、撃った本人の一撃が重くなる。
+    // 撃つほど強くなる形にして、OD を溜め込むより回す動機を作る
+    for (const a of this.alive(actor.side)) {
+      if (passiveOf(a) !== 'archivesail') continue;
+      const key = `sail:${actor.uid}`;
+      const st = a.stacks[key] ?? 0;
+      if (st < 3) {
+        a.stacks[key] = st + 1;
+        ev.push({ t: 'passive', uid: a.uid, label: '記録の帆' });
+        this.addMod(actor, { kind: 'atk', value: 0.12, turns: 999, source: 'archivesail' }, ev, 'ATK上昇');
+      }
+      break;
+    }
+
     actor.od = 0;
     ev.push({ t: 'od', uid: actor.uid, value: 0 });
     // 特殊攻撃のあとは隙ができる。隙の大きさは技の重さに比例させる。
@@ -508,6 +538,8 @@ export class BattleSim {
     if (pa === 'deeppressure' && def.spd >= atk.spd + 20) buff *= 1.14;
     if (pa === 'traction' && def.row === 'back') buff *= 1.34;
     if (pa === 'overheat') buff *= 1 + 0.25 * (1 - atk.hp / atk.maxHp);
+    // 「旧き暴君」: まだ削れていない相手を先に潰す
+    if (pa === 'oldtyrant' && def.hp / def.maxHp > atk.hp / atk.maxHp) buff *= 1.16;
     const pd = passiveOf(def);
     if (pd === 'subsidence' && def.row === 'front') buff *= 0.85;
 
