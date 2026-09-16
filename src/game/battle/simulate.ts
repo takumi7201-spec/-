@@ -125,6 +125,13 @@ export class BattleSim {
   private rng: Prng;
   private formations: [ReturnType<typeof formOf>, ReturnType<typeof formOf>];
   private turn = 0;
+  /**
+   * 戦闘内の経過時間（AV の単位）。
+   *
+   * advanceToNextActor が全員に配る量そのもの。行動と行動のあいだに
+   * どれだけ「時間」が流れたかを、再生側が実時間へ割り付けるために使う。
+   */
+  private clockV = 0;
   private finished = false;
   private winner: Side | -1 = -1;
   /** プレイヤーが「このユニットのODを溜めて撃つ」と指示した集合 */
@@ -144,6 +151,28 @@ export class BattleSim {
   get isOver(): boolean { return this.finished; }
   get currentWinner(): Side | -1 { return this.winner; }
   get turnCount(): number { return this.turn; }
+  /** 戦闘内の経過時間。step するたびに bestT ぶん進む */
+  get clock(): number { return this.clockV; }
+
+  /** 陣形とバフ込みの実効 SPD。再生側が「あと何秒で動くか」を出すのに使う */
+  speedOf(f: Fighter): number { return this.effSpd(f); }
+
+  /**
+   * 次に誰かが動く時刻。clock と同じ単位で、step せずに覗くだけ。
+   *
+   * 再生側はこれを見て「まだ誰も動かない」区間を作る。先に step して
+   * 待たせると、その行動はもう確定しているので、プレイヤーが OD を
+   * 押し込む余地がそのぶん消える。
+   */
+  nextActorAt(): number {
+    const living = this.alive();
+    if (living.length === 0 || this.alive(0).length === 0 || this.alive(1).length === 0) {
+      return Infinity;
+    }
+    let best = Infinity;
+    for (const f of living) best = Math.min(best, (AV_THRESHOLD - f.av) / this.effSpd(f));
+    return this.clockV + Math.max(0, best);
+  }
 
   startEvents(): BattleEvent[] {
     return [{ t: 'start', fighters: this.fighters.map(snapshot) }];
@@ -300,6 +329,7 @@ export class BattleSim {
     }
     if (!best) return null;
     for (const f of living) f.av += this.effSpd(f) * bestT;
+    this.clockV += bestT;
     best.av -= AV_THRESHOLD;
     return best;
   }

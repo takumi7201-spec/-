@@ -16,6 +16,8 @@ interface UnitCard {
   odBtn?: HTMLButtonElement;
   alive: boolean;
   maxHp: number;
+  /** 画面に出ている OD 値。判定は見えているほうに合わせる */
+  odValue: number;
   /** アイコンの外枠。クールタイムのリングとスイープを持つ */
   icon: HTMLElement;
   /** 表示中の充填率。シミュレータの離散更新を補間してなめらかに見せる */
@@ -155,7 +157,7 @@ export class BattleScreen extends Screen {
           h('div', { class: 'card-row' }, hpText, h('span', { class: 'card-od-label', text: 'OD' }), od.el),
         );
         this.allyRow.appendChild(btn);
-        this.allyCards.push({ uid: f.uid, el: btn, hp, od, hpText, odBtn: btn, alive: true, maxHp: f.maxHp, icon, cd: 0, cdReady: false });
+        this.allyCards.push({ uid: f.uid, el: btn, hp, od, hpText, odBtn: btn, alive: true, maxHp: f.maxHp, odValue: f.od, icon, cd: 0, cdReady: false });
       } else {
         const el = h('div', { class: 'enemy-card' },
           h('div', { class: 'card-top' },
@@ -166,7 +168,7 @@ export class BattleScreen extends Screen {
           hp.el,
         );
         this.enemyRow.appendChild(el);
-        this.enemyCards.push({ uid: f.uid, el, hp, od, hpText, alive: true, maxHp: f.maxHp, icon, cd: 0, cdReady: false });
+        this.enemyCards.push({ uid: f.uid, el, hp, od, hpText, alive: true, maxHp: f.maxHp, odValue: f.od, icon, cd: 0, cdReady: false });
       }
     }
   }
@@ -206,6 +208,7 @@ export class BattleScreen extends Screen {
       case 'od': {
         const c = this.allyCards.find((x) => x.uid === e.uid);
         if (c) {
+          c.odValue = e.value;
           c.od.set(e.value / 100);
           c.el.classList.toggle('is-od-ready', e.value >= 100);
         }
@@ -252,7 +255,16 @@ export class BattleScreen extends Screen {
   private tryOd(uid: string): void {
     const f = this.player.sim.fighters.find((x) => x.uid === uid);
     if (!f || !f.alive) return;
-    if (f.od < 100) { audio.uiError(); this.ui.toast('OD ゲージが足りない', 'warn', 1400); return; }
+
+    // 判定は「見えている値」で行う。シミュレータは再生より先に進んでいるので、
+    // 光っているカードを押したのに「足りない」と言われることがあった
+    const c = this.allyCards.find((x) => x.uid === uid);
+    const shown = c ? c.odValue : f.od;
+    if (shown < 100) { audio.uiError(); this.ui.toast('OD ゲージが足りない', 'warn', 1400); return; }
+    // 見た目は満ちているが、シミュレータ側ではもう撃たれている。
+    // 咎めずに受け流す——この直後に必殺技の演出が出る
+    if (f.od < 100) return;
+
     this.player.fireOd(uid);
     this.ui.toast(`${f.name} の OD を解放`, 'info', 1400);
   }
