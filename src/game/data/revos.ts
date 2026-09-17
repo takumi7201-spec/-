@@ -3,7 +3,7 @@ import type { Archetype } from '../../voxel/CreatureBuilder';
 import type { TargetPref } from '../battle/types';
 
 /**
- * ローンチ・ロスター 16体。
+ * ローンチ・ロスター 19体。
  *
  * 名称は実在分類群の語根（Ignis / Abyssus / Terra / Zephyrus 等）からの
  * 合成語で、原作固有の造語は使わない。
@@ -19,13 +19,15 @@ export type PassiveId =
   | 'subsidence' | 'embers' | 'deeppressure' | 'vanguard' | 'sediment'
   | 'heatreflect' | 'tide' | 'shearwind' | 'immutable' | 'resonance'
   | 'traction' | 'overheat' | 'pursuit' | 'deepreign'
-  | 'oldtyrant' | 'archivesail';
+  | 'oldtyrant' | 'archivesail'
+  | 'skygrasp' | 'platescreen' | 'greatbeak';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
   | 'scorchring' | 'tideheal' | 'erosionstorm' | 'obsidiancut' | 'resonantlight'
   | 'faulthaul' | 'greateruption' | 'crushbite' | 'abyssalmaw'
-  | 'galemaw' | 'stratarecord';
+  | 'galemaw' | 'stratarecord'
+  | 'skyreign' | 'spikebore' | 'leapstrike';
 
 export interface RevosDef {
   id: string;
@@ -76,7 +78,7 @@ export interface RevosDef {
 export const REVOS: RevosDef[] = [
   {
     id: 'ankylosaurus', name: 'アンキロサウルス', en: 'Ankylosaurus', element: 'terra', role: 'Tank',
-    hp: 1610, atk: 96, def: 144, spd: 74, basicPower: 87,
+    hp: 1654, atk: 100, def: 149, spd: 76, basicPower: 90,
     passive: { id: 'subsidence', name: '地盤沈下', desc: '前列にいる間、被ダメージ −15%。撃破されると味方全体の OD +40。' },
     od: { id: 'faultcrush', name: '断層圧壊', desc: '単体に大ダメージ。対象の昇格を1行動遅延させる。', power: 185 },
     defaultPref: 'front',
@@ -186,7 +188,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'iguanodon', name: 'イグアノドン', en: 'Iguanodon', element: 'terra', role: 'Technical',
-    hp: 1400, atk: 138, def: 112, spd: 88, basicPower: 92,
+    hp: 1448, atk: 143, def: 117, spd: 91, basicPower: 95,
     passive: { id: 'traction', name: '牽引', desc: '後列の敵への与ダメージ +34%。' },
     od: { id: 'faulthaul', name: '断層牽引', desc: '敵後列1体を強制的に前列へ引きずり出す（2行動）。', power: 120 },
     defaultPref: 'back',
@@ -219,7 +221,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'pliosaurus-funkei', name: 'プリオサウルス フンケイ', short: 'フンケイ', en: 'Pliosaurus funkei', element: 'aqua', role: 'Apex',
-    hp: 1310, atk: 132, def: 114, spd: 100, basicPower: 90,
+    hp: 1288, atk: 129, def: 112, spd: 98, basicPower: 88,
     passive: { id: 'deepreign', name: '制海', desc: '自分が生きている間、敵全体の OD 獲得 −15%。' },
     od: { id: 'abyssalmaw', name: '絶海断', desc: '敵全体に大ダメージ。シールドを貫通する。', power: 104 },
     defaultPref: 'front',
@@ -251,6 +253,58 @@ export const REVOS: RevosDef[] = [
     build: { archetype: 'theropod', seed: 16171, bulk: 1.1, scale: 1.08, sail: true },
     habitat: [], rarity: 4, eventOnly: true,
     flavor: '1915年、ストローマーが記載した最初の姿。原標本は戦火で焼け、残ったのは図版と記述だけ。いま復元されるどの姿より、この一枚のほうが長く生きている。',
+  },
+  {
+    id: 'quetzalcoatlus', name: 'ケツァルコアトルス', short: 'ケツァル',
+    en: 'Quetzalcoatlus', element: 'gale', role: 'Buffer',
+    hp: 1232, atk: 111, def: 105, spd: 131, basicPower: 83,
+    passive: {
+      id: 'skygrasp', name: '掌握する空',
+      desc: '味方の攻撃が奇数回目になるたび、味方全体の ATK +5%（最大 +15%）。自分が倒れると効果は消える。',
+    },
+    od: {
+      id: 'skyreign', name: '制空覇道',
+      desc: '味方全体の SPD・DEF +10%（10秒）。', power: 0,
+    },
+    defaultPref: 'support',
+    sprite: 'quetzalcoatlus',
+    build: { archetype: 'pterosaur', seed: 17181, bulk: 1.02, scale: 1.16, crest: true },
+    habitat: ['canyon', 'frostpeak'], rarity: 5,
+    flavor: '翼を広げれば10mを超える、空を飛んだ最大の生き物。地に降りればキリンの背丈で歩き、見上げる空には競合がいなかった。',
+  },
+  {
+    id: 'stegosaurus', name: 'ステゴサウルス', en: 'Stegosaurus', element: 'flame', role: 'Guardian',
+    hp: 1762, atk: 103, def: 165, spd: 81, basicPower: 91,
+    passive: {
+      id: 'platescreen', name: '板の放熱',
+      desc: '自分が前列にいる間、後列の味方が狙われたとき 45% で肩代わりする。',
+    },
+    od: {
+      id: 'spikebore', name: '尾棘穿孔',
+      desc: '単体に大ダメージ ＋ 対象の ATK −22%（4行動）。', power: 158,
+    },
+    defaultPref: 'front',
+    sprite: 'stegosaurus',
+    build: { archetype: 'stegosaur', seed: 18191, bulk: 1.2, scale: 1.12, spikes: true },
+    habitat: ['emberfield', 'canyon'], rarity: 3,
+    flavor: '背に二列の骨板を並べ、尾の先に四本の棘を持つ。板には血管の溝が走っていて、熱を逃がしていたと考えられている。',
+  },
+  {
+    id: 'diatryma', name: 'ディアトリマ', en: 'Diatryma', element: 'null', role: 'Breaker',
+    hp: 1170, atk: 123, def: 87, spd: 107, basicPower: 94,
+    passive: {
+      id: 'greatbeak', name: '大喙',
+      desc: '通常攻撃の与ダメージ +22%。ただし OD の溜まりが 20% 遅い。',
+    },
+    od: {
+      id: 'leapstrike', name: '跳襲',
+      desc: '単体に大ダメージ ＋ 対象の被ダメージ +25%（3行動）。', power: 150,
+    },
+    defaultPref: 'lowhp',
+    sprite: 'diatryma',
+    build: { archetype: 'raptor', seed: 19201, bulk: 1.08, scale: 1.02, crest: true },
+    habitat: ['emberfield', 'tidehollow'], rarity: 3,
+    flavor: '恐竜が去ったあとの森を歩いた、身長2mの飛べない鳥。斧のような嘴だけが残っていて、それで何を割っていたのかは今も決まっていない。',
   },
 ];
 

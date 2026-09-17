@@ -39,10 +39,21 @@ const OD_RECOVERY: Record<string, number> = {
   galerend: 0.9, scorchring: 0.8, erosionstorm: 0.8, greateruption: 0.85,
   crushbite: 0.5, abyssalmaw: 0.85, galemaw: 0.5,
   stratarecord: 0.28,
+  spikebore: 0.5, leapstrike: 0.5,
+  skyreign: 0.28,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28,
 };
 const MAX_TURNS = 200;
+
+/**
+ * 「制空覇道」の持続。標準速の10秒を戦闘内時刻に換算したもの。
+ *
+ * 再生側は 1 秒あたり 1/0.055 だけ clock を進める（BattlePlayer の
+ * SEC_PER_AV）。実時間で数えると倍速・3倍速で結果が変わってしまうので、
+ * 標準速の秒数を固定値として持つ。
+ */
+const SKYREIGN_DURATION = Math.round(10 / 0.055);
 
 /** レベル補正。Lv30 でおよそ 2.6 倍 */
 function levelScale(level: number): number {
@@ -204,7 +215,12 @@ export class BattleSim {
 
   private modSum(f: Fighter, kind: ModKind): number {
     let s = 0;
-    for (const m of f.mods) if (m.kind === kind) s += m.value;
+    for (const m of f.mods) {
+      if (m.kind !== kind) continue;
+      // 秒で切れるバフ。持ち主の行動を待たずに、時刻が来たら効かなくなる
+      if (m.until !== undefined && this.clockV >= m.until) continue;
+      s += m.value;
+    }
     return s;
   }
 
@@ -216,6 +232,7 @@ export class BattleSim {
     const actor = this.advanceToNextActor();
     if (!actor) { this.finish(ev); return ev; }
 
+    this.sweepTimedMods();
     this.turn++;
     ev.push({ t: 'turnBegin', uid: actor.uid });
 
@@ -348,12 +365,35 @@ export class BattleSim {
     return actor.stance === 'aggressive';
   }
 
+  /**
+   * 「掌握する空」: 味方の攻撃が奇数回目になるたび、味方全体の ATK が上がる。
+   *
+   * 数えるのは陣営ごとの攻撃回数。1・3・5回目で1段ずつ乗り、3段（+15%）で
+   * 止まる。序盤にだけ伸びて、あとは維持する形——維持のためには本体を
+   * 守らなければならない。ケツァルコアトルスが落ちれば、積んだ分は全部消える。
+   */
+  private tickSkygrasp(actor: Fighter, ev: BattleEvent[]): void {
+    const holder = this.alive(actor.side).find((a) => passiveOf(a) === 'skygrasp');
+    if (!holder) return;
+    const hits = (holder.stacks.skyhits ?? 0) + 1;
+    holder.stacks.skyhits = hits;
+    if (hits % 2 === 0) return;
+    const st = holder.stacks.sky ?? 0;
+    if (st >= 3) return;
+    holder.stacks.sky = st + 1;
+    ev.push({ t: 'passive', uid: holder.uid, label: '掌握する空' });
+    for (const a of this.alive(actor.side)) {
+      this.addMod(a, { kind: 'atk', value: 0.05, turns: 999, source: 'skygrasp' }, ev, 'ATK上昇');
+    }
+  }
+
   private performBasic(actor: Fighter, ev: BattleEvent[]): void {
     const target = this.pickTarget(actor);
     if (!target) return;
     ev.push({ t: 'action', uid: actor.uid, kind: 'basic', name: '通常攻撃', targets: [target.uid] });
-    const dealt = this.dealDamage(actor, target, actor.basicPower, ev);
+    const dealt = this.dealDamage(actor, target, this.basicPowerOf(actor), ev);
     this.gainOd(actor, 12, ev);
+    this.tickSkygrasp(actor, ev);
 
     if (dealt > 0) {
       const p = passiveOf(actor);
@@ -494,6 +534,30 @@ export class BattleSim {
         }
         break;
       }
+      case 'skyreign': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: allies.map((a) => a.uid) });
+        // 「10秒」は標準速の実時間。戦闘内時刻に換算して持たせる
+        const until = this.clockV + SKYREIGN_DURATION;
+        for (const a of allies) {
+          this.addMod(a, { kind: 'spd', value: 0.10, until, turns: 0, source: 'skyreign' }, ev, 'SPD上昇');
+          this.addMod(a, { kind: 'def', value: 0.10, until, turns: 0, source: 'skyreign' }, ev, 'DEF上昇');
+        }
+        break;
+      }
+      case 'spikebore': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        if (t.alive) this.addMod(t, { kind: 'atk', value: -0.22, turns: 4, source: 'spikebore' }, ev, 'ATK低下');
+        break;
+      }
+      case 'leapstrike': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        if (t.alive) this.addMod(t, { kind: 'taken', value: 0.25, turns: 3, source: 'leapstrike' }, ev, '被ダメ上昇');
+        break;
+      }
       case 'greateruption': {
         ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
         for (const e of enemies) {
@@ -506,6 +570,7 @@ export class BattleSim {
         break;
       }
     }
+    this.tickSkygrasp(actor, ev);
     // 「記録の帆」: 誰かが特殊攻撃を撃つたび、撃った本人の一撃が重くなる。
     // 撃つほど強くなる形にして、OD を溜め込むより回す動機を作る
     for (const a of this.alive(actor.side)) {
@@ -531,6 +596,16 @@ export class BattleSim {
 
   private estimateDamage(atk: Fighter, def: Fighter, power: number): number {
     return this.computeDamage(atk, def, power, false).amount;
+  }
+
+  /**
+   * 通常攻撃の実効威力。
+   *
+   * 威力はダメージ式に線形で入るので、ここを割り増せば「通常攻撃だけ重い」を
+   * そのまま表現できる。computeDamage に通常／必殺の区別を持ち込まずに済む。
+   */
+  private basicPowerOf(f: Fighter): number {
+    return passiveOf(f) === 'greatbeak' ? f.basicPower * 1.22 : f.basicPower;
   }
 
   private computeDamage(
@@ -650,6 +725,14 @@ export class BattleSim {
       ev.push({ t: 'passive', uid: target.uid, label: '地盤沈下' });
       for (const a of this.alive(target.side)) this.gainOd(a, 40, ev);
     }
+    // 「掌握する空」: 空を握っていた本体が落ちれば、積み上げた分は残らない
+    if (passiveOf(target) === 'skygrasp') {
+      for (const a of this.fighters) {
+        if (a.side !== target.side) continue;
+        a.mods = a.mods.filter((m) => m.source !== 'skygrasp');
+      }
+      ev.push({ t: 'passive', uid: target.uid, label: '掌握する空' });
+    }
     // 「潮汐」: 味方が倒れると生存者を癒す
     for (const a of this.alive(target.side)) {
       if (passiveOf(a) === 'tide') {
@@ -680,6 +763,8 @@ export class BattleSim {
     // 「制海」: 海の主が生きている間、向かいの側は必殺技が溜まらない。
     // 与ダメージを押し上げないので、盾役や回復役の居場所を潰さずに強い
     if (this.alive(other(f.side)).some((e) => passiveOf(e) === 'deepreign')) mul *= 0.8;
+    // 「大喙」: 通常攻撃が重いぶん、必殺技の出番が遅い
+    if (passiveOf(f) === 'greatbeak') mul *= 0.8;
     const before = f.od;
     f.od = clamp(f.od + amount * mul, 0, 150);
     if (Math.round(f.od) !== Math.round(before)) ev.push({ t: 'od', uid: f.uid, value: f.od });
@@ -693,10 +778,26 @@ export class BattleSim {
 
   private decayMods(f: Fighter): void {
     f.mods = f.mods.filter((m) => {
+      if (m.until !== undefined) return this.clockV < m.until;
       if (m.turns >= 999) return true;
       m.turns--;
       return m.turns > 0;
     });
+  }
+
+  /**
+   * 秒で切れたバフを全員から掃除する。
+   *
+   * decayMods は行動した本人にしか回らないので、それだけだと切れた効果が
+   * 配列に残り、UI に「まだ乗っている」と見えてしまう。効き目は modSum が
+   * 時刻で弾いているが、表示のために毎 step ここで落とす。
+   */
+  private sweepTimedMods(): void {
+    for (const f of this.fighters) {
+      if (f.mods.some((m) => m.until !== undefined && this.clockV >= m.until)) {
+        f.mods = f.mods.filter((m) => m.until === undefined || this.clockV < m.until);
+      }
+    }
   }
 
   private applyBurn(target: Fighter, ev: BattleEvent[], source: string): void {
@@ -760,7 +861,7 @@ export class BattleSim {
           break;
       }
       if (actor.stance === 'aggressive') {
-        const est = this.estimateDamage(actor, e, actor.basicPower);
+        const est = this.estimateDamage(actor, e, this.basicPowerOf(actor));
         if (est >= e.hp) b *= 3;
       }
       return b;
@@ -768,11 +869,29 @@ export class BattleSim {
 
     const total = bias.reduce((s, b) => s + b, 0);
     let r = this.rng.next() * total;
+    let picked = enemies[enemies.length - 1];
     for (let i = 0; i < enemies.length; i++) {
       r -= bias[i];
-      if (r <= 0) return enemies[i];
+      if (r <= 0) { picked = enemies[i]; break; }
     }
-    return enemies[enemies.length - 1];
+    return this.coverFor(picked);
+  }
+
+  /**
+   * 「板の放熱」: 後列を狙った一撃を、前で立っている本人が受けに行く。
+   *
+   * 盾（岩盾展開）は量を肩代わりするが、これは相手を差し替える。後列の
+   * 回復役・支援役が先に落ちる展開そのものを潰せるので、シールドとは
+   * 役割が重ならない。乱数はここでも引く——引く回数が分岐で変わると
+   * 同じシードで同じ戦闘にならなくなるため、条件を満たすときだけ引く。
+   */
+  private coverFor(target: Fighter): Fighter {
+    if (target.row !== 'back') return target;
+    const guard = this.alive(target.side).find(
+      (a) => a !== target && a.row === 'front' && passiveOf(a) === 'platescreen',
+    );
+    if (!guard) return target;
+    return this.rng.chance(0.45) ? guard : target;
   }
 
   private teamHpRatio(side: Side): number {

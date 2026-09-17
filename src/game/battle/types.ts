@@ -60,6 +60,14 @@ export interface Mod {
   value: number;
   /** 残り行動数。対象の行動が回るたびに1減る */
   turns: number;
+  /**
+   * 時間で切れるバフの失効時刻（BattleSim.clock と同じ単位）。
+   *
+   * 行動数ではなく「秒」で効くものにだけ使う。実時間で数えると倍速で
+   * 結果が変わってしまい、同じシードが同じ戦闘にならなくなるので、
+   * 標準速の秒数を戦闘内時刻に換算して持たせる。
+   */
+  until?: number;
   source: string;
 }
 
