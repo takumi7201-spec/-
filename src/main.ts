@@ -21,6 +21,7 @@ import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, teamAnchor } 
 import { advanceHoloTime } from './fx/SpriteUnit';
 import { buildEventTeam, type EventDef } from './game/data/events';
 import { EventScreen } from './ui/screens/EventScreen';
+import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
 import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
@@ -95,9 +96,10 @@ async function main(): Promise<void> {
   const partyScreen = new PartyScreen();
   const dexScreen = new DexScreen();
   const eventScreen = new EventScreen();
+  const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
   const resultScreen = new ResultScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, stockScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, stockScreen, debugScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -208,6 +210,7 @@ async function main(): Promise<void> {
       case 'clean': stockScreen.setData(data); ui.show('stock'); break;
       case 'battle': void startBattle(); break;
       case 'event': eventScreen.setData(data); ui.show('event'); break;
+      case 'debug': openDebug(); break;
       case 'party': partyScreen.setData(data); ui.show('party'); break;
       case 'dex': dexScreen.setData(data); ui.show('dex'); break;
       case 'title': ui.show('title'); break;
@@ -352,6 +355,27 @@ async function main(): Promise<void> {
   eventScreen.onBack = () => goHome();
   eventScreen.onChallenge = (ev) => { void startBattle(ev); };
 
+  /**
+   * デバッグモードを開く。
+   *
+   * 開いた事実を保存して、以後は拠点のタイルからも行けるようにする。
+   * 長押しを毎回やり直させると、結局さわらなくなる。
+   */
+  function openDebug(): void {
+    if (data.settings.debug !== true) {
+      data.settings.debug = true;
+      writeSave(data);
+      ui.toast('デバッグモードを開いた', 'warn');
+    }
+    debugScreen.setData(data);
+    ui.show('debug');
+  }
+
+  title.onDebug = () => openDebug();
+  debugScreen.onBack = () => goHome();
+  // 触った結果は即保存する。検証中にリロードして消えるのがいちばん困る
+  debugScreen.onChanged = () => writeSave(data);
+
   partyScreen.onBack = () => goHome();
   partyScreen.onApply = (order, formation, prefs) => {
     data.party.order = order;
@@ -401,6 +425,7 @@ async function main(): Promise<void> {
     else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
     else if (jump === 'event') { eventScreen.setData(data); ui.show('event'); }
     else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
+    else if (jump === 'debug') openDebug();
     else if (jump === 'dig') void startRun('canyon');
   }
 

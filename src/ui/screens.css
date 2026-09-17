@@ -153,7 +153,12 @@ body[data-hand='left'] .rail--r { right: auto; left: calc(var(--gutter) + var(--
 }
 .title-actions .row { display: flex; gap: 8px; }
 .title-actions .row .btn { flex: 1; }
-.title-ver { text-align: center; font-size: 11px; color: var(--ink-soft); letter-spacing: 0.1em; margin-top: 4px; }
+.title-ver {
+  text-align: center; font-size: 11px; color: var(--ink-soft);
+  letter-spacing: 0.1em; margin-top: 4px;
+  /* ボタンだが、ボタンには見せない。長押しの行き先を示唆しない */
+  min-height: 0; padding: 2px 0; background: none; box-shadow: none; border: 0;
+}
 
 /* ---- ホーム ---- */
 .home-grid {
@@ -772,6 +777,110 @@ body[data-layout='wide'] .stock-body { left: 18vw; right: 18vw; }
 }
 .screen--stock > * { z-index: 1; }
 body[data-layout='wide'] .screen--stock::after { left: 2.2vw; }
+
+/* =========================================================================
+   デバッグ
+   検証用の画面。方眼紙の裏に走り書きした操作盤のつもりで、
+   本編の紙とは少しだけ質感を変える——間違えて開いたときに気づける
+   ========================================================================= */
+.dbg-body {
+  position: absolute;
+  top: calc(var(--safe-t) + 56px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-bottom: 24px;
+  pointer-events: auto;
+}
+.dbg-stamp {
+  font-family: var(--font-marker); font-size: 11px; letter-spacing: 0.14em;
+  color: var(--pen-red);
+  border: 1.5px solid var(--pen-red);
+  border-radius: 3px 8px 4px 7px;
+  padding: 2px 7px;
+  transform: rotate(-3deg);
+  opacity: 0.8;
+}
+.dbg-note {
+  font-size: 11px; line-height: 1.7; color: var(--ink-soft);
+  border-left: 2px solid var(--pen-red);
+  padding-left: 8px;
+}
+.dbg-section {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 10px 12px;
+  background: var(--paper-card);
+  box-shadow: var(--lift-1);
+  border-radius: 6px 10px 7px 9px;
+}
+.dbg-head {
+  font-size: 12px; color: var(--pen-brown);
+  border-bottom: 1px dashed var(--rule);
+  padding-bottom: 5px;
+}
+.dbg-stat { display: flex; justify-content: space-between; font-size: 12px; }
+.dbg-field { display: flex; flex-direction: column; gap: 5px; }
+.dbg-field .label { font-size: 10px; }
+.dbg-picker { display: flex; flex-wrap: wrap; gap: 5px; }
+.dbg-chip { min-height: 30px; min-width: 40px; padding: 0 8px; font-size: 12px; }
+/* 選択中は蛍光ペンで囲った1つ。枠ではなく塗りで示す */
+.dbg-chip.is-on {
+  background-color: var(--paper-card);
+  background-image: linear-gradient(100deg, transparent 0 4%, var(--hl-mint) 8% 92%, transparent 96%);
+  color: var(--ink);
+}
+/* 操作ボタンは陣形の選択と同じ組み方。ラベルと注釈を横に並べると、
+   両方が折り返して「全種そろってい／る」のように割れる */
+.dbg-section .btn--wide {
+  flex-direction: column; align-items: flex-start; gap: 1px;
+  min-height: 48px; padding: 7px 10px; text-align: left;
+}
+.dbg-section .btn--wide .btn-label { font-size: 13px; }
+.dbg-section .btn--wide .btn-sub {
+  font-size: 9px; color: var(--ink-faint); letter-spacing: 0;
+}
+.dbg-row { display: flex; gap: 6px; }
+.dbg-row .btn { flex: 1; }
+.dbg-danger { color: var(--pen-red); }
+.dbg-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+}
+.dbg-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  min-height: 92px; padding: 6px 4px;
+  background: var(--paper);
+  box-shadow: var(--lift-1);
+}
+/* 未所持は「まだ書き込んでいない欄」。消すのではなく薄くする */
+.dbg-cell.is-missing { opacity: 0.42; border: 1px dashed var(--rule); box-shadow: none; }
+.dbg-cell-icon { width: 40px; height: 40px; }
+.dbg-cell-name {
+  font-size: 10px; line-height: 1.2; text-align: center;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dbg-cell-sub { display: flex; align-items: center; gap: 4px; }
+.dbg-cell-sub .chip { height: 15px; font-size: 9px; padding: 0 4px; }
+.dbg-cell-rarity { font-size: 8px; color: var(--pen-brown); }
+
+body[data-layout='wide'] .dbg-body { left: 18vw; right: 18vw; }
+body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
+
+.screen--debug .status-strip { background: none; }
+.screen--debug .status-strip::after { display: none; }
+/* 方眼。本編の罫線とは目を変えて、開いた瞬間に別の紙だと分かるようにする */
+.screen--debug::before {
+  content: ''; position: absolute; inset: 0;
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 23px, var(--rule) 23px 24px),
+    repeating-linear-gradient(90deg, transparent 0 23px, var(--rule) 23px 24px),
+    var(--fiber);
+  background-blend-mode: normal, normal, multiply;
+  opacity: 0.96;
+  pointer-events: none;
+}
+.screen--debug > * { z-index: 1; }
 
 /* ---- 図鑑 ---- */
 .dex-count { font-size: 13px; color: var(--ink-soft); }

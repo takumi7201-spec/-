@@ -6,6 +6,7 @@ export class TitleScreen extends Screen {
   onStart?: (fresh: boolean) => void;
   onSettings?: () => void;
   onBattle?: () => void;
+  onDebug?: () => void;
   private hasSave = false;
 
   constructor() { super('title'); }
@@ -38,7 +39,12 @@ export class TitleScreen extends Screen {
           button('操作を左右反転', () => { audio.uiTap(); this.onSettings?.(); }, { class: 'btn--sm btn--ghost' }),
           button('図鑑', () => { audio.uiTap(); this.ui.toast('図鑑は準備中'); }, { class: 'btn--sm btn--ghost' }),
         ),
-        h('div', { class: 'title-ver', text: 'v0.1.0 — 発掘オートバトル' }),
+        // バージョン表記の長押しでデバッグへ。触れる場所は残しつつ、
+        // 押し方を知らないと開かない位置に置く
+        button('v0.1.0 — 発掘オートバトル', () => { /* 表示だけ */ }, {
+          class: 'btn--ghost title-ver',
+          onLongPress: () => { audio.uiConfirm(); this.onDebug?.(); },
+        }),
       ),
     );
   }

@@ -22,6 +22,13 @@ export interface OwnedRevos {
   clean: number;
   skillLevel: number;
   obtainedAt: number;
+  /**
+   * デバッグモードで配った個体。
+   *
+   * 掘って削って手に入れたものと区別できないと、検証用に全種を出したあと
+   * 元の手持ちに戻せなくなる。印を付けておけば、まとめて外せる。
+   */
+  debug?: boolean;
 }
 
 export interface SaveData {
@@ -49,6 +56,8 @@ export interface SaveData {
     battleSpeed: 1 | 2 | 3;
     autoOd: boolean;
     reducedShake: boolean;
+    /** デバッグモードを開いたことがある。拠点にタイルを出すかどうか */
+    debug?: boolean;
   };
 }
 
