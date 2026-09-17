@@ -54,6 +54,12 @@ const MAX_TURNS = 200;
  * 標準速の秒数を固定値として持つ。
  */
 const SKYREIGN_DURATION = Math.round(10 / 0.055);
+/*
+ * SPD を上げる時間制のバフは、上げ幅がそのまま「その窓の中で何回動けるか」に
+ * なるので、自分の持続を自分で買う。+10% では窓の中に1回も増えず、★5の
+ * 切り札が何も起きないまま消えていた。倍率だけ上げ、10秒という持続は
+ * ——これがロスターで唯一の「秒で切れる効果」なので——そのまま残す。
+ */
 
 /** レベル補正。Lv30 でおよそ 2.6 倍 */
 function levelScale(level: number): number {
@@ -539,8 +545,8 @@ export class BattleSim {
         // 「10秒」は標準速の実時間。戦闘内時刻に換算して持たせる
         const until = this.clockV + SKYREIGN_DURATION;
         for (const a of allies) {
-          this.addMod(a, { kind: 'spd', value: 0.10, until, turns: 0, source: 'skyreign' }, ev, 'SPD上昇');
-          this.addMod(a, { kind: 'def', value: 0.10, until, turns: 0, source: 'skyreign' }, ev, 'DEF上昇');
+          this.addMod(a, { kind: 'spd', value: 0.30, until, turns: 0, source: 'skyreign' }, ev, 'SPD上昇');
+          this.addMod(a, { kind: 'def', value: 0.20, until, turns: 0, source: 'skyreign' }, ev, 'DEF上昇');
         }
         break;
       }
@@ -765,6 +771,12 @@ export class BattleSim {
     if (this.alive(other(f.side)).some((e) => passiveOf(e) === 'deepreign')) mul *= 0.8;
     // 「大喙」: 通常攻撃が重いぶん、必殺技の出番が遅い
     if (passiveOf(f) === 'greatbeak') mul *= 0.8;
+    // 「掌握する空」: 空を握りきっている間、味方の必殺技が早く回る。
+    // ATK を積む前半だけの特性だと、5回の攻撃で仕事を終えて
+    // 残り35ターンを黙って立っていることになる。後半の仕事をここに置く
+    if (this.alive(f.side).some((a) => passiveOf(a) === 'skygrasp' && (a.stacks.sky ?? 0) >= 3)) {
+      mul *= 1.2;
+    }
     const before = f.od;
     f.od = clamp(f.od + amount * mul, 0, 150);
     if (Math.round(f.od) !== Math.round(before)) ev.push({ t: 'od', uid: f.uid, value: f.od });

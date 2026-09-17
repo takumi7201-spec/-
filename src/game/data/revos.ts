@@ -257,14 +257,14 @@ export const REVOS: RevosDef[] = [
   {
     id: 'quetzalcoatlus', name: 'ケツァルコアトルス', short: 'ケツァル',
     en: 'Quetzalcoatlus', element: 'gale', role: 'Buffer',
-    hp: 1232, atk: 111, def: 105, spd: 131, basicPower: 83,
+    hp: 1160, atk: 104, def: 98, spd: 126, basicPower: 79,
     passive: {
       id: 'skygrasp', name: '掌握する空',
-      desc: '味方の攻撃が奇数回目になるたび、味方全体の ATK +5%（最大 +15%）。自分が倒れると効果は消える。',
+      desc: '味方の攻撃が奇数回目になるたび、味方全体の ATK +5%（最大 +15%）。+15% の間は味方全体の OD 獲得 +20%。自分が倒れると効果は消える。',
     },
     od: {
       id: 'skyreign', name: '制空覇道',
-      desc: '味方全体の SPD・DEF +10%（10秒）。', power: 0,
+      desc: '味方全体の SPD +30% / DEF +20%（10秒）。', power: 0,
     },
     defaultPref: 'support',
     sprite: 'quetzalcoatlus',
