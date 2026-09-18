@@ -18,7 +18,8 @@ export type DigMode = 'explore' | 'scan' | 'extract';
 
 export interface DigEvents {
   onEcho?(hits: { node: BuriedNode; strength: Strength }[]): void;
-  onDig?(slot: number, worldPos: THREE.Vector3): void;
+  /** removed は実際に消したボクセル数。1掘りで十数個ぶん崩れる */
+  onDig?(slot: number, worldPos: THREE.Vector3, removed: number): void;
   onFossilTouched?(node: BuriedNode): void;
   onCollect?(node: BuriedNode): void;
   onDigBlocked?(): void;
@@ -474,14 +475,14 @@ export class DigScene {
     this.events.onDepthChange?.(depth * VOXEL_SIZE);
 
     const hardness = hardnessOf(slot);
-    this.openHole(gx, gz, surface, depth);
+    const removed = this.openHole(gx, gz, surface, depth);
 
     const worldPos = new THREE.Vector3(
       (gx + 0.5) * VOXEL_SIZE, (targetY + 0.5) * VOXEL_SIZE, (gz + 0.5) * VOXEL_SIZE,
     );
     this.debris.burst(worldPos, colorForSlot(slot, this.biomeId), 12, { speed: 2.8, up: 3.2, life: 0.8 });
     audio.dig(hardness);
-    this.events.onDig?.(slot, worldPos);
+    this.events.onDig?.(slot, worldPos, removed);
 
     // --- 埋蔵物の判定 ---
     // 平面距離が近く、その地点の深度が埋蔵深度に届いたら掘り当て
@@ -502,7 +503,7 @@ export class DigScene {
   }
 
   /** 一時的な穴を開ける。元のボクセルを控えておき、時間経過で埋め戻す */
-  private openHole(gx: number, gz: number, surface: number, depth: number): void {
+  private openHole(gx: number, gz: number, surface: number, depth: number): number {
     const cells: { x: number; y: number; z: number; v: number }[] = [];
     const radius = 1.7;
     const r = Math.ceil(radius * 2);
@@ -522,7 +523,7 @@ export class DigScene {
           this.world.set(x, y, z, 0);
         }
       }
-    if (cells.length === 0) return;
+    if (cells.length === 0) return 0;
     // 同じ地点を掘り続けている間は埋め戻さない。掘るたびに猶予を作り直す
     const key = gx + gz * AREA_VOX;
     const existing = this.holes.find((x) => x.key === key);
@@ -532,6 +533,7 @@ export class DigScene {
     } else {
       this.holes.push({ key, cells, t: 0, life: 2.6 });
     }
+    return cells.length;
   }
 
   /** 穴を埋め戻す。掘った直後は見えていて、数秒で崩れて元に戻る */

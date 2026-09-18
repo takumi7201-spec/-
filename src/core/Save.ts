@@ -45,7 +45,57 @@ export interface SaveData {
   stageProgress: number;
   /** クリア済みイベントの id。報酬のリヴォスは初回だけ配る */
   events: { cleared: string[] };
-  stats: { runs: number; fossils: number; battles: number; wins: number; voxelsDug: number };
+  /**
+   * 記録。
+   *
+   * 「何回やったか」ではなく「どこまでやったか」が残るように取る。
+   * 回数だけを並べると、長く遊ぶほど数字が伸びるだけの表になる——
+   * 最高値と最短記録を混ぜて、更新しに行く対象を作る。
+   *
+   * 増やすときは必ず加算する側も同時に書くこと。配線のない項目は
+   * 永久に 0 のまま並び、プロフィールがただの飾りになる。
+   */
+  stats: {
+    // --- 発掘 ---
+    runs: number;
+    /** 実際に崩したボクセル数。1掘りで十数個ぶん消える */
+    voxelsDug: number;
+    /** 掘り当てた埋蔵物の数（精錬前） */
+    found: number;
+    /** 掘り当てた最高レア度 */
+    bestRarity: number;
+    /** バイオームごとの潜行回数 */
+    biomeRuns: Record<string, number>;
+
+    // --- 精錬 ---
+    /** 精錬を終えた化石の数 */
+    fossils: number;
+    /** 到達した最高クリーン度 */
+    bestClean: number;
+    /** Sランクの回数 */
+    sRanks: number;
+
+    // --- バトル ---
+    battles: number;
+    wins: number;
+    /** 現在の連勝数 */
+    streak: number;
+    bestStreak: number;
+    kos: number;
+    /** 累計の与ダメージ */
+    damage: number;
+    /** 最大の一撃 */
+    bestHit: number;
+    odFired: number;
+    /** 最短で決めた勝利の行動数。未達成は 0 */
+    fastestWin: number;
+    /** リヴォスごとの出撃回数 */
+    sorties: Record<string, number>;
+
+    // --- 時間 ---
+    /** 累計プレイ時間（秒） */
+    playSeconds: number;
+  };
   daily: { date: string; runs: number };
   settings: {
     quality: QualityTier | 'auto';
@@ -85,7 +135,13 @@ export function defaultSave(): SaveData {
     unlockedBiomes: ['canyon'],
     stageProgress: 0,
     events: { cleared: [] },
-    stats: { runs: 0, fossils: 0, battles: 0, wins: 0, voxelsDug: 0 },
+    stats: {
+      runs: 0, voxelsDug: 0, found: 0, bestRarity: 0, biomeRuns: {},
+      fossils: 0, bestClean: 0, sRanks: 0,
+      battles: 0, wins: 0, streak: 0, bestStreak: 0,
+      kos: 0, damage: 0, bestHit: 0, odFired: 0, fastestWin: 0, sorties: {},
+      playSeconds: 0,
+    },
     daily: { date: todayKey(), runs: 0 },
     settings: {
       quality: 'auto',
@@ -145,7 +201,14 @@ export function load(): SaveData {
       player: { ...base.player, ...(data.player ?? {}) },
       party: { ...base.party, ...(data.party ?? {}) },
       events: { ...base.events, ...(data.events ?? {}) },
-      stats: { ...base.stats, ...(data.stats ?? {}) },
+      stats: {
+        ...base.stats,
+        ...(data.stats ?? {}),
+        // 連想配列は浅いマージで undefined のまま残る。触る側が毎回
+        // 存在チェックするより、ここで1回そろえる
+        biomeRuns: { ...(data.stats?.biomeRuns ?? {}) },
+        sorties: { ...(data.stats?.sorties ?? {}) },
+      },
     };
   } catch {
     return defaultSave();
@@ -199,6 +262,26 @@ export function addExp(unit: OwnedRevos, amount: number, cap = 30): { leveled: n
     leveled++;
   }
   if (unit.level >= cap) unit.exp = 0;
+  return { leveled };
+}
+
+/**
+ * 探索者本人の経験値。
+ *
+ * ホームに Lv と EXP バーが出ているのに、どこからも加算していなかった。
+ * 表示だけがあって動かない要素は、無いよりたちが悪い。
+ * リヴォスと違って上限を置かない——遊んだぶんだけ伸びる目盛りにする。
+ */
+export function addPlayerExp(data: SaveData, amount: number): { leveled: number } {
+  const p = data.player;
+  let leveled = 0;
+  p.exp += amount;
+  while (p.exp >= expToNext(p.level)) {
+    p.exp -= expToNext(p.level);
+    p.level++;
+    leveled++;
+    if (leveled > 50) break; // 異常値で固まらせない
+  }
   return { leveled };
 }
 

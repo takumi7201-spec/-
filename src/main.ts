@@ -23,10 +23,11 @@ import { buildEventTeam, type EventDef } from './game/data/events';
 import { EventScreen } from './ui/screens/EventScreen';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
+import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
 import {
-  load as loadSave, save as writeSave, defaultSave, dropDecay, addExp,
+  load as loadSave, save as writeSave, defaultSave, dropDecay, addExp, addPlayerExp,
   type SaveData,
 } from './core/Save';
 import type { BiomeId } from './voxel/palette';
@@ -98,8 +99,9 @@ async function main(): Promise<void> {
   const eventScreen = new EventScreen();
   const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
+  const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, stockScreen, debugScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, stockScreen, profileScreen, debugScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -128,6 +130,16 @@ async function main(): Promise<void> {
 
   async function startRun(biome: BiomeId): Promise<void> {
     runFossils = [];
+    /*
+     * 潜行した回数は、降りた時点で数える。
+     *
+     * 以前は「持ち帰ったとき」に数えていたので、掘ったのに何も出なかった
+     * 周回が記録から丸ごと消えていた。プロフィールに出す以上、空振りも
+     * 潜行のうち。一方 daily.runs はドロップ逓減の基準なので、
+     * こちらは成果のある周回に紐づけたまま動かさない。
+     */
+    data.stats.runs++;
+    data.stats.biomeRuns[biome] = (data.stats.biomeRuns[biome] ?? 0) + 1;
     boot.classList.remove('hidden');
     await progress(0.35, 'エリアを生成しています…');
     const seed = (Date.now() ^ (data.daily.runs * 7919)) >>> 0;
@@ -213,25 +225,34 @@ async function main(): Promise<void> {
       case 'debug': openDebug(); break;
       case 'party': partyScreen.setData(data); ui.show('party'); break;
       case 'dex': dexScreen.setData(data); ui.show('dex'); break;
+      case 'profile': profileScreen.setData(data); ui.show('profile'); break;
       case 'title': ui.show('title'); break;
     }
   };
 
   digScreen.setSave(data);
+  // 崩した量は記録だけ。保存は周回の終わりにまとめて走るので、ここでは書かない
+  dig.events.onDig = (_slot, _pos, removed) => { data.stats.voxelsDug += removed; };
   digScreen.onCollectFossil = (n) => {
-    if (n.kind === 'fossil') runFossils.push({ defId: n.speciesId, rarity: n.rarity });
-    else data.player.coins += 40 + n.rarity * 20;
+    if (n.kind === 'fossil') {
+      runFossils.push({ defId: n.speciesId, rarity: n.rarity });
+      data.stats.found++;
+      data.stats.bestRarity = Math.max(data.stats.bestRarity, n.rarity);
+    } else data.player.coins += 40 + n.rarity * 20;
   };
   digScreen.onExit = () => {
     audio.uiBack();
     dig.setMode('explore');
     // 途中で抜けても拾ったものは失わせない
     if (runFossils.length > 0) { digScreen.onFinish?.(); return; }
+    // 手ぶらで戻る場合も、崩した量は書いておく。ここを書かずに帰ると、
+    // 掘っただけで何も見つからなかった時間が記録から丸ごと消える
+    writeSave(data);
     goHome();
   };
   digScreen.onFinish = () => {
-    data.stats.runs++;
     data.daily.runs++;
+    addPlayerExp(data, 40 + runFossils.length * 20);
     if (runFossils.length === 0) {
       writeSave(data);
       ui.toast('収穫なし', 'warn');
@@ -250,6 +271,9 @@ async function main(): Promise<void> {
   cleanScreen.onFinish = (score, defId) => {
     const { isNew, unit } = addFossil(data, defId, score.clean);
     data.stats.fossils++;
+    data.stats.bestClean = Math.max(data.stats.bestClean, score.clean);
+    if (score.rank === 'S') data.stats.sRanks++;
+    addPlayerExp(data, 60 + Math.round(score.clean * 0.6));
     writeSave(data);
     showResult({
       title: '精錬完了',
@@ -273,11 +297,29 @@ async function main(): Promise<void> {
 
   battleScreen.onFinish = (winner) => {
     data.stats.battles++;
+    if (player) {
+      const t = player.tally;
+      data.stats.damage += t.damage;
+      data.stats.bestHit = Math.max(data.stats.bestHit, t.bestHit);
+      data.stats.kos += t.kos;
+      data.stats.odFired += t.odFired;
+    }
+    // 出撃回数。誰を連れて行きがちかは、勝敗と別に残しておく
+    for (const uid of buildTeamSetup(data.roster, data.party.order, data.party.formation)?.members.map((m) => m.defId) ?? []) {
+      data.stats.sorties[uid] = (data.stats.sorties[uid] ?? 0) + 1;
+    }
     const ev = activeEvent;
     activeEvent = null;
     const rows: ResultData['rows'] = [];
     if (winner === 0) {
       data.stats.wins++;
+      data.stats.streak++;
+      data.stats.bestStreak = Math.max(data.stats.bestStreak, data.stats.streak);
+      const turns = player?.sim.turnCount ?? 0;
+      // 0 は「未達成」。初回は無条件に入れないと、いつまでも 0 のまま
+      if (turns > 0 && (data.stats.fastestWin === 0 || turns < data.stats.fastestWin)) {
+        data.stats.fastestWin = turns;
+      }
       let coins: number;
       if (ev) {
         // イベントは進行度を進めない。編成を試す場としていつでも戻れるようにする
@@ -301,9 +343,11 @@ async function main(): Promise<void> {
       data.player.coins += coins;
       rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
     } else {
+      data.stats.streak = 0;
       rows.push({ label: '結果', value: winner === 1 ? '敗北' : '引き分け' });
       rows.push({ label: '助言', value: '編成と陣形を見直そう' });
     }
+    addPlayerExp(data, winner === 0 ? 120 : 40);
 
     /*
      * EXP は勝敗に関わらず入る。
@@ -344,6 +388,7 @@ async function main(): Promise<void> {
     });
   };
 
+  profileScreen.onBack = () => goHome();
   stockScreen.onBack = () => goHome();
   stockScreen.onClean = (entry) => {
     const [s] = data.stock.splice(entry.index, 1);
@@ -425,6 +470,7 @@ async function main(): Promise<void> {
     else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
     else if (jump === 'event') { eventScreen.setData(data); ui.show('event'); }
     else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
+    else if (jump === 'profile') { profileScreen.setData(data); ui.show('profile'); }
     else if (jump === 'debug') openDebug();
     else if (jump === 'dig') void startRun('canyon');
   }
@@ -501,6 +547,10 @@ async function main(): Promise<void> {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (paused) return;
+
+    // プレイ時間。タブを離れている間は paused で止まるので、
+    // 「開きっぱなし」ではなく実際に見ていた時間になる
+    data.stats.playSeconds += dt;
 
     input.beginFrame();
     switch (ui.currentName) {

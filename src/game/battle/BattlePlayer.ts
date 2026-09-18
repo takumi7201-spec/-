@@ -65,6 +65,16 @@ export class BattlePlayer {
   private odFired = false;
   private tmpVec = new THREE.Vector3();
 
+  /**
+   * この1戦でプレイヤー側が出した記録。
+   *
+   * シミュレータの result() は各個体の累計を持っているが、「最大の一撃」は
+   * 1発ずつのダメージを見ないと取れない。イベント列はここを必ず通るので、
+   * 数えるならここ。演出には使わないので、シミュレータ側は汚さない。
+   */
+  readonly tally = { damage: 0, bestHit: 0, kos: 0, odFired: 0 };
+  private sideOf = new Map<string, 0 | 1>();
+
   /*
    * 攻撃間隔の表示。
    *
@@ -87,7 +97,10 @@ export class BattlePlayer {
     private scene: BattleScene,
   ) {
     this.sim = new BattleSim(seed, teamA, teamB);
-    for (const f of this.sim.fighters) this.maxHp.set(f.uid, f.maxHp);
+    for (const f of this.sim.fighters) {
+      this.maxHp.set(f.uid, f.maxHp);
+      this.sideOf.set(f.uid, f.side);
+    }
   }
 
   start(): void {
@@ -221,6 +234,7 @@ export class BattlePlayer {
         this.pendingTarget = e.targets[0] ?? null;
         if (this.pendingTarget) this.scene.focus(e.uid, this.pendingTarget);
         if (e.kind === 'od') {
+          if (this.sideOf.get(e.uid) === 0) this.tally.odFired++;
           this.scene.play(e.uid, 'roar');
           this.scene.addShake(0.3);
           audio.odFire();
@@ -236,6 +250,12 @@ export class BattlePlayer {
 
       case 'damage': {
         const maxHp = this.maxHp.get(e.uid) ?? 1000;
+        // 味方が出したぶんだけ数える。自傷（大噴火）は差し引かない——
+        // 撃った本人のダメージであることに変わりはない
+        if (this.sideOf.get(e.from) === 0 && e.from !== e.uid) {
+          this.tally.damage += e.amount;
+          if (e.amount > this.tally.bestHit) this.tally.bestHit = e.amount;
+        }
         this.scene.hit(e.uid, e.amount, e.crit, e.eff, maxHp);
         audio.hit(Math.min(1, e.amount / (maxHp * 0.35)), e.crit);
         return 0.07 * Math.max(0.4, beat);
@@ -270,6 +290,7 @@ export class BattlePlayer {
       }
 
       case 'ko': {
+        if (this.sideOf.get(e.by) === 0 && this.sideOf.get(e.uid) === 1) this.tally.kos++;
         this.scene.ko(e.uid);
         audio.ko();
         // 最後の1体を倒す瞬間だけスロー。1戦に1回だから効く

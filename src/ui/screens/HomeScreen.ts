@@ -19,7 +19,7 @@ export class HomeScreen extends Screen {
   private noticeEl!: HTMLElement;
   private tiles = new Map<string, HTMLButtonElement>();
 
-  onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'party' | 'dex' | 'title' | 'debug') => void;
+  onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'party' | 'dex' | 'profile' | 'title' | 'debug') => void;
 
   constructor() { super('home'); }
 
@@ -61,6 +61,7 @@ export class HomeScreen extends Screen {
     tile('event', 'イベント', '✉', () => this.onGo?.('event'));
     tile('party', '編成', '❖', () => this.onGo?.('party'));
     tile('dex', '図鑑', '☰', () => this.onGo?.('dex'));
+    tile('profile', 'プロフィール', '✎', () => this.onGo?.('profile'));
     tile('title', 'タイトル', '⌂', () => this.onGo?.('title'));
     // 一度開いたら拠点からも行けるようにする。毎回タイトルへ戻って
     // 長押しし直すのは、検証のたびに払うには高い

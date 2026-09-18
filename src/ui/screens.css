@@ -779,6 +779,125 @@ body[data-layout='wide'] .stock-body { left: 18vw; right: 18vw; }
 body[data-layout='wide'] .screen--stock::after { left: 2.2vw; }
 
 /* =========================================================================
+   プロフィール
+   野帳の巻頭に貼る記録票。数字を読ませるより「どこまで来たか」を見せる
+   ========================================================================= */
+.prof-body {
+  position: absolute;
+  top: calc(var(--safe-t) + 56px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l) + 28px); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 12px;
+  padding-bottom: 24px;
+  pointer-events: auto;
+}
+
+/* 名札。台紙に貼った1枚として、少しだけ傾ける */
+.prof-card {
+  padding: 12px 12px 10px;
+  background: var(--paper-card);
+  box-shadow: var(--lift-1);
+  border-radius: 7px 11px 8px 10px;
+}
+.prof-id { display: flex; gap: 12px; align-items: flex-start; }
+.prof-avatar {
+  width: 62px; height: 62px; flex: none;
+  display: grid; place-items: center;
+  background: var(--paper);
+  border: 1px dashed var(--rule-strong);
+  border-radius: 5px 9px 6px 8px;
+}
+.prof-avatar-img { width: 54px; height: 54px; }
+.prof-avatar-empty { font-family: var(--font-marker); font-size: 22px; color: var(--ink-faint); }
+.prof-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+/* 称号は赤ペンの走り書き。名前より小さく、上に置く */
+.prof-title {
+  font-family: var(--font-marker); font-size: 11px;
+  color: var(--pen-red); letter-spacing: 0.08em;
+}
+.prof-name { font-size: 18px; line-height: 1.2; }
+.prof-lv { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); }
+.prof-since {
+  display: flex; justify-content: space-between;
+  margin-top: 9px; padding-top: 7px;
+  border-top: 1px dashed var(--rule);
+  font-size: 10px; color: var(--ink-soft);
+}
+
+/* 4つの要点。ここだけ読めば現在地がわかる */
+.prof-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.prof-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 2px;
+  background: var(--paper-card);
+  box-shadow: var(--lift-1);
+  border-radius: 5px 8px 6px 7px;
+}
+.prof-tile .label { font-size: 9px; }
+.prof-tile .num { font-size: 14px; }
+
+.prof-section {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 11px 11px;
+  background: var(--paper-card);
+  box-shadow: var(--lift-1);
+  border-radius: 6px 10px 7px 9px;
+}
+.prof-head {
+  font-size: 12px; color: var(--pen-brown);
+  border-bottom: 1px dashed var(--rule);
+  padding-bottom: 5px; margin-bottom: 4px;
+}
+/* 項目名と値を罫線でつなぐ。目録の読み方をそのまま使う */
+.prof-row {
+  display: flex; align-items: baseline; gap: 6px;
+  min-height: 24px;
+  font-size: 12px;
+}
+.prof-label { color: var(--ink-soft); flex: none; }
+.prof-row::before { display: none; }
+.prof-value {
+  flex: 1; text-align: right;
+  border-bottom: 1px dotted var(--rule-strong);
+  margin-bottom: 3px;
+}
+.prof-note { flex: none; font-size: 9px; color: var(--ink-faint); }
+
+.prof-fav { display: flex; align-items: center; gap: 10px; padding-top: 2px; }
+.prof-fav-icon { width: 44px; height: 44px; flex: none; }
+.prof-fav-main { min-width: 0; }
+.prof-fav-name { font-size: 13px; }
+.prof-fav-sub { font-size: 10px; color: var(--ink-soft); }
+
+.prof-empty { padding: 20px 4px; font-size: 13px; line-height: 2; }
+
+body[data-layout='wide'] .prof-body { left: 18vw; right: 18vw; }
+
+.screen--profile .status-strip { background: none; }
+.screen--profile .status-strip::after { display: none; }
+.screen--profile::before {
+  content: ''; position: absolute; inset: 0;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, transparent 0 34px, var(--margin-rule) 34px 35px, transparent 35px),
+    var(--ruled),
+    var(--fiber);
+  background-blend-mode: normal, normal, multiply;
+  pointer-events: none;
+}
+.screen--profile::after {
+  content: ''; position: absolute;
+  left: 7px; top: 22%; height: 384px; width: 14px;
+  background-image: radial-gradient(circle at 50% 22px, rgba(120, 104, 74, 0.3) 0 6.5px, transparent 7.5px);
+  background-size: 14px 128px;
+  background-repeat: repeat-y;
+  pointer-events: none;
+}
+.screen--profile > * { z-index: 1; }
+body[data-layout='wide'] .screen--profile::after { left: 2.2vw; }
+
+/* =========================================================================
    デバッグ
    検証用の画面。方眼紙の裏に走り書きした操作盤のつもりで、
    本編の紙とは少しだけ質感を変える——間違えて開いたときに気づける
