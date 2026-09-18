@@ -7,6 +7,7 @@ import { createVoxelMaterial, type VoxelMaterial } from '../shaders/VoxelMateria
 import { SpriteUnit, SpriteAnimator, type SpriteState } from '../fx/SpriteUnit';
 import { Environment } from '../fx/Environment';
 import { DebrisSystem } from '../fx/Debris';
+import { BuffAura } from '../fx/BuffAura';
 import { DamageNumbers } from '../fx/DamageNumbers';
 import { getRevos } from '../game/data/revos';
 import type { Fighter, Row, Side } from '../game/battle/types';
@@ -56,6 +57,7 @@ export class BattleScene {
   private arenaMaterial: VoxelMaterial;
   private debris: DebrisSystem;
   readonly numbers = new DamageNumbers(28);
+  private buffAura = new BuffAura(12);
   private arena?: THREE.Mesh;
 
   private camPos = new THREE.Vector3();
@@ -96,6 +98,7 @@ export class BattleScene {
     this.debris = new DebrisSystem(Math.min(quality.maxParticles, 260), 0.18);
     this.scene.add(this.debris.mesh);
     this.scene.add(this.numbers.group);
+    this.scene.add(this.buffAura.group);
 
     this.camPos.set(0, 8.6, 15.8);
     this.camLook.set(0, 1.2, -0.3);
@@ -205,6 +208,7 @@ export class BattleScene {
   }
 
   private clearUnits(): void {
+    this.buffAura.clear();
     for (const u of this.units.values()) {
       this.scene.remove(u.unit.root);
       u.unit.dispose();
@@ -246,6 +250,22 @@ export class BattleScene {
     // ヒットストップ。倍速でも短縮しない。これが消えると手応えが完全に失われる
     this.hitStop = Math.max(this.hitStop, crit ? 0.09 : 0.05);
     this.addShake(crit ? 0.34 : 0.16);
+  }
+
+  /**
+   * ステータスが上がったユニットに火の粉を重ねる。
+   *
+   * 数値を出さないのは、これが「量」ではなく「乗った」を伝える合図だから。
+   * 実際の増分はカードの数値が引き受ける——両方を出すと、1行動のあいだに
+   * 6件のバフが飛ぶ編成（制空覇道）で画面が数字で埋まる。
+   */
+  buff(uid: string): void {
+    const u = this.units.get(uid);
+    if (!u || !u.alive) return;
+    this.buffAura.spawn(uid, u.unit.root, {
+      height: u.unit.spriteHeight * 0.5,
+      scale: u.unit.spriteHeight * 1.25,
+    });
   }
 
   heal(uid: string, amount: number): void {
@@ -362,6 +382,7 @@ export class BattleScene {
 
     this.debris.update(sdt, -0.4);
     this.numbers.update(dt);
+    this.buffAura.update(sdt);
     this.env.update(dt, this.camera.position);
     this.updateCamera(dt);
   }
@@ -415,6 +436,7 @@ export class BattleScene {
     }
     this.debris.dispose();
     this.numbers.dispose();
+    this.buffAura.dispose();
     this.env.dispose();
     this.arenaMaterial.dispose();
   }

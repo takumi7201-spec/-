@@ -252,6 +252,23 @@ export class BattlePlayer {
         return 0.1 * beat;
       }
 
+      case 'mod': {
+        /*
+         * ステータスが上がったときだけ火の粉を重ねる。
+         *
+         * 符号だけでは足りない。taken（被ダメージ）は +25% が「弱くなった」
+         * を意味するので、そこだけ向きが逆になる。値の正負ではなく
+         * 「このユニットにとって得か」で判定する。
+         *
+         * 間引きは BuffAura 側でユニット単位に行う。ここで止めると、
+         * 同じ行動で別々の味方に乗ったぶんまで落ちる。
+         */
+        const good = e.kind === 'taken' ? e.value < 0 : e.value > 0;
+        if (good) this.scene.buff(e.uid);
+        // 尺は取らない。バフは行動の一部で、それ自体が間を持つものではない
+        return 0;
+      }
+
       case 'ko': {
         this.scene.ko(e.uid);
         audio.ko();
