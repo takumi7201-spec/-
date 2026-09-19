@@ -23,7 +23,7 @@ const preload = src.match(/<link rel="modulepreload" crossorigin href="\.\/([^"]
 
 const out = [
   '<title>ストラタコア</title>',
-  '<meta name="theme-color" content="#f1e9d6">',
+  '<meta name="theme-color" content="#e7ddc8">',
   `<link rel="stylesheet" href="${css}">`,
   preload ? `<link rel="modulepreload" href="${preload[1]}">` : null,
   body.trim(),
