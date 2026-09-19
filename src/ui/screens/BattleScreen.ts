@@ -82,11 +82,11 @@ export class BattleScreen extends Screen {
 
   build(): void {
     // ---- 上: 敵チーム ----
-    const enemyStrip = h('div', { class: 'battle-enemy panel' },
+    const enemyStrip = h('div', { class: 'battle-enemy' },
       h('div', { class: 'battle-enemy-head' },
-        h('span', { class: 'label', text: 'ENEMY' }),
+        h('span', { class: 'label enemy-tag' }, h('span', { text: '敵' })),
         this.enemyTotal.el,
-        (this.roundEl = h('span', { class: 'num round', text: 'T 0' })),
+        (this.roundEl = h('span', { class: 'num round', text: '0 手' })),
       ),
       h('div', { class: 'enemy-cards' }),
     );
@@ -105,7 +105,7 @@ export class BattleScreen extends Screen {
         this.logEl,
         allyRow,
         h('div', { class: 'battle-controls' },
-          button('LOG', () => this.toggleLog(), { class: 'btn--sm btn--ghost' }),
+          button('記録', () => this.toggleLog(), { class: 'btn--sm btn--ghost' }),
           h('div', { class: 'spacer' }),
           this.speedBtn,
           button('スキップ', () => this.skip(), { class: 'btn--sm btn--ghost' }),
@@ -154,7 +154,7 @@ export class BattleScreen extends Screen {
           ),
           h('span', { class: 'card-name', text: revosShortName(def.id) }),
           hp.el,
-          h('div', { class: 'card-row' }, hpText, h('span', { class: 'card-od-label', text: 'OD' }), od.el),
+          h('div', { class: 'card-row' }, hpText, h('span', { class: 'card-od-label', text: '必殺' }), od.el),
         );
         this.allyRow.appendChild(btn);
         this.allyCards.push({ uid: f.uid, el: btn, hp, od, hpText, odBtn: btn, alive: true, maxHp: f.maxHp, odValue: f.od, icon, cd: 0, cdReady: false });
@@ -182,7 +182,7 @@ export class BattleScreen extends Screen {
       case 'turnBegin': {
         const c = this.card(e.uid);
         for (const x of [...this.allyCards, ...this.enemyCards]) x.el.classList.toggle('is-acting', x === c);
-        this.roundEl.textContent = `T ${this.player.sim.turnCount}`;
+        this.roundEl.textContent = `${this.player.sim.turnCount} 手`;
         break;
       }
       case 'damage': {

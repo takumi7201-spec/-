@@ -60,6 +60,8 @@ export class DexScreen extends Screen {
       const cell = button('', () => has ? this.openDetail(r.id) : audio.uiError(), {
         class: `dex-cell ${has ? '' : 'is-locked'}`,
       });
+      // ★5 だけ枠の質感を変える。判定は CSS 側に持たせる
+      cell.dataset.rarity = String(r.rarity);
       cell.append(
         revosIcon(r.id, `dex-icon ${has ? '' : 'is-silhouette'}`),
         h('span', { class: `chip chip--${r.element}`, text: ELEMENT_NAMES[r.element] }),

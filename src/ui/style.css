@@ -1,67 +1,95 @@
 /* =========================================================================
-   STRATA CORE — UI レイヤ（フィールドノート）
+   STRATA CORE — UI レイヤ（昼の現場インターフェース）
 
    方針:
    - 画面を上下に割らない。L0ステージは常に全画面、UIはその上に浮くだけ
    - L1（情報）は pointer-events:none、L2（操作）だけが触れる
-   - UI は「発掘者の野帳」。紙・罫線・ペン・蛍光ペン・テープで構成する。
-     3D の地層は写真、UI はその上に貼った書き込み——という関係にする
-   - 面の言語は「押し出し」ではなく「紙の重なり」。硬いオフセット影をやめ、
-     やわらかい落ち影に変える。角丸は手描きの歪みで代用する
-   - インクは紙より濃い。彩度ではなく明度差でコントラストを取る
+   - 地は昼の採掘現場。空・砂・地層が見えている上に計器が浮く。
+     暗幕で覆って光らせるのではなく、明るい場所に道具を置く
+   - 面は2種類しかない。白い板（情報の主面）と黒い板（いまここを指す札）。
+     黒は限って使う——全部黒にすると、どれが「いま」なのか分からなくなる
+   - 角は切り欠かず丸で受ける。影は広く淡く。沈めない
+   - 傾き −8° は下タブ・通貨・見出し札にだけ与える。全部を傾けると読めない
    ========================================================================= */
 
-/* 手書きの2書体。Google Fonts から取らず、このゲームが実際に出す字だけを
-   焼いたサブセットを同梱する（tools/subset-fonts.py）。
-   ネットワークに依存しないぶん、初回から書体が揃った状態で出せる */
+/* 2書体。Google Fonts から取らず、このゲームが実際に出す字だけを焼いた
+   サブセットを同梱する（tools/subset-fonts.py）。
+   Chakra Petch は数値と英字だけを持つ——和文を申告させると、日本語が
+   そちらへ回って豆腐になる */
 @font-face {
-  font-family: 'Zen Kurenaido';
-  src: url('./fonts/zen-kurenaido.woff2') format('woff2');
-  font-weight: 400;
+  font-family: 'Chakra Petch';
+  src: url('./fonts/chakra-petch-600.woff2') format('woff2');
+  font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Yusei Magic';
-  src: url('./fonts/yusei-magic.woff2') format('woff2');
-  font-weight: 400;
+  font-family: 'Chakra Petch';
+  src: url('./fonts/chakra-petch-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zen Kaku Gothic New';
+  src: url('./fonts/zen-kaku-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zen Kaku Gothic New';
+  src: url('./fonts/zen-kaku-900.woff2') format('woff2');
+  font-weight: 900;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
-  /* --- 紙 --- */
-  --paper: #f1e9d6;
-  --paper-card: #f6f0e1;
-  --paper-shade: #e6dcc3;
-  --paper-edge: #cfc0a0;
-  --paper-deep: #d8cbac;
+  /* --- 地（明るい現場）--- */
+  --sky: #d6e3e4;
+  --haze: #e7ddc8;
+  --sand: #d2c2a0;
+  --sand-deep: #b6a382;
+  --paper: var(--haze);
+  --paper-card: #fffdf8;
+  --paper-shade: #f2ead8;
+  --paper-edge: #c7b795;
+  --paper-deep: var(--sand);
 
-  /* --- 罫線 --- */
-  --rule: rgba(58, 106, 150, 0.2);
-  --rule-strong: rgba(58, 106, 150, 0.3);
-  --margin-rule: rgba(190, 84, 74, 0.42);
+  /* --- 黒い板。「いまここ」を指す札だけに使う --- */
+  --plate: rgba(46, 41, 34, 0.86);
+  --plate-solid: #2e2922;
+  --plate-2: rgba(62, 56, 46, 0.78);
+  --on-plate: #f7f3e8;
+  --on-plate-dim: #a79c89;
+
+  /* --- 罫線ではなく境界 --- */
+  --rule: rgba(42, 37, 30, 0.12);
+  --rule-strong: rgba(42, 37, 30, 0.22);
+  --margin-rule: rgba(42, 37, 30, 0.14);
 
   /* --- インク --- */
-  --ink: #232c38;
-  --ink-line: #3a4352;
-  --ink-soft: #55606e;
-  --ink-faint: #8b8778;
-  --pencil: #6d675c;
+  --ink: #2a251e;
+  --ink-line: #4a4136;
+  --ink-soft: #6b6154;
+  --ink-faint: #7a6f60;
+  --pencil: #8a7f6e;
 
-  /* --- ペンの色（面積比5%以下で使う） --- */
-  --pen-red: #bf4038;
-  --pen-red-deep: #96291f;
-  --pen-blue: #2f5f9c;
-  --pen-green: #2f7a5c;
-  --pen-brown: #8a5f2b;
+  /* --- 信号色（面積比を絞って使う）--- */
+  --pen-red: #c23a28;
+  --pen-red-deep: #9a2c1e;
+  --pen-blue: #2f7aad;
+  --pen-green: #2e7a50;
+  --pen-brown: #8a6a2e;
   --pen-violet: #6f4a97;
 
-  /* --- 蛍光ペン --- */
-  --hl-amber: #ffd873;
-  --hl-amber-deep: #f0b53c;
-  --hl-mint: #9fe3c8;
-  --hl-rose: #f7b9ac;
+  /* --- 面に敷く色 --- */
+  --hl-amber: #f5a623;
+  --hl-amber-deep: #c98a1e;
+  --hl-amber-lift: #ffc559;
+  --hl-mint: #3fc2be;
+  --hl-rose: #e8503c;
 
   /* 旧トークン名の互換。画面側の参照を一斉に書き換えないための橋 */
   --obsidian: var(--ink);
@@ -81,25 +109,28 @@
   --loam: var(--pen-brown);
   --ash: var(--ink-faint);
 
-  /* --- 属性（紙の上で読める濃さに落とす）--- */
-  --el-flame: #bf4038;
-  --el-aqua: #2f5f9c;
-  --el-terra: #9a6a16;
-  --el-gale: #2f7a5c;
-  --el-null: #6f6a60;
+  /* --- 属性 --- */
+  --el-flame: #c2402b;
+  --el-aqua: #2f7aad;
+  --el-terra: #a06f1e;
+  --el-gale: #2e8a58;
+  --el-null: #6b6276;
 
   --text: var(--ink);
   --text-dim: var(--ink-soft);
   --text-faint: var(--ink-faint);
 
-  /* 紙に大きな角丸はない。歪みで手描きを出す */
-  --r-sm: 3px;
-  --r-md: 5px;
-  --r-lg: 8px;
-  /* ペンで囲うときの震え。大きく取ると細長い箱がレンズ型に潰れるので、
-     見た目が歪んで見える最小限（10〜18px）にとどめる */
-  --r-hand: 15px 5px 13px 7px / 6px 14px 5px 16px;
-  --r-hand-2: 5px 15px 7px 13px / 14px 6px 16px 5px;
+  /* 切り欠きではなく丸で受ける。面の大きさで3段 */
+  --r-sm: 7px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+  /* かつての手描きの震え。丸に統一したので、参照先だけ残して値を揃える */
+  --r-hand: var(--r-lg);
+  --r-hand-2: var(--r-lg);
+  /* 下タブ・通貨・見出し札にだけ与える傾き */
+  --skew: -8deg;
+  --unskew: 8deg;
 
   --dur-fast: 120ms;
   --dur: 220ms;
@@ -113,7 +144,7 @@
   --safe-r: env(safe-area-inset-right, 0px);
   --deck-bottom: calc(var(--safe-b) + 12px);
 
-  --gutter: 16px;
+  --gutter: 14px;
   --ui-scale: 1;
   --fs-body: 15px;
   --fs-label: 13px;
@@ -121,21 +152,26 @@
   --fs-display: 28px;
   --fs-num: 18px;
 
-  /* 手書き。読み込み中は font-display:swap でシステムの丸ゴシックに退避する */
-  --font-hand: 'Zen Kurenaido', 'Klee One', 'Hiragino Maru Gothic ProN', 'Yu Gothic',
-    'Noto Sans JP', system-ui, sans-serif;
-  --font-marker: 'Yusei Magic', var(--font-hand);
+  /* 日本語。読み込み中は font-display:swap でシステムのゴシックに退避する */
+  --font-hand: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP',
+    system-ui, sans-serif;
+  /* 数値と英字だけ。和文は持たせていないので、混植すると自動でゴシックに落ちる */
+  --font-num: 'Chakra Petch', var(--font-hand);
+  --font-marker: var(--font-hand);
   --font-ui: var(--font-hand);
 
-  /* 紙の繊維。1枚だけ定義して大きな面にだけ敷く */
+  /* 砂の粒。大きな面にだけ、ごく薄く敷く */
   --fiber: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='4'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23f)' opacity='.5'/%3E%3C/svg%3E");
-  /* 罫線。カードの中でも同じピッチを使い、ページの一部に見せる */
-  --ruled: repeating-linear-gradient(180deg, transparent 0 25px, var(--rule) 25px 26px);
+  /* かつての罫線。紙をやめたので無地にする（参照先が多いので空で残す）*/
+  --ruled: none;
+  /* 昼の地。空から砂へ、そのまま落とす */
+  --ground: linear-gradient(178deg, var(--sky) 0%, var(--haze) 32%, var(--sand) 64%, var(--sand-deep) 100%);
 
-  /* 紙の落ち影。硬いオフセットではなく浮きで出す */
-  --lift-1: 0 1px 2px rgba(74, 60, 38, 0.22), 0 3px 8px rgba(74, 60, 38, 0.12);
-  --lift-2: 0 2px 4px rgba(74, 60, 38, 0.24), 0 8px 18px rgba(74, 60, 38, 0.16);
-  --lift-3: 0 3px 6px rgba(74, 60, 38, 0.26), 0 16px 34px rgba(74, 60, 38, 0.2);
+  /* 影は広く淡く。濃く狭い影は物を沈ませる */
+  --lift-1: 0 4px 12px rgba(72, 58, 36, 0.14);
+  --lift-2: 0 6px 18px rgba(72, 58, 36, 0.18);
+  --lift-3: 0 10px 28px rgba(72, 58, 36, 0.24);
+  --lift-hot: 0 7px 18px rgba(197, 138, 30, 0.4);
 }
 
 @media (min-width: 600px) {
@@ -155,7 +191,7 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: #2b2418;
+  background: var(--sand-deep);
   color: var(--text);
   font-family: var(--font-ui);
   font-size: var(--fs-body);
@@ -171,6 +207,10 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
+/* hidden を立てた要素は、後続の display 指定より強く畳む。
+   .home-notice のように display を持つ部品が居残るのを防ぐ */
+[hidden] { display: none !important; }
+
 #app { position: fixed; inset: 0; width: 100%; height: 100dvh; }
 
 /* L0: ステージ。UIに面積を譲らない */
@@ -183,31 +223,20 @@ html, body {
    紙のユーティリティ
    ========================================================================= */
 
-/* 罫線つきの紙。ページにも小さなカードにも同じピッチで敷く */
+/* 情報の主面。白い板。読ませたいものはこの上に置く */
 .paper {
   background-color: var(--paper-card);
-  background-image: var(--ruled);
 }
 
-/* 手描きの枠。角丸の非対称でペンの震えを出す */
+/* 情報の主面。線で囲わず、影の高さだけで前後を決める */
 .sketch {
-  border: 1.5px solid var(--ink-line);
-  border-radius: var(--r-hand);
+  border: 0;
+  border-radius: var(--r-lg);
 }
 
-/* テープ。写真やメモを留める */
-.tape::before {
-  content: '';
-  position: absolute;
-  top: -9px; left: 50%;
-  width: 56px; height: 17px;
-  transform: translateX(-50%) rotate(-2.2deg);
-  background: rgba(246, 233, 190, 0.72);
-  border-left: 1px solid rgba(206, 188, 144, 0.6);
-  border-right: 1px solid rgba(206, 188, 144, 0.6);
-  box-shadow: 0 1px 2px rgba(74, 60, 38, 0.18);
-  pointer-events: none;
-}
+/* かつて紙を留めていたテープ。面で表現するようになったので画としては消す
+   （参照している画面が残っているので、セレクタだけ残す）*/
+.tape::before { content: none; }
 
 /* =========================================================================
    共通部品
@@ -220,16 +249,16 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 56px;
-  padding: 0 20px;
-  border: 1.5px solid var(--ink-line);
-  border-radius: var(--r-hand);
+  min-height: 52px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--r-lg);
   background: var(--paper-card);
   color: var(--ink);
   font: inherit;
   font-family: var(--font-hand);
   font-size: var(--fs-label);
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.04em;
   cursor: pointer;
   box-shadow: var(--lift-1);
@@ -238,131 +267,152 @@ html, body {
   -webkit-appearance: none;
   appearance: none;
 }
-/* 隣り合うボタンで歪みの向きを変える。同じ枠が並ぶと印刷に見える */
-.btn:nth-child(even) { border-radius: var(--r-hand-2); }
+/* 押すと沈む。影を縮めて面を近づける——動かすのは2pxで足りる */
 .btn:active, .btn.is-pressed {
-  transform: translate(1px, 2px);
-  box-shadow: 0 1px 1px rgba(74, 60, 38, 0.18);
+  transform: translateY(2px);
+  box-shadow: 0 2px 6px rgba(72, 58, 36, 0.16);
 }
-.btn:disabled { opacity: 0.4; pointer-events: none; }
-/* 長押しの受付中。押し込んでいる間だけ紙がたわむ */
-.btn.is-holding { transform: translate(1px, 2px) scale(0.985); }
+.btn:disabled { opacity: 0.42; pointer-events: none; }
+.btn.is-holding { transform: translateY(2px) scale(0.985); }
 
-/* 主アクションは蛍光ペンで塗る。塗り残しからは紙が見えるべきで、
-   背景が透けてはいけない——下地に紙を必ず敷く */
+/* 主アクション。一画面に一箇所だけ、琥珀で塗る */
 .btn--primary {
-  background-color: var(--paper-card);
-  background-image:
-    linear-gradient(100deg, transparent 0 1%, var(--hl-amber) 3% 97%, transparent 99%);
-  border-width: 2px;
-  min-height: 64px;
+  background: linear-gradient(180deg, var(--hl-amber-lift), var(--hl-amber));
+  color: #3a2a08;
+  min-height: 56px;
   font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  box-shadow: var(--lift-hot);
 }
-/* 3D の上に浮くこともあるので、下地は薄く残す。完全な透明にすると
-   砂色の地層に文字が沈む */
+/* 黒い札。3D の上に浮いても読めるが、「いまここ」以外には使わない */
 .btn--ghost {
-  background: var(--paper-shade);
-  border-color: var(--pencil); border-style: dashed;
-  box-shadow: none;
+  background: var(--plate);
+  color: var(--on-plate);
+  box-shadow: var(--lift-1);
 }
 .btn--danger {
-  background-color: var(--paper-card);
-  background-image: linear-gradient(100deg, transparent 0 1%, var(--hl-rose) 3% 97%, transparent 99%);
-  border-color: var(--pen-red);
+  background: linear-gradient(180deg, #f27a5c, var(--hl-rose));
+  color: #fff4ee;
+  font-weight: 900;
+  box-shadow: 0 7px 18px rgba(232, 80, 60, 0.36);
 }
-.btn--sm { min-height: 44px; padding: 0 12px; font-size: 12px; }
-.btn--icon { min-width: 56px; padding: 0; flex-direction: column; gap: 2px; }
-.btn--round { border-radius: 49% 51% 47% 53% / 52% 48% 53% 47%; min-width: 72px; min-height: 72px; padding: 0; }
+.btn--sm { min-height: 42px; padding: 0 12px; font-size: 12px; border-radius: var(--r-md); }
+.btn--icon { min-width: 52px; padding: 0; flex-direction: column; gap: 2px; }
+/* 丸ボタンは真円。歪ませない——計器のつまみは歪まない */
+.btn--round { border-radius: 50%; min-width: 68px; min-height: 68px; padding: 0; }
 .btn--wide { width: 100%; }
+/* 左の縦列。丸い小さな札で、上に赤い報せが乗る */
+.btn--rail {
+  width: 46px; min-width: 46px; height: 46px; min-height: 46px;
+  padding: 0; border-radius: 50%;
+  background: var(--plate); color: var(--on-plate);
+  font-family: var(--font-num); font-size: 17px;
+}
+/* 傾いた札。下タブと通貨と見出しにだけ */
+.skewed { transform: skewX(var(--skew)); }
+.skewed > * { transform: skewX(var(--unskew)); }
+/* 板の角の鋲。2つで足りる */
+.rivets { position: absolute; right: 7px; top: 7px; display: flex; gap: 2px; }
+.rivets > i { width: 3px; height: 3px; border-radius: 50%; background: var(--rule-strong); }
 
 .btn .k { font-size: 10px; opacity: 0.5; letter-spacing: 0.1em; }
 .btn-label { font-family: var(--font-hand); }
 
-/* 選択中は蛍光ペンでなぞった状態。枠の塗りつぶしにしない——
-   塗りつぶすと「印刷されたボタン」になり、書き込みに見えなくなる */
+/* 選択中は琥珀で塗り切る。半端になぞると、どれが選ばれているか分からない */
 .is-on, .btn.is-on {
-  background-color: var(--paper-card);
-  background-image:
-    linear-gradient(100deg, transparent 0 2%, var(--hl-amber) 4% 96%, transparent 98%);
-  border-color: var(--ink);
-  border-width: 2px;
+  background: linear-gradient(180deg, var(--hl-amber-lift), var(--hl-amber));
+  color: #3a2a08;
+  font-weight: 900;
+  box-shadow: 0 5px 13px rgba(197, 138, 30, 0.36);
+}
+/* 非選択。面を沈めて、選択中との差を塗りの有無で出す */
+.btn--opt {
+  background: rgba(42, 37, 30, 0.07);
+  color: var(--ink-line);
+  box-shadow: none;
 }
 
 /* 紙。背後のボクセルを透かさない。透かすと書き込みが読めない */
 .panel {
   position: relative;
-  background-color: var(--paper-card);
-  background-image: var(--ruled);
-  border: 1.5px solid var(--ink-line);
-  border-radius: var(--r-hand);
+  background: var(--paper-card);
+  border: 0;
+  border-radius: var(--r-lg);
   box-shadow: var(--lift-2);
 }
 .panel--sunk {
-  background-color: var(--paper-shade);
-  background-image: none;
-  border-style: dashed;
-  border-color: var(--pencil);
+  background: rgba(42, 37, 30, 0.06);
   box-shadow: none;
 }
-.panel--light { background-color: var(--paper); color: var(--ink); }
+.panel--light { background: var(--paper-card); color: var(--ink); }
+/* 黒い板。いまここを指す札 */
+.panel--plate { background: var(--plate); color: var(--on-plate); box-shadow: var(--lift-1); }
 
 /* 手描きのゲージ。枠はペン、中身はインクを流し込む */
+/* 溝に流し込む帯。枠線は引かない——溝そのものが枠になる */
 .bar {
   position: relative;
-  height: 11px;
-  background: var(--paper-shade);
-  border: 1.5px solid var(--ink-line);
-  border-radius: 2px;
+  height: 12px;
+  background: rgba(42, 37, 30, 0.12);
+  border: 0;
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
 .bar > i {
   display: block;
   height: 100%;
   width: 0%;
-  background-color: var(--pen-green);
-  /* インクのムラ。均一な帯だと印刷に見える */
-  background-image: repeating-linear-gradient(
-    -52deg, rgba(255, 255, 255, 0.22) 0 3px, transparent 3px 7px);
+  background: linear-gradient(90deg, #3fa772, #55be86);
   transition: width var(--dur) var(--ease);
 }
-.bar--hp > i { background-color: var(--pen-green); }
-.bar--hp.is-low > i { background-color: var(--pen-red); }
-.bar--hp.is-mid > i { background-color: var(--hl-amber-deep); }
-.bar--od > i { background-color: var(--hl-amber-deep); }
-.bar--exp > i { background-color: var(--pen-blue); }
-.bar--slim { height: 7px; }
+.bar--hp > i { background: linear-gradient(90deg, #3fa772, #55be86); }
+.bar--hp.is-low > i { background: linear-gradient(90deg, var(--pen-red-deep), var(--hl-rose)); }
+.bar--hp.is-mid > i { background: linear-gradient(90deg, var(--hl-amber-deep), #f0c24a); }
+.bar--od > i { background: linear-gradient(90deg, var(--hl-amber-deep), var(--hl-amber)); }
+.bar--exp > i { background: linear-gradient(90deg, var(--hl-amber-deep), var(--hl-amber)); }
+.bar--slim { height: 8px; }
+/* 黒い板の上に置く溝は、地を深くしないと帯が読めない */
+.panel--plate .bar, .bar--onplate { background: rgba(10, 8, 5, 0.4); }
 .bar > .shield { position: absolute; inset: 0 auto 0 0; background: var(--pen-blue); opacity: 0.5; }
 
-.num { font-variant-numeric: tabular-nums; font-family: var(--font-marker); letter-spacing: 0.02em; }
+/* 数値だけ別の骨格。和文を持たないフェイスなので、混植しても崩れない */
+.num { font-variant-numeric: tabular-nums; font-family: var(--font-num); font-weight: 700; letter-spacing: 0.02em; }
 
 /* 見出しは赤ペンの書き込み。小文字の間延びを避けて短く置く */
+/* 小見出し。日本語に欧文トラッキングの代わりをさせる——字間を大きく空けると、
+   大文字の小ラベルと同じ「計器の目盛り」に見える */
 .label {
-  font-family: var(--font-marker);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  color: var(--pen-red);
-  text-transform: uppercase;
+  font-family: var(--font-hand);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  color: var(--pen-brown);
 }
 
 /* 属性は丸で囲った注記。四角い箱にすると印刷物に見える */
+/* 属性。丸で囲わず、色の面に置く。左端の角を落として札に見せる */
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   height: 22px;
   padding: 0 9px;
-  border-radius: 48% 52% 47% 53% / 56% 44% 58% 42%;
-  background: transparent;
-  border: 1.5px solid currentColor;
+  border-radius: var(--r-sm);
+  background: var(--el, var(--ink-line));
+  color: var(--paper-card);
+  border: 0;
   font-family: var(--font-hand);
   font-size: 11px;
-  letter-spacing: 0.06em;
+  font-weight: 900;
+  letter-spacing: 0.08em;
 }
-.chip--flame { color: var(--el-flame); }
-.chip--aqua { color: var(--el-aqua); }
-.chip--terra { color: var(--el-terra); }
-.chip--gale { color: var(--el-gale); }
-.chip--null { color: var(--el-null); }
+/* 属性色は --el に入れる。面と、カードの縁など他の場所でも同じ一本を読む */
+.chip--flame { --el: var(--el-flame); }
+.chip--aqua { --el: var(--el-aqua); }
+.chip--terra { --el: var(--el-terra); }
+.chip--gale { --el: var(--el-gale); }
+.chip--null { --el: var(--el-null); }
 
 /* =========================================================================
    層モデル
@@ -397,27 +447,17 @@ html, body {
   transition: opacity var(--dur) var(--ease), visibility 0s;
 }
 
-/* L1: 上端の常時情報。ページの端が写真の上にめくれている見立て */
+/* L1: 上端の常時情報。地の明るさを殺さないよう、ごく薄くだけ敷く */
 .status-strip {
   position: absolute;
   top: 0; left: 0; right: 0;
-  padding: calc(var(--safe-t) + 8px) calc(var(--gutter) + var(--safe-l)) 10px
+  padding: calc(var(--safe-t) + 10px) calc(var(--gutter) + var(--safe-l)) 10px
     calc(var(--gutter) + var(--safe-r));
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   pointer-events: none;
-  background:
-    linear-gradient(180deg, var(--paper) 0 62%, rgba(241, 233, 214, 0) 100%);
-}
-/* めくれた紙の切り口 */
-.status-strip::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; top: calc(var(--safe-t) + 52px);
-  height: 1px;
-  background: var(--rule-strong);
-  opacity: 0.7;
+  background: linear-gradient(180deg, rgba(231, 221, 200, 0.94) 0 46%, rgba(231, 221, 200, 0) 100%);
 }
 .status-strip > .interactive { pointer-events: auto; }
 
@@ -439,9 +479,9 @@ html, body {
     calc(var(--gutter) + var(--safe-r));
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
   pointer-events: none;
-  background: linear-gradient(0deg, var(--paper) 34%, rgba(241, 233, 214, 0) 100%);
+  background: linear-gradient(0deg, rgba(231, 221, 200, 0.95) 26%, rgba(231, 221, 200, 0) 100%);
 }
 .deck > * { pointer-events: auto; }
 
@@ -458,37 +498,38 @@ html, body {
   pointer-events: none;
   width: min(440px, calc(100% - var(--gutter) * 2));
 }
+/* 黒い札で出す。明るい地の上では、白い札より黒のほうが目に入る */
 .toast {
-  padding: 10px 18px;
-  background: var(--hl-amber);
-  color: var(--ink);
+  padding: 11px 18px;
+  background: var(--plate);
+  color: var(--on-plate);
   border: 0;
-  border-left: 5px solid var(--pen-green);
-  border-radius: 2px 10px 3px 8px / 8px 3px 10px 2px;
+  border-left: 4px solid var(--hl-mint);
+  border-radius: var(--r-md);
   font-family: var(--font-hand);
   font-size: var(--fs-label);
+  font-weight: 700;
   animation: toast-in var(--dur) var(--ease-back);
   box-shadow: var(--lift-2);
-  transform: rotate(-0.7deg);
   max-width: 100%;
 }
-.toast--warn { border-left-color: var(--hl-amber-deep); background: #ffe9a8; }
-.toast--bad { border-left-color: var(--pen-red); background: var(--hl-rose); }
+.toast--warn { border-left-color: var(--hl-amber); }
+.toast--bad { border-left-color: var(--hl-rose); }
 .toast.is-out { animation: toast-out var(--dur) var(--ease) forwards; }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(14px) rotate(-3deg) scale(0.96); }
-  to { opacity: 1; transform: rotate(-0.7deg); }
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes toast-out {
-  to { opacity: 0; transform: translateY(-8px) rotate(-2deg); }
+  to { opacity: 0; transform: translateY(-8px); }
 }
 
 /* L3: モーダル／シート */
 .scrim {
   position: absolute;
   inset: 0;
-  background: rgba(48, 38, 24, 0.46);
+  background: rgba(48, 38, 24, 0.4);
   pointer-events: auto;
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
@@ -502,25 +543,23 @@ html, body {
   max-height: 78dvh;
   display: flex;
   flex-direction: column;
-  background-color: var(--paper-card);
-  background-image: var(--ruled);
-  border-top: 1.5px solid var(--ink-line);
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--paper-card);
+  border-top: 0;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 30px rgba(72, 58, 36, 0.24);
   padding: 8px calc(var(--gutter) + var(--safe-l)) var(--deck-bottom)
     calc(var(--gutter) + var(--safe-r));
   transform: translateY(100%);
   transition: transform var(--dur-slow) var(--ease);
   pointer-events: auto;
-  box-shadow: var(--lift-3);
 }
 .sheet.is-open { transform: none; }
 .sheet .grabber {
-  width: 44px; height: 3px;
-  background: var(--pencil);
-  border-radius: 2px;
+  width: 44px; height: 4px;
+  background: rgba(42, 37, 30, 0.2);
+  border-radius: var(--r-pill);
   margin: 6px auto 12px;
   flex: none;
-  opacity: 0.5;
 }
 .sheet .sheet-body { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 
@@ -554,42 +593,38 @@ body[data-layout='tower'] .side-only { display: none; }
   z-index: 100;
   display: grid;
   place-items: center;
-  background-color: var(--paper);
-  background-image:
-    linear-gradient(90deg, transparent 0 38px, var(--margin-rule) 38px 39px, transparent 39px),
-    var(--ruled),
-    var(--fiber);
-  background-blend-mode: normal, normal, multiply;
+  background: var(--ground);
   transition: opacity var(--dur-slow) var(--ease);
 }
 #boot.hidden { opacity: 0; pointer-events: none; }
 .boot-inner { text-align: center; width: min(420px, 76vw); }
 .boot-logo { display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; }
 .boot-logo-main {
-  font-family: var(--font-marker);
+  font-family: var(--font-num);
+  font-weight: 700;
   font-size: clamp(30px, 9vw, 52px);
   color: var(--ink);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.04em;
 }
 .boot-logo-sub {
   font-family: var(--font-hand);
+  font-weight: 700;
   font-size: clamp(11px, 3.2vw, 15px);
-  color: var(--pen-red);
+  color: var(--hl-amber-deep);
   letter-spacing: 0.5em;
   margin-top: 4px;
   margin-left: 0.5em;
 }
 .boot-bar {
-  height: 9px; width: 100%;
-  background: var(--paper-shade);
-  border: 1.5px solid var(--ink-line);
-  border-radius: 2px;
+  height: 10px; width: 100%;
+  background: rgba(42, 37, 30, 0.12);
+  border: 0;
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
 .boot-bar i {
   display: block; height: 100%; width: 0%;
-  background-color: var(--pen-blue);
-  background-image: repeating-linear-gradient(-52deg, rgba(255,255,255,.25) 0 3px, transparent 3px 7px);
+  background: linear-gradient(90deg, var(--hl-amber-deep), var(--hl-amber));
   transition: width var(--dur) var(--ease);
 }
 .boot-status {

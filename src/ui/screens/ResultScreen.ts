@@ -38,7 +38,7 @@ export class ResultScreen extends Screen {
     this.subEl = h('div', { class: 'result-sub' });
     this.rowsEl = h('div', { class: 'result-rows' });
 
-    const card = h('div', { class: 'result-card panel' }, this.titleEl, this.subEl, this.rowsEl);
+    const card = h('div', { class: 'result-card' }, this.titleEl, this.subEl, this.rowsEl);
     const deck = h('div', { class: 'deck deck--result' },
       button('もう一度', () => { audio.uiTap(); this.onAgain?.(); }, { class: 'btn--ghost' }),
       button('拠点へ', () => { audio.uiConfirm(); this.onNext?.(); }, { class: 'btn--primary' }),

@@ -381,7 +381,7 @@ async function main(): Promise<void> {
     if (winner === 0 && !ev) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
     writeSave(data);
     showResult({
-      title: winner === 0 ? 'VICTORY' : winner === 1 ? 'DEFEAT' : 'DRAW',
+      title: winner === 0 ? '勝 利' : winner === 1 ? '敗 北' : '引 き 分 け',
       subtitle: ev ? `${ev.name} — ${player?.sim.turnCount ?? 0} 行動` : `${player?.sim.turnCount ?? 0} 行動`,
       good: winner === 0,
       rows,

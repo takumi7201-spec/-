@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""手書きフォントを、このゲームが実際に出す字だけに絞って woff2 にする。
+"""書体を、このゲームが実際に出す字だけに絞って woff2 にする。
 
 Google Fonts をそのまま読むと unicode-range 分割の CSS を1枚と woff2 を
 数個、毎回ネットワークから取ることになる。オフラインでも Artifact でも
@@ -12,8 +12,15 @@ Google Fonts をそのまま読むと unicode-range 分割の CSS を1枚と wof
 
     python3 tools/subset-fonts.py <元TTFのディレクトリ>
 
-元 TTF（yusei.ttf / zen.ttf）はリポジトリに置かない。Google Fonts から
-落としたものを引数のディレクトリに置いて実行する。
+元 TTF はリポジトリに置かない。Google Fonts から落としたものを引数の
+ディレクトリに置いて実行する。必要なのは4つ:
+
+  chakra600.ttf / chakra700.ttf  Chakra Petch — 数値と英字だけを担う
+  zkg700.ttf    / zkg900.ttf     Zen Kaku Gothic New — 日本語
+
+欧文側は和文を持たないので、収録する字を分ける。Chakra Petch に
+ひらがなを渡しても入らないうえ、サブセット後のファイルに
+「その字を持っている」と申告されると、和文がそちらへ回って豆腐になる。
 """
 import subprocess
 import sys
@@ -58,6 +65,11 @@ def collect() -> set[str]:
     return {c for c in chars if ord(c) >= 0x20 and c not in ''}
 
 
+# 欧文フェイスに渡す範囲。和文を混ぜない——持っていない字を申告させると、
+# ブラウザがそのフェイスを選んでしまい、日本語が豆腐になる
+LATIN_MAX = 0x2FFF
+
+
 def subset(src: Path, dst: Path, chars: set[str]) -> None:
     text = ''.join(sorted(chars))
     subprocess.run(
@@ -81,13 +93,20 @@ def main() -> None:
     src_dir = Path(sys.argv[1])
     chars = collect()
     OUT.mkdir(parents=True, exist_ok=True)
-    for name, out in (('zen.ttf', 'zen-kurenaido.woff2'), ('yusei.ttf', 'yusei-magic.woff2')):
+    latin = {c for c in chars if ord(c) <= LATIN_MAX}
+    faces = (
+        ('chakra600.ttf', 'chakra-petch-600.woff2', latin),
+        ('chakra700.ttf', 'chakra-petch-700.woff2', latin),
+        ('zkg700.ttf', 'zen-kaku-700.woff2', chars),
+        ('zkg900.ttf', 'zen-kaku-900.woff2', chars),
+    )
+    for name, out, use in faces:
         src = src_dir / name
         if not src.exists():
             raise SystemExit(f'{src} がない')
-        subset(src, OUT / out, chars)
-        print(f'{out}: {(OUT / out).stat().st_size / 1024:.1f} KB')
-    print(f'収録 {len(chars)} 字')
+        subset(src, OUT / out, use)
+        print(f'{out}: {(OUT / out).stat().st_size / 1024:.1f} KB  ({len(use)} 字)')
+    print(f'走査 {len(chars)} 字 / うち欧文 {len(latin)} 字')
 
 
 if __name__ == '__main__':

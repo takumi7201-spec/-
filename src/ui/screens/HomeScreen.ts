@@ -51,6 +51,8 @@ export class HomeScreen extends Screen {
 
     const tile = (key: string, label: string, icon: string, go: () => void): void => {
       const b = button(label, () => { audio.uiTap(); go(); }, { class: 'home-tile', icon });
+      // 札の色分けは CSS 側で決める。どの導線かを DOM に残しておく
+      b.dataset.tile = key;
       this.tiles.set(key, b);
       this.grid.appendChild(b);
     };

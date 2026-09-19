@@ -324,4 +324,20 @@ export function getRevos(id: string): RevosDef {
 
 /** ★5 は「ホロタイプ」——その種を定義する、ただ1つの標本 */
 export const RARITY_NAMES = ['', 'コモン', 'レア', 'エピック', 'レジェンド', 'ホロタイプ'] as const;
+
+/** 役割の表示名。データ側は英語の識別子のまま、画面には日本語だけを出す */
+export const ROLE_NAMES: Record<Role, string> = {
+  Tank: '壁役',
+  Striker: '打撃役',
+  Breaker: '崩し役',
+  Sprinter: '先行役',
+  Guardian: '守護役',
+  Healer: '回復役',
+  Debuffer: '妨害役',
+  'All-round': '万能役',
+  Buffer: '支援役',
+  Technical: '搦め手',
+  Finisher: '仕留め役',
+  Apex: '頂点種',
+};
 export const RARITY_COLORS = ['', '#c8c2b4', '#6fc8e8', '#c898f0', '#ffc84a', '#e8623c'] as const;

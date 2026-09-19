@@ -55,15 +55,15 @@ export class DigScreen extends Screen {
     const strip = h('div', { class: 'status-strip' },
       button('‹', () => this.onExit?.(), { class: 'btn--sm btn--ghost' }),
       h('div', { class: 'stat-group' },
-        h('div', { class: 'label', text: 'STAMINA' }),
+        h('div', { class: 'label', text: '体 力' }),
         this.staminaBar.el,
       ),
       h('div', { class: 'stat-col' },
-        h('div', { class: 'label', text: 'DEPTH' }),
+        h('div', { class: 'label', text: '深 度' }),
         (this.depthEl = h('div', { class: 'num stat-num', text: '0.0m' })),
       ),
       h('div', { class: 'stat-col' },
-        h('div', { class: 'label', text: 'FINDS' }),
+        h('div', { class: 'label', text: '発 見' }),
         (this.findsEl = h('div', { class: 'num stat-num', text: '0/0' })),
       ),
     );
@@ -81,7 +81,7 @@ export class DigScreen extends Screen {
       h('div', { class: 'scan-corner scan-corner--tr' }),
       h('div', { class: 'scan-corner scan-corner--bl' }),
       h('div', { class: 'scan-corner scan-corner--br' }),
-      h('div', { class: 'scan-label', text: 'SCAN MODE' }),
+      h('div', { class: 'scan-label' }, h('span', { text: '探 査 中' })),
     );
 
     // ---- 仮想スティック（触った場所に出る）----
@@ -90,10 +90,10 @@ export class DigScreen extends Screen {
 
     // ---- L2: 親指デッキ ----
     this.echoFill = h('i', { class: 'cd-fill' });
-    this.echoBtn = button('ECHO', () => this.fireEcho(), { class: 'btn--round btn--echo' });
+    this.echoBtn = button('反響', () => this.fireEcho(), { class: 'btn--round btn--echo' });
     this.echoBtn.appendChild(h('div', { class: 'cd-ring' }, this.echoFill));
 
-    this.digBtn = button('DIG', () => this.scene.requestDig(), { class: 'btn--round btn--dig' });
+    this.digBtn = button('掘る', () => this.scene.requestDig(), { class: 'btn--round btn--dig' });
 
     const deck = h('div', { class: 'deck deck--dig' },
       h('div', { class: 'deck-left' },

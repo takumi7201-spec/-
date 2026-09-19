@@ -1,6 +1,6 @@
 import { h } from './dom';
 import type { OwnedRevos } from '../core/Save';
-import { RARITY_NAMES, getRevos } from '../game/data/revos';
+import { RARITY_NAMES, ROLE_NAMES, getRevos } from '../game/data/revos';
 import { ELEMENT_NAMES } from '../voxel/palette';
 import { cleanRank } from '../game/battle/simulate';
 import { revosIcon } from './revosIcon';
@@ -34,7 +34,7 @@ export function revosDetailBody(defId: string, opts: RevosDetailOpts = {}): HTML
     h('div', { class: 'dex-hero' }, revosIcon(r.id, 'dex-hero-img')),
     h('div', { class: 'dex-detail-head' },
       h('span', { class: `chip chip--${r.element}`, text: ELEMENT_NAMES[r.element] }),
-      h('span', { class: 'dex-detail-role', text: r.role }),
+      h('span', { class: 'dex-detail-role', text: ROLE_NAMES[r.role] }),
       h('span', { class: 'dex-detail-rarity', text: RARITY_NAMES[r.rarity] }),
     ),
     // この個体を開いているなら、種の基準値より先に手元の状態を出す
@@ -47,7 +47,7 @@ export function revosDetailBody(defId: string, opts: RevosDetailOpts = {}): HTML
       : null,
     h('p', { class: 'dex-flavor', text: r.flavor }),
     h('div', { class: 'dex-stats' },
-      ...([['HP', r.hp], ['ATK', r.atk], ['DEF', r.def], ['SPD', r.spd]] as const).map(([k, v]) =>
+      ...([['体力', r.hp], ['攻撃', r.atk], ['防御', r.def], ['速度', r.spd]] as const).map(([k, v]) =>
         h('div', { class: 'dex-stat' },
           h('span', { class: 'label', text: k }),
           h('span', { class: 'num', text: String(v) }),
@@ -59,7 +59,7 @@ export function revosDetailBody(defId: string, opts: RevosDetailOpts = {}): HTML
       h('span', { text: r.passive.desc }),
     ),
     h('div', { class: 'dex-skill' },
-      h('b', { class: 'od', text: `OD · ${r.od.name}` }),
+      h('b', { class: 'od', text: `必殺 · ${r.od.name}` }),
       h('span', { text: r.od.desc }),
     ),
     owned

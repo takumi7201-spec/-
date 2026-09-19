@@ -48,7 +48,7 @@ export class DebugScreen extends Screen {
     const strip = h('div', { class: 'status-strip' },
       button('‹', () => { audio.uiBack(); this.onBack?.(); }, { class: 'btn--sm btn--ghost' }),
       h('div', { class: 'screen-title', text: 'デバッグ' }),
-      h('div', { class: 'dbg-stamp', text: 'DEBUG' }),
+      h('div', { class: 'dbg-stamp' }, h('span', { text: '検 証' })),
     );
     this.bodyEl = h('div', { class: 'dbg-body' });
     this.el.append(strip, this.bodyEl);

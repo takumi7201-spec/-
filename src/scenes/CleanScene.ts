@@ -92,7 +92,8 @@ export class CleanScene {
   constructor(quality: QualitySettings) {
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.05, 40);
     this.camera.position.set(0, 0, 2.3);
-    this.scene.background = new THREE.Color(0x46352a);
+    // 昼の作業台。UI が明るい面でできているので、地も明るい側へ寄せる
+    this.scene.background = new THREE.Color(0xdfd3b6);
 
     // 作業面なので、太陽の代わりに「作業灯」を3灯置く。
     // 影の落ち方より、凹凸が読めることを優先する
@@ -102,7 +103,7 @@ export class CleanScene {
     const rim = new THREE.DirectionalLight(0x88a8d0, 1.2);
     rim.position.set(-1.6, 0.6, -1.4);
     this.scene.add(rim);
-    this.scene.add(new THREE.HemisphereLight(0xd8e4f0, 0x4a3a28, 1.25));
+    this.scene.add(new THREE.HemisphereLight(0xeef3f7, 0xb5a488, 1.35));
 
     this.material = createVoxelMaterial({
       voxelSize: VOX,
