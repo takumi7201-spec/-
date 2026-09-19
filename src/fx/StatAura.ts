@@ -2,7 +2,11 @@ import * as THREE from 'three';
 import { spriteUrl } from './SpriteUnit';
 
 /**
- * バフが乗った瞬間に重ねる、立ち上がる火の粉。
+ * ステータスが動いた瞬間に重ねる粒子。
+ *
+ * 上がったときは立ち上がる橙の火の粉、下がったときは降りてくる青の粒。
+ * 向きと色が逆なので、色が見えなくても——倍速で1コマしか見えなくても——
+ * どちらが起きたのか判別できる。
  *
  * 素材は 32×32 ドットを10コマ。GIF のままでは three のテクスチャとして
  * コマが進まないので、横一列のシートに焼いて UV をずらす。ドット絵なので
@@ -10,8 +14,12 @@ import { spriteUrl } from './SpriteUnit';
  * 混ざる（10コマぶんが1枚の帯に並んでいる）のを避ける。
  *
  * ユニットに追従させる。数値は出た場所に置き去りでいいが、こちらは
- * 体にまとうものなので、突進中に置き去りにされると「誰が強くなったのか」
+ * 体にまとうものなので、突進中に置き去りにされると「誰に何が起きたのか」
  * が読めなくなる。
+ *
+ * バフとデバフで1つずつ持つ。同じ行動で両方が飛ぶことがある（風蝕嵐は
+ * 味方を強化しないが、跳襲のように敵に付けるものと味方への支援が
+ * 同じターンに重なる編成はある）ので、間引きも別勘定にしたい。
  */
 
 const FRAMES = 10;
@@ -28,7 +36,7 @@ interface Entry {
   life: number;
 }
 
-export class BuffAura {
+export class StatAura {
   readonly group = new THREE.Group();
   private base: THREE.Texture;
   private pool: Entry[] = [];
@@ -37,8 +45,8 @@ export class BuffAura {
   private lastAt = new Map<string, number>();
   private clock = 0;
 
-  constructor(private max = 12) {
-    this.base = new THREE.TextureLoader().load(spriteUrl('fx-buff'));
+  constructor(sheet: string, private max = 12) {
+    this.base = new THREE.TextureLoader().load(spriteUrl(sheet));
     this.base.colorSpace = THREE.SRGBColorSpace;
     this.base.magFilter = THREE.NearestFilter;
     this.base.minFilter = THREE.NearestFilter;
@@ -52,8 +60,8 @@ export class BuffAura {
    * 1枚出す。
    *
    * 同じユニットに同じ瞬間へ何度も要求が来る——制空覇道は SPD と DEF で
-   * 2件、それが味方3体ぶん同時に飛ぶ——ので、ユニット単位で間引く。
-   * 重ねても濃くなるだけで、情報は増えない。
+   * 2件、それが味方3体ぶん同時に飛ぶ。風蝕嵐も敵3体に同時に乗る——ので、
+   * ユニット単位で間引く。重ねても濃くなるだけで、情報は増えない。
    */
   spawn(uid: string, follow: THREE.Object3D, opts: { height?: number; scale?: number } = {}): void {
     const last = this.lastAt.get(uid);
@@ -101,10 +109,10 @@ export class BuffAura {
       /*
        * 加算ではなく通常合成。
        *
-       * 火の粉は光なので加算が素直に見えるが、この game の地面は砂と紙の
-       * 明るい色で、そこに橙を足しても白へ寄るだけでほとんど見えない。
-       * 元の GIF が持っている橙と赤をそのまま出したほうが、明るい背景の
-       * 上で形が残る。
+       * 粒子は光なので加算が素直に見えるが、この game の地面は砂と紙の
+       * 明るい色で、そこに色を足しても白へ寄るだけでほとんど見えない。
+       * 元の GIF が持っている色をそのまま出したほうが、明るい背景の
+       * 上で形が残る。青はとくに加算だと消し飛ぶ。
        */
       blending: THREE.NormalBlending,
     }));

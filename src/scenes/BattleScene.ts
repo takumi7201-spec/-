@@ -7,7 +7,7 @@ import { createVoxelMaterial, type VoxelMaterial } from '../shaders/VoxelMateria
 import { SpriteUnit, SpriteAnimator, type SpriteState } from '../fx/SpriteUnit';
 import { Environment } from '../fx/Environment';
 import { DebrisSystem } from '../fx/Debris';
-import { BuffAura } from '../fx/BuffAura';
+import { StatAura } from '../fx/StatAura';
 import { DamageNumbers } from '../fx/DamageNumbers';
 import { getRevos } from '../game/data/revos';
 import type { Fighter, Row, Side } from '../game/battle/types';
@@ -57,7 +57,8 @@ export class BattleScene {
   private arenaMaterial: VoxelMaterial;
   private debris: DebrisSystem;
   readonly numbers = new DamageNumbers(28);
-  private buffAura = new BuffAura(12);
+  private buffAura = new StatAura('fx-buff', 12);
+  private debuffAura = new StatAura('fx-debuff', 12);
   private arena?: THREE.Mesh;
 
   private camPos = new THREE.Vector3();
@@ -99,6 +100,7 @@ export class BattleScene {
     this.scene.add(this.debris.mesh);
     this.scene.add(this.numbers.group);
     this.scene.add(this.buffAura.group);
+    this.scene.add(this.debuffAura.group);
 
     this.camPos.set(0, 8.6, 15.8);
     this.camLook.set(0, 1.2, -0.3);
@@ -209,6 +211,7 @@ export class BattleScene {
 
   private clearUnits(): void {
     this.buffAura.clear();
+    this.debuffAura.clear();
     for (const u of this.units.values()) {
       this.scene.remove(u.unit.root);
       u.unit.dispose();
@@ -253,16 +256,18 @@ export class BattleScene {
   }
 
   /**
-   * ステータスが上がったユニットに火の粉を重ねる。
+   * ステータスが動いたユニットに粒子を重ねる。up なら火の粉、
+   * そうでなければ降りてくる青。
    *
    * 数値を出さないのは、これが「量」ではなく「乗った」を伝える合図だから。
-   * 実際の増分はカードの数値が引き受ける——両方を出すと、1行動のあいだに
-   * 6件のバフが飛ぶ編成（制空覇道）で画面が数字で埋まる。
+   * 実際の増減はカードの数値が引き受ける——両方を出すと、1行動のあいだに
+   * 6件のバフが飛ぶ編成（制空覇道）や、敵3体に同時に乗るデバフ（風蝕嵐）で
+   * 画面が数字で埋まる。
    */
-  buff(uid: string): void {
+  statChange(uid: string, up: boolean): void {
     const u = this.units.get(uid);
     if (!u || !u.alive) return;
-    this.buffAura.spawn(uid, u.unit.root, {
+    (up ? this.buffAura : this.debuffAura).spawn(uid, u.unit.root, {
       height: u.unit.spriteHeight * 0.5,
       scale: u.unit.spriteHeight * 1.25,
     });
@@ -383,6 +388,7 @@ export class BattleScene {
     this.debris.update(sdt, -0.4);
     this.numbers.update(dt);
     this.buffAura.update(sdt);
+    this.debuffAura.update(sdt);
     this.env.update(dt, this.camera.position);
     this.updateCamera(dt);
   }
@@ -437,6 +443,7 @@ export class BattleScene {
     this.debris.dispose();
     this.numbers.dispose();
     this.buffAura.dispose();
+    this.debuffAura.dispose();
     this.env.dispose();
     this.arenaMaterial.dispose();
   }
