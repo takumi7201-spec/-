@@ -6,6 +6,8 @@ import type { DigScene } from '../../scenes/DigScene';
 import type { BuriedNode } from '../../game/TerrainGen';
 import { AREA_VOX, VOXEL_SIZE } from '../../game/TerrainGen';
 import { REVOS_BY_ID } from '../../game/data/revos';
+import { BIOMES } from '../../voxel/palette';
+import { screenHead, plate, railButton, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
 /**
@@ -18,7 +20,6 @@ import { audio } from '../../core/Audio';
  */
 export class DigScreen extends Screen {
   private staminaBar = bar('bar--hp', 1);
-  private depthEl!: HTMLElement;
   private findsEl!: HTMLElement;
   private echoBtn!: HTMLButtonElement;
   private echoFill!: HTMLElement;
@@ -31,6 +32,13 @@ export class DigScreen extends Screen {
   private mapTimer = 0;
   private echoRemain = 0;
   private mapRange: { lo: number; hi: number } | null = null;
+  private depthPlate = plate('深度', { tone: 'mint' });
+  private siteEl!: HTMLElement;
+  private echoCardEl!: HTMLElement;
+  private echoHeadEl!: HTMLElement;
+  private echoNoteEl!: HTMLElement;
+  private staminaNumEl!: HTMLElement;
+  private sweepEl!: HTMLElement;
 
   private inv = new InventoryPanel();
   private save: SaveData | null = null;
@@ -51,28 +59,53 @@ export class DigScreen extends Screen {
   }
 
   build(): void {
-    // ---- L1: 上端ステータス ----
-    const strip = h('div', { class: 'status-strip' },
-      button('‹', () => this.onExit?.(), { class: 'btn--sm btn--ghost' }),
-      h('div', { class: 'stat-group' },
-        h('div', { class: 'label', text: '体 力' }),
-        this.staminaBar.el,
+    // ---- L1: 頭。現場の名前と深度 ----
+    this.siteEl = h('div', { class: 'scr-title' });
+    this.depthPlate.set('0.0');
+    const strip = screenHead({
+      eyebrow: '発掘現場', title: '',
+      onBack: () => this.onExit?.(),
+      right: this.depthPlate.el,
+    });
+    strip.querySelector('.scr-title')?.replaceWith(this.siteEl);
+
+    // ---- L1: 体力。白い板を1枚、頭のすぐ下に ----
+    this.staminaNumEl = h('span', { class: 'num dig-card-num', text: '0 / 0' });
+    this.findsEl = h('span', { class: 'num dig-card-num', text: '0 / 0' });
+    const staminaCard = h('div', { class: 'dig-card dig-stamina' },
+      h('div', { class: 'dig-card-head' },
+        h('span', { class: 'dig-card-label', text: spaced('体力') }),
+        this.staminaNumEl,
+        h('span', { class: 'dig-card-label dig-card-label--r', text: spaced('発見') }),
+        this.findsEl,
       ),
-      h('div', { class: 'stat-col' },
-        h('div', { class: 'label', text: '深 度' }),
-        (this.depthEl = h('div', { class: 'num stat-num', text: '0.0m' })),
-      ),
-      h('div', { class: 'stat-col' },
-        h('div', { class: 'label', text: '発 見' }),
-        (this.findsEl = h('div', { class: 'num stat-num', text: '0/0' })),
-      ),
+      this.staminaBar.el,
     );
 
-    // ---- L1: 右レール（ミニマップ）----
+    // ---- L1: 反響の結果。出るときだけ出す ----
+    this.echoHeadEl = h('div', { class: 'echo-card-head' });
+    this.echoNoteEl = h('div', { class: 'echo-card-note' });
+    this.echoCardEl = h('div', { class: 'echo-card', hidden: true }, this.echoHeadEl, this.echoNoteEl);
+
+    // ---- L1: レーダー。同心円と掃引線。画面の中心に置く ----
+    this.sweepEl = h('i', { class: 'radar-sweep' });
+    const radar = h('div', { class: 'radar' },
+      h('i', { class: 'radar-ring radar-ring--1' }),
+      h('i', { class: 'radar-ring radar-ring--2' }),
+      h('i', { class: 'radar-ring radar-ring--3' }),
+      this.sweepEl,
+    );
+
+    // ---- L1: 右レール（ミニマップ）と道具 ----
     this.minimap = h('canvas', { class: 'minimap', width: '176', height: '176' });
     this.mapCtx = this.minimap.getContext('2d');
     const rail = h('div', { class: 'rail rail--r' },
       h('div', { class: 'minimap-wrap panel panel--sunk' }, this.minimap),
+      h('div', { class: 'rail-col dig-tools' },
+        railButton('▤', '持ち物', () => this.toggleInventory()).el,
+        railButton('◎', '俯瞰', () => this.toggleScan()).el,
+        railButton('↥', '引き上げる', () => this.leave()).el,
+      ),
     );
 
     // ---- スキャンモードの枠（モードに入ったことを隠さない）----
@@ -88,44 +121,62 @@ export class DigScreen extends Screen {
     this.stickKnob = h('div', { class: 'stick-knob' });
     this.stickEl = h('div', { class: 'stick' }, h('div', { class: 'stick-ring' }), this.stickKnob);
 
-    // ---- L2: 親指デッキ ----
+    // ---- L2: 親指デッキ。左は移動の受け皿、右は探査と掘削 ----
     this.echoFill = h('i', { class: 'cd-fill' });
     this.echoBtn = button('反響', () => this.fireEcho(), { class: 'btn--round btn--echo' });
     this.echoBtn.appendChild(h('div', { class: 'cd-ring' }, this.echoFill));
 
     this.digBtn = button('掘る', () => this.scene.requestDig(), { class: 'btn--round btn--dig' });
 
+    // 動かす指の定位置。触れば実際のスティックがそこに出るが、
+    // 何も置かないと「どこを触れば動くのか」が分からない
+    const moveRest = h('div', { class: 'move-rest' },
+      h('i', { class: 'move-rest-knob' }),
+      h('span', { class: 'move-rest-label', text: '移動' }),
+    );
+
     const deck = h('div', { class: 'deck deck--dig' },
-      h('div', { class: 'deck-left' },
-        button('持ち物', () => this.toggleInventory(), { class: 'btn--sm btn--ghost', key: 'I' }),
-        button('俯瞰', () => this.toggleScan(), { class: 'btn--sm btn--ghost', key: 'Q' }),
-        button('引き上げる', () => this.leave(), { class: 'btn--sm btn--ghost' }),
-      ),
+      moveRest,
       h('div', { class: 'deck-right' }, this.echoBtn, this.digBtn),
     );
 
-    this.el.append(strip, rail, this.scanFrame, this.stickEl, this.inv.el, deck);
+    this.el.append(strip, staminaCard, this.echoCardEl, radar, rail, this.scanFrame, this.stickEl, this.inv.el, deck);
   }
 
   enter(): void {
+    this.siteEl.textContent = BIOMES[this.scene.biomeId]?.name ?? '発掘現場';
+    // 初期値はイベント待ちにしない。最初の1回が来るまで 0/0 が出てしまう
+    this.staminaBar.set(this.scene.stamina / Math.max(1, this.scene.staminaMax));
+    this.staminaNumEl.textContent =
+      `${Math.ceil(this.scene.stamina)} / ${Math.round(this.scene.staminaMax)}`;
+    this.depthPlate.set('0.0');
     this.scene.events.onStaminaChange = (v, max) => {
       this.staminaBar.set(v / max);
+      this.staminaNumEl.textContent = `${Math.ceil(v)} / ${Math.round(max)}`;
       if (v === 0) {
         this.ui.toast('スタミナ切れ。引き上げます', 'warn');
         setTimeout(() => this.onFinish?.(), 1200);
       }
     };
     this.scene.events.onDepthChange = (m) => {
-      this.depthEl.textContent = `${m.toFixed(1)}m`;
+      this.depthPlate.set(m.toFixed(1));
     };
+    // 反響の結果はトーストで流さず、画面に残す。
+    // 掘る場所を決めるための情報なので、消えては使えない
     this.scene.events.onEcho = (hits) => {
+      clear(this.echoHeadEl);
       if (hits.length === 0) {
-        this.ui.toast('反応なし', 'info', 1600);
-        return;
+        this.echoHeadEl.textContent = '反応なし';
+        this.echoNoteEl.textContent = 'ここには何も無い';
+      } else {
+        const s = hits[0].strength;
+        const word = s === 3 ? '至近' : s === 2 ? '近い' : '遠い';
+        this.echoHeadEl.append(
+          '反響 · ', h('span', { class: 'num', text: String(hits.length) }), ' 件',
+        );
+        this.echoNoteEl.textContent = `最寄りは${word}`;
       }
-      const s = hits[0].strength;
-      const word = s === 3 ? '至近' : s === 2 ? '近い' : '遠い';
-      this.ui.toast(`反応 ${hits.length}件 — 最寄りは${word}`, 'info', 2200);
+      this.echoCardEl.hidden = false;
     };
     this.scene.events.onFossilTouched = (n) => {
       this.ui.toast(n.kind === 'fossil' ? '化石を掘り当てた' : '鉱石を掘り当てた', 'info');
@@ -152,6 +203,7 @@ export class DigScreen extends Screen {
       this.echoBtn.classList.toggle('is-cooling', remain > 0);
     };
     this.mapRange = null;
+    this.echoCardEl.hidden = true;
     this.haul = [];
     this.inv.close();
     this.el.classList.remove('inv-open');
@@ -177,7 +229,7 @@ export class DigScreen extends Screen {
   private updateFinds(): void {
     const total = this.scene.site?.nodes.length ?? 0;
     const got = total - (this.scene.remainingFinds ?? 0);
-    this.findsEl.textContent = `${got}/${total}`;
+    if (this.findsEl) this.findsEl.textContent = `${got} / ${total}`;
   }
 
   private fireEcho(): void {

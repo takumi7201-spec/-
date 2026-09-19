@@ -24,6 +24,7 @@ import { EventScreen } from './ui/screens/EventScreen';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
+import { DetailScreen } from './ui/screens/DetailScreen';
 import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
 import {
@@ -101,7 +102,8 @@ async function main(): Promise<void> {
   const stockScreen = new StockScreen();
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, stockScreen, profileScreen, debugScreen, resultScreen]) {
+  const detailScreen = new DetailScreen();
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -149,7 +151,6 @@ async function main(): Promise<void> {
     renderer.setScene(dig.scene, dig.camera);
     renderer.invalidateShadows();
     await progress(1, '準備完了');
-    digScreen.setSave(data);
     ui.show('dig');
     audio.startMusic('dig');
     setTimeout(() => boot.classList.add('hidden'), 240);
@@ -228,6 +229,24 @@ async function main(): Promise<void> {
       case 'profile': profileScreen.setData(data); ui.show('profile'); break;
       case 'title': ui.show('title'); break;
     }
+  };
+
+  // 詳細は1枚の画面。どこから開いたかを覚えて、閉じたらそこへ戻す
+  dexScreen.onDetail = (defId) => {
+    ui.show('detail', {
+      defId,
+      owned: data.roster.filter((u) => u.defId === defId),
+      back: () => { dexScreen.setData(data); ui.show('dex'); },
+      onEquip: () => { partyScreen.setData(data); ui.show('party'); },
+    });
+  };
+  partyScreen.onDetail = (defId, unit) => {
+    ui.show('detail', {
+      defId,
+      unit,
+      owned: data.roster.filter((u) => u.defId === defId),
+      back: () => { partyScreen.setData(data); ui.show('party'); },
+    });
   };
 
   digScreen.setSave(data);
@@ -381,9 +400,13 @@ async function main(): Promise<void> {
     if (winner === 0 && !ev) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
     writeSave(data);
     showResult({
+      eyebrow: '戦闘終了',
       title: winner === 0 ? '勝 利' : winner === 1 ? '敗 北' : '引 き 分 け',
-      subtitle: ev ? `${ev.name} — ${player?.sim.turnCount ?? 0} 行動` : `${player?.sim.turnCount ?? 0} 行動`,
+      subtitle: ev
+        ? `${ev.name} — ${player?.sim.turnCount ?? 0} 手で決着`
+        : `ステージ ${data.stageProgress} — ${player?.sim.turnCount ?? 0} 手で決着`,
       good: winner === 0,
+      cast: setup?.members.map((m) => m.defId) ?? [],
       rows,
     });
   };

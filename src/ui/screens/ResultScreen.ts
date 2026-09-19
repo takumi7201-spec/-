@@ -1,6 +1,8 @@
 import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
 import { audio } from '../../core/Audio';
+import { revosIcon } from '../revosIcon';
+import { spaced } from '../chrome';
 
 export interface ResultRow {
   label: string;
@@ -13,6 +15,10 @@ export interface ResultData {
   subtitle?: string;
   rows: ResultRow[];
   good: boolean;
+  /** 勝敗の上に置く小札。省略すると出さない */
+  eyebrow?: string;
+  /** 出撃した面々。居れば題の下に並べる */
+  cast?: string[];
 }
 
 /**
@@ -23,8 +29,11 @@ export interface ResultData {
  * ボタンは演出完了まで無効化しない（「押せるのに反応しない」を作らない）。
  */
 export class ResultScreen extends Screen {
+  private eyebrowEl!: HTMLElement;
   private titleEl!: HTMLElement;
+  private dashEl!: HTMLElement;
   private subEl!: HTMLElement;
+  private castEl!: HTMLElement;
   private rowsEl!: HTMLElement;
   private timers: number[] = [];
 
@@ -34,30 +43,48 @@ export class ResultScreen extends Screen {
   constructor() { super('result'); }
 
   build(): void {
+    this.eyebrowEl = h('div', { class: 'result-eyebrow' });
     this.titleEl = h('div', { class: 'result-title' });
+    // 短い線3本。勝敗の下の区切りで、意味は持たせない
+    this.dashEl = h('div', { class: 'result-dash' }, h('i', { class: 'is-on' }), h('i'), h('i'));
     this.subEl = h('div', { class: 'result-sub' });
+    this.castEl = h('div', { class: 'result-cast' });
     this.rowsEl = h('div', { class: 'result-rows' });
 
-    const card = h('div', { class: 'result-card' }, this.titleEl, this.subEl, this.rowsEl);
+    const card = h('div', { class: 'result-card' },
+      this.eyebrowEl, this.titleEl, this.dashEl, this.subEl, this.castEl, this.rowsEl,
+    );
     const deck = h('div', { class: 'deck deck--result' },
-      button('もう一度', () => { audio.uiTap(); this.onAgain?.(); }, { class: 'btn--ghost' }),
-      button('拠点へ', () => { audio.uiConfirm(); this.onNext?.(); }, { class: 'btn--primary' }),
+      button('もう一度', () => { audio.uiTap(); this.onAgain?.(); }, { class: 'btn--ghost result-again' }),
+      button('拠点へ', () => { audio.uiConfirm(); this.onNext?.(); }, { class: 'btn--primary result-next' }),
     );
 
     // 画面のどこでも触れたら演出を飛ばす
     const skip = h('div', { class: 'result-skip interactive', 'data-ui-block': '' });
     skip.addEventListener('pointerdown', () => this.revealAll());
 
-    this.el.append(skip, h('div', { class: 'result-wrap' }, card), deck);
+    this.el.append(h('div', { class: 'result-rays' }), skip, h('div', { class: 'result-wrap' }, card), deck);
   }
 
   enter(params?: unknown): void {
     const d = params as ResultData | undefined;
     if (!d) return;
     this.clearTimers();
+    this.eyebrowEl.textContent = spaced(d.eyebrow ?? '');
+    this.eyebrowEl.hidden = !d.eyebrow;
     this.titleEl.textContent = d.title;
     this.titleEl.classList.toggle('is-bad', !d.good);
+    this.el.classList.toggle('is-bad', !d.good);
     this.subEl.textContent = d.subtitle ?? '';
+    // 出撃した面々。数字の列より先に、誰が戦ったかを見せる
+    clear(this.castEl);
+    const cast = d.cast ?? [];
+    cast.slice(0, 3).forEach((id, i) => {
+      this.castEl.appendChild(h('div', { class: `result-cast-slot ${i === 1 ? 'is-lead' : ''}` },
+        revosIcon(id, 'result-cast-img'),
+      ));
+    });
+    this.castEl.hidden = cast.length === 0;
     clear(this.rowsEl);
 
     d.rows.forEach((r, i) => {

@@ -448,19 +448,6 @@ html, body {
 }
 
 /* L1: 上端の常時情報。地の明るさを殺さないよう、ごく薄くだけ敷く */
-.status-strip {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  padding: calc(var(--safe-t) + 10px) calc(var(--gutter) + var(--safe-l)) 10px
-    calc(var(--gutter) + var(--safe-r));
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(231, 221, 200, 0.94) 0 46%, rgba(231, 221, 200, 0) 100%);
-}
-.status-strip > .interactive { pointer-events: auto; }
-
 .rail {
   position: absolute;
   pointer-events: none;
@@ -469,7 +456,11 @@ html, body {
   gap: 8px;
 }
 .rail--l { left: calc(var(--gutter) + var(--safe-l)); top: 50%; transform: translateY(-50%); }
-.rail--r { right: calc(var(--gutter) + var(--safe-r)); top: 96px; }
+.rail--r {
+  right: calc(var(--gutter) + var(--safe-r));
+  top: calc(var(--safe-t) + var(--head-h) + 74px);
+  align-items: flex-end;
+}
 
 /* L2: 親指デッキ。ページの下端 */
 .deck {
@@ -675,3 +666,192 @@ body[data-layout='tower'] .side-only { display: none; }
 }
 
 :focus-visible { outline: 2.5px solid var(--pen-red); outline-offset: 2px; }
+
+/* =========================================================================
+   画面のシャーシ
+   アートボードで決めた構造。各画面はこれを並べるだけにする
+   ========================================================================= */
+
+/* ---- 画面の頭 ---- */
+.scr-head {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: calc(var(--safe-t) + 14px) calc(var(--gutter) + var(--safe-r)) 10px
+    calc(var(--gutter) + var(--safe-l));
+  display: flex; align-items: center; gap: 10px;
+  pointer-events: none;
+  z-index: 3;
+}
+/* 3D の上に載る画面では、地の明るさが保証されない。
+   頭の後ろにだけ霞を敷いて、題と札が沈まないようにする */
+.scr-head::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(231, 221, 200, 0.94) 0 52%, rgba(231, 221, 200, 0) 100%);
+  pointer-events: none;
+}
+.scr-head > * { position: relative; pointer-events: auto; }
+.scr-head-main { flex: 1; min-width: 0; pointer-events: none; }
+.scr-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 0.3em; color: var(--pen-brown); }
+.scr-title { font-size: 19px; font-weight: 900; line-height: 1.15; }
+/* 頭の高さぶん、本文はここから始める */
+:root { --head-h: 66px; }
+
+/* ---- 傾いた黒い札 ---- */
+.plate {
+  flex: none;
+  transform: skewX(var(--skew));
+  background: var(--plate);
+  border-radius: var(--r-md);
+  padding: 6px 14px;
+  box-shadow: var(--lift-1);
+}
+.plate-inner { transform: skewX(var(--unskew)); text-align: right; }
+.plate-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: var(--on-plate-dim); }
+.plate-value {
+  font-family: var(--font-num); font-weight: 700; font-size: 19px; line-height: 1.1;
+  color: var(--on-plate);
+}
+.plate-value--amber { color: var(--hl-amber); }
+.plate-value--mint { color: #6fe0da; }
+.plate-sub { font-size: 9px; font-weight: 700; color: #d6cdb9; }
+
+/* ---- 身分 ---- */
+.ident { position: relative; flex: none; }
+.ident-frame {
+  width: 58px; height: 58px; padding: 2px;
+  background: linear-gradient(135deg, var(--hl-mint), #8fe0d2);
+  border-radius: 13px;
+  box-shadow: 0 5px 14px rgba(63, 194, 190, 0.34);
+}
+.ident-face {
+  width: 100%; height: 100%; border-radius: 11px;
+  background: var(--paper-card);
+  display: grid; place-items: center; overflow: hidden;
+}
+.ident-face > * { width: 52px; height: 52px; }
+.ident-grade {
+  position: absolute; left: 2px; bottom: -8px;
+  padding: 1px 8px; border-radius: 5px;
+  background: var(--ink);
+  box-shadow: 0 3px 8px rgba(42, 37, 30, 0.32);
+  white-space: nowrap;
+}
+.ident-grade-label {
+  font-size: 8px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--on-plate-dim); margin-right: 3px;
+}
+.ident-grade-num { font-size: 12px; color: var(--on-plate); }
+
+/* ---- 傾いた帯 ---- */
+.banner {
+  display: flex; align-items: center; overflow: hidden;
+  width: 100%; height: 58px; padding: 0; border: 0;
+  transform: skewX(var(--skew));
+  background: linear-gradient(100deg, rgba(42, 37, 30, 0.9), rgba(62, 56, 46, 0.76));
+  border-radius: 13px;
+  box-shadow: 0 7px 20px rgba(72, 58, 36, 0.26);
+  min-height: 0;
+}
+.banner:active { transform: skewX(var(--skew)) translateY(2px); }
+.banner-inner {
+  transform: skewX(var(--unskew));
+  padding-left: 18px; flex: 1; min-width: 0; text-align: left;
+}
+.banner-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 0.3em; color: var(--on-plate-dim); }
+.banner-value {
+  font-size: 18px; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--on-plate); line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 右端の耳。達成率はここだけに出す */
+.banner-cap {
+  width: 66px; height: 100%; flex: none;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--hl-mint), #8fe0d2);
+  font-size: 17px; font-weight: 700; color: #16302f;
+}
+.banner-dots { display: flex; gap: 4px; justify-content: center; margin-top: 6px; }
+.banner-dots > i { width: 6px; height: 3px; border-radius: 2px; background: rgba(42, 37, 30, 0.24); }
+.banner-dots > i.is-on { width: 15px; background: rgba(42, 37, 30, 0.62); }
+
+/* ---- 左の丸列 ---- */
+.rail-col { display: flex; flex-direction: column; gap: 9px; }
+.rail-btn { position: relative; }
+.rail-alert {
+  position: absolute; right: -2px; top: -2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--hl-rose); color: #fff6f4;
+  border: 2px solid var(--haze);
+  font-family: var(--font-num); font-size: 10px; font-weight: 700;
+  display: grid; place-items: center; line-height: 1;
+}
+
+/* ---- 右の色札 ---- */
+.card-col { display: flex; flex-direction: column; gap: 13px; }
+.card-slot { position: relative; text-align: center; }
+.card-btn {
+  width: 60px; height: 60px; min-width: 60px; min-height: 60px;
+  padding: 0; border: 0; border-radius: 15px;
+  font-family: var(--font-num); font-size: 23px; font-weight: 600;
+}
+.card-btn--rose { background: linear-gradient(160deg, #ff7a62, var(--hl-rose)); color: #fff3ef; box-shadow: 0 6px 16px rgba(232, 80, 60, 0.38); }
+.card-btn--amber { background: linear-gradient(160deg, #ffd264, #f0b02a); color: #3a2a08; box-shadow: 0 6px 16px rgba(240, 176, 42, 0.38); }
+.card-btn--mint { background: linear-gradient(160deg, #7fe3de, var(--hl-mint)); color: #14403e; box-shadow: 0 6px 16px rgba(63, 194, 190, 0.38); }
+.card-btn--dim { background: rgba(46, 41, 34, 0.34); color: rgba(247, 243, 232, 0.6); box-shadow: none; }
+.card-label {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.12em;
+  color: #453c31; margin-top: 4px;
+  text-shadow: 0 1px 2px rgba(240, 232, 214, 0.7);
+}
+.card-badge {
+  position: absolute; right: -3px; top: -4px;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--hl-rose); color: #fff6f4;
+  border: 2px solid var(--haze);
+  font-size: 10px; font-weight: 700;
+  display: grid; place-items: center; line-height: 1;
+}
+
+/* ---- 下タブ ---- */
+.tabbar {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 0 calc(8px + var(--safe-l)) calc(var(--safe-b) + 14px) calc(8px + var(--safe-r));
+  display: flex; align-items: flex-end; gap: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+.tabbar > * { pointer-events: auto; }
+.tab {
+  position: relative;
+  flex: 1; min-width: 0;
+  height: 56px; min-height: 56px; padding: 0;
+  border: 0; border-radius: 13px;
+  transform: skewX(var(--skew));
+  background: rgba(46, 41, 34, 0.8);
+  color: #d6cdb9;
+  box-shadow: var(--lift-1);
+  transition: height var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.tab:active { transform: skewX(var(--skew)) translateY(2px); }
+/* 選択中は白く、背を高くする。色ではなく明るさと高さで「いま」を示す */
+.tab.is-on {
+  height: 70px; min-height: 70px;
+  background: var(--paper-card);
+  color: var(--ink);
+  box-shadow: 0 -2px 20px rgba(72, 58, 36, 0.26);
+}
+.tab-inner { transform: skewX(var(--unskew)); text-align: center; }
+.tab-icon { font-family: var(--font-num); font-size: 18px; font-weight: 600; line-height: 1; }
+.tab-label { font-size: 10px; font-weight: 900; letter-spacing: 0.14em; margin-top: 4px; }
+.tab-dots { position: absolute; right: 6px; top: 6px; display: flex; gap: 2px; }
+.tab-dots > i { width: 3px; height: 3px; border-radius: 50%; background: rgba(214, 205, 185, 0.4); }
+.tab.is-on .tab-dots > i { background: rgba(42, 37, 30, 0.2); }
+.tab-badge {
+  position: absolute; right: -2px; top: -5px;
+  transform: skewX(var(--unskew));
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--hl-rose); color: #fff6f4;
+  border: 2px solid #c7b48f;
+  font-size: 10px; font-weight: 700;
+  display: grid; place-items: center; line-height: 1;
+}

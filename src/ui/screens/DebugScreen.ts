@@ -8,6 +8,7 @@ import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
 import { revosDetailBody } from '../revosDetail';
+import { screenHead, spaced } from '../chrome';
 
 /**
  * デバッグモード。
@@ -45,11 +46,11 @@ export class DebugScreen extends Screen {
   setData(d: SaveData): void { this.data = d; this.render(); }
 
   build(): void {
-    const strip = h('div', { class: 'status-strip' },
-      button('‹', () => { audio.uiBack(); this.onBack?.(); }, { class: 'btn--sm btn--ghost' }),
-      h('div', { class: 'screen-title', text: 'デバッグ' }),
-      h('div', { class: 'dbg-stamp' }, h('span', { text: '検 証' })),
-    );
+    const strip = screenHead({
+      eyebrow: '検証用', title: 'デバッグ',
+      onBack: () => this.onBack?.(),
+      right: h('div', { class: 'dbg-stamp' }, h('span', { text: spaced('検証') })),
+    });
     this.bodyEl = h('div', { class: 'dbg-body' });
     this.el.append(strip, this.bodyEl);
   }

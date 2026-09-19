@@ -9,7 +9,7 @@ export type TargetPref = 'front' | 'back' | 'lowhp' | 'defense' | 'support';
 export const TARGET_PREFS: { id: TargetPref; name: string; desc: string }[] = [
   { id: 'front', name: '前衛優先', desc: '前に出ている敵から崩す' },
   { id: 'back', name: '後衛優先', desc: '奥の敵を狙う' },
-  { id: 'lowhp', name: '手負い優先', desc: 'HPの減った敵を仕留める' },
+  { id: 'lowhp', name: '手負い優先', desc: '体力の減った敵を仕留める' },
   { id: 'defense', name: '硬い敵優先', desc: '守りの厚い敵から削る' },
   { id: 'support', name: '支援役優先', desc: '回復・強化役を先に潰す' },
 ];
@@ -31,22 +31,22 @@ export interface Formation {
 
 export const FORMATIONS: Record<FormationId, Formation> = {
   wedge: {
-    id: 'wedge', name: '楔陣', desc: '前列 与ダメ +20%',
+    id: 'wedge', name: '楔陣', desc: '前列の与ダメージ +20%',
     frontDamage: 1.2, backHitRateBonus: 0.05, allDamageTaken: 1, allDamageDealt: 1,
     spdMul: 1, defMul: 1, startOd: 0, odGainMul: 1,
   },
   ring: {
-    id: 'ring', name: '環陣', desc: '被ダメ −12% 与ダメ −8%',
+    id: 'ring', name: '環陣', desc: '被ダメージ −12% / 与ダメージ −8%',
     frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 0.88, allDamageDealt: 0.92,
     spdMul: 1, defMul: 1, startOd: 0, odGainMul: 1,
   },
   rush: {
-    id: 'rush', name: '疾陣', desc: 'SPD +15% DEF −10%',
+    id: 'rush', name: '疾陣', desc: '速度 +15% / 防御 −10%',
     frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 1, allDamageDealt: 1,
     spdMul: 1.15, defMul: 0.9, startOd: 0, odGainMul: 1,
   },
   metro: {
-    id: 'metro', name: '律陣', desc: '開始OD +40 獲得 +15%',
+    id: 'metro', name: '律陣', desc: '開始 必殺 +40 / 獲得 +15%',
     frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 1, allDamageDealt: 1,
     spdMul: 1, defMul: 1, startOd: 40, odGainMul: 1.15,
   },

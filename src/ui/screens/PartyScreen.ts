@@ -6,7 +6,7 @@ import { FORMATIONS, TARGET_PREFS, type FormationId, type TargetPref } from '../
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
 import { revosIcon } from '../revosIcon';
-import { revosDetailBody } from '../revosDetail';
+import { screenHead, plate, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
 /**
@@ -28,8 +28,10 @@ export class PartyScreen extends Screen {
   private formation: FormationId = 'wedge';
   private prefs: TargetPref[] = ['front', 'front', 'front'];
   private selected: string | null = null;
+  private powerPlate = plate('戦力', { tone: 'amber' });
 
   onBack?: () => void;
+  onDetail?: (defId: string, unit: OwnedRevos) => void;
   onApply?: (order: [string, string, string], formation: FormationId, prefs: TargetPref[]) => void;
 
   constructor() { super('party'); }
@@ -60,10 +62,11 @@ export class PartyScreen extends Screen {
   }
 
   build(): void {
-    const strip = h('div', { class: 'status-strip' },
-      button('‹', () => { audio.uiBack(); this.onBack?.(); }, { class: 'btn--sm btn--ghost' }),
-      h('div', { class: 'screen-title', text: '編成' }),
-    );
+    const strip = screenHead({
+      eyebrow: '出撃編成', title: '編成',
+      onBack: () => this.onBack?.(),
+      right: this.powerPlate.el,
+    });
 
     this.slotsEl = h('div', { class: 'party-field' });
     this.totalEl = h('div', { class: 'party-total' });
@@ -74,17 +77,17 @@ export class PartyScreen extends Screen {
     const body = h('div', { class: 'party-body' },
       this.slotsEl,
       this.totalEl,
-      h('div', { class: 'label party-label', text: '陣形' }),
+      h('div', { class: 'label party-label', text: spaced('陣形') }),
       this.formEl,
-      h('div', { class: 'label party-label', text: '作戦' }),
+      h('div', { class: 'label party-label', text: spaced('作戦') }),
       this.tacticEl,
-      h('div', { class: 'label party-label', text: '手持ち' }),
+      h('div', { class: 'label party-label', text: spaced('手持ち') }),
       h('div', { class: 'party-hint', text: '長押しで詳細' }),
       this.rosterEl,
     );
 
     const deck = h('div', { class: 'deck deck--party' },
-      button('決定', () => this.apply(), { class: 'btn--primary btn--wide' }),
+      button(spaced('決定'), () => this.apply(), { class: 'btn--primary btn--wide' }),
     );
 
     this.el.append(strip, body, deck);
@@ -112,16 +115,22 @@ export class PartyScreen extends Screen {
           onLongPress: u ? () => this.openDetail(u) : undefined,
         },
       );
-      slot.append(h('span', { class: 'slot-label', text: labels[i] }));
+      slot.append(
+        h('span', { class: 'slot-dots' }, h('i'), h('i')),
+        h('span', { class: 'slot-label', text: spaced(labels[i]) }),
+      );
       if (u) {
         const def = getRevos(u.defId);
-        const mc = cleanMultiplier(u.clean);
         slot.append(
-          revosIcon(u.defId, 'slot-icon'),
-          h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
-          h('span', { class: 'slot-name', text: revosShortName(def.id) }),
-          h('span', { class: 'slot-sub num', text: `Lv${u.level} / ${cleanRank(u.clean)}ランク` }),
-          h('span', { class: 'slot-sub num', text: `ATK ${Math.round(def.atk * mc * (1 + 0.055 * (u.level - 1)))}` }),
+          h('span', { class: 'slot-art' }, revosIcon(u.defId, 'slot-icon')),
+          h('span', { class: 'slot-name', text: def.name }),
+          h('span', { class: 'slot-foot' },
+            h('i', { class: `dot dot--${def.element}` }),
+            h('span', { class: 'slot-sub' },
+              h('span', { class: 'num', text: String(u.level) }),
+              ` 級 · ${cleanRank(u.clean)}`,
+            ),
+          ),
         );
       } else {
         slot.append(h('span', { class: 'slot-empty', text: '＋' }));
@@ -144,12 +153,17 @@ export class PartyScreen extends Screen {
       elems.set(d.element, (elems.get(d.element) ?? 0) + 1);
     }
     clear(this.totalEl);
+    const cell = (k: string, v: number): HTMLElement =>
+      h('span', { class: 'total-cell' }, `${k} `, h('span', { class: 'num', text: String(v) }));
+    const dots = h('span', { class: 'total-elems' });
+    for (const [e, n] of elems) {
+      for (let i = 0; i < n; i++) dots.appendChild(h('i', { class: `dot dot--${e}` }));
+    }
     this.totalEl.append(
-      h('span', { class: 'num', text: `HP ${hp}` }),
-      h('span', { class: 'num', text: `ATK ${atk}` }),
-      h('span', { class: 'num', text: `DEF ${def}` }),
-      h('span', { class: 'total-elems', text: [...elems].map(([e, n]) => `${ELEMENT_NAMES[e as never]}×${n}`).join(' ') }),
+      h('span', { class: 'total-row' }, cell('体力', hp), cell('攻撃', atk), cell('防御', def)),
+      dots,
     );
+    this.powerPlate.set(String(hp + atk * 4 + def * 4));
 
     // ---- 作戦 ----
     // 誰を狙うかはスロットごとに決める。編成とセットで意味が出る決定なので、
@@ -160,7 +174,7 @@ export class PartyScreen extends Screen {
       const row = h('div', { class: 'tactic-row' });
       const head = h('div', { class: 'tactic-head' });
       if (u) {
-        head.append(revosIcon(u.defId, 'tactic-icon'), h('span', { class: 'tactic-name', text: revosShortName(u.defId) }));
+        head.append(revosIcon(u.defId, 'tactic-icon'), h('span', { class: 'tactic-name', text: getRevos(u.defId).name }));
       } else {
         head.append(h('span', { class: 'tactic-name dim', text: `スロット${i + 1}` }));
       }
@@ -171,7 +185,7 @@ export class PartyScreen extends Screen {
           audio.uiTap();
           this.prefs[i] = t.id;
           this.render();
-        }, { class: `btn--sm tactic-btn ${on ? 'is-on' : ''}` });
+        }, { class: `btn--sm tactic-btn ${on ? 'is-on' : 'btn--opt'}` });
         b.title = t.desc;
         b.disabled = !u;
         opts.appendChild(b);
@@ -185,7 +199,7 @@ export class PartyScreen extends Screen {
     clear(this.formEl);
     for (const f of Object.values(FORMATIONS)) {
       const b = button(f.name, () => { audio.uiTap(); this.formation = f.id; this.render(); }, {
-        class: `btn--sm form-btn ${this.formation === f.id ? 'is-on' : ''}`,
+        class: `btn--sm form-btn ${this.formation === f.id ? 'is-on' : 'btn--opt'}`,
         sub: f.desc,
       });
       this.formEl.appendChild(b);
@@ -219,11 +233,7 @@ export class PartyScreen extends Screen {
   private openDetail(u: OwnedRevos): void {
     audio.uiTap();
     navigator.vibrate?.(12);
-    const def = getRevos(u.defId);
-    this.ui.sheet(def.name, revosDetailBody(u.defId, {
-      unit: u,
-      owned: this.data.roster.filter((r) => r.defId === u.defId),
-    }));
+    this.onDetail?.(u.defId, u);
   }
 
   private tapSlot(i: number): void {

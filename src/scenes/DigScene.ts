@@ -46,6 +46,7 @@ export class DigScene {
   world!: VoxelWorld;
   mode: DigMode = 'explore';
   stamina = MAX_STAMINA;
+  readonly staminaMax = MAX_STAMINA;
   biomeId: BiomeId = 'canyon';
 
   private env: Environment;

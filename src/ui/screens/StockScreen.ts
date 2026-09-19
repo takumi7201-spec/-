@@ -6,6 +6,7 @@ import { ELEMENT_NAMES, type BiomeId } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
 import { revosDetailBody } from '../revosDetail';
+import { screenHead } from '../chrome';
 
 /**
  * 未精錬の化石の一覧。
@@ -46,11 +47,11 @@ export class StockScreen extends Screen {
 
   build(): void {
     this.countEl = h('div', { class: 'num dex-count', text: '0' });
-    const strip = h('div', { class: 'status-strip' },
-      button('‹', () => { audio.uiBack(); this.onBack?.(); }, { class: 'btn--sm btn--ghost' }),
-      h('div', { class: 'screen-title', text: '未精錬' }),
-      this.countEl,
-    );
+    const strip = screenHead({
+      eyebrow: '持ち帰り', title: '未精錬',
+      onBack: () => this.onBack?.(),
+      right: this.countEl,
+    });
     this.listEl = h('div', { class: 'stock-body' });
     this.el.append(strip, this.listEl);
   }

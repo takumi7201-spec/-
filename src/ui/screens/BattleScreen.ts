@@ -98,17 +98,16 @@ export class BattleScreen extends Screen {
     const allyRow = h('div', { class: 'ally-cards' });
     this.logEl = h('div', { class: 'battle-log', hidden: true });
 
-    this.speedBtn = button('×1', () => this.cycleSpeed(), { class: 'btn--sm' });
+    this.speedBtn = button('×1', () => this.cycleSpeed(), { class: 'btn--sm btn--speed' });
 
     const deck = h('div', { class: 'deck deck--battle' },
       h('div', { class: 'battle-deck-inner' },
         this.logEl,
         allyRow,
         h('div', { class: 'battle-controls' },
-          button('記録', () => this.toggleLog(), { class: 'btn--sm btn--ghost' }),
-          h('div', { class: 'spacer' }),
+          button('記録', () => this.toggleLog(), { class: 'btn--sm btn--ghost btn--log' }),
           this.speedBtn,
-          button('スキップ', () => this.skip(), { class: 'btn--sm btn--ghost' }),
+          button('早送り', () => this.skip(), { class: 'btn--sm btn--ghost btn--skip' }),
         ),
       ),
     );

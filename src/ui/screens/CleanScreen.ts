@@ -4,6 +4,7 @@ import type { CleanScene, ToolId } from '../../scenes/CleanScene';
 import { TOOLS } from '../../scenes/CleanScene';
 import type { CleanScore } from '../../game/FossilBlock';
 import { getRevos } from '../../game/data/revos';
+import { screenHead, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
 /**
@@ -23,6 +24,7 @@ export class CleanScreen extends Screen {
   private progressBar = bar('', 0);
   private progressText!: HTMLElement;
   private boneEl!: HTMLElement;
+  private boneNumEl!: HTMLElement;
   private nameEl!: HTMLElement;
   private surface!: HTMLElement;
   private toolBtns = new Map<ToolId, HTMLButtonElement>();
@@ -45,31 +47,47 @@ export class CleanScreen extends Screen {
   constructor(private scene: CleanScene) { super('clean'); }
 
   build(): void {
-    // ---- 情報ストリップ（手の外側に固定）----
-    this.timeEl = h('div', { class: 'num clean-time', text: '1:00' });
-    this.progressText = h('span', { class: 'num', text: '0%' });
-    this.boneEl = h('div', { class: 'clean-bone' });
-    this.nameEl = h('div', { class: 'clean-name', text: '' });
+    // ---- 頭。題は化石の名前、右端に残り時間 ----
+    this.timeEl = h('div', { class: 'plate-value num', text: '1:00' });
+    this.nameEl = h('div', { class: 'scr-title' });
+    // 戻るは置かない。この画面を途中で抜けると化石をどう扱うかの規則が要る。
+    // 抜け道は「ここで終える」の1つに絞り、そこで必ず採点する
+    const head = screenHead({
+      eyebrow: '下ごしらえ', title: '',
+      right: h('div', { class: 'plate clean-time-plate' },
+        h('div', { class: 'plate-inner' }, this.timeEl),
+      ),
+    });
+    head.querySelector('.scr-title')?.replaceWith(this.nameEl);
 
-    const strip = h('div', { class: 'clean-strip panel' },
-      h('div', { class: 'clean-strip-row' },
-        h('div', { class: 'clean-col' },
-          h('span', { class: 'label', text: '残 り' }),
-          this.timeEl,
+    // ---- 計器。左に除去率、右に損傷。1枚の板に並べる ----
+    this.progressText = h('span', { class: 'num clean-num', text: '0%' });
+    this.boneEl = h('i', { class: 'clean-dmg-fill' });
+    this.boneNumEl = h('div', { class: 'num clean-dmg-num', text: '0.0' });
+
+    const strip = h('div', { class: 'clean-strip' },
+      h('div', { class: 'clean-col grow' },
+        h('div', { class: 'clean-prog-head' },
+          h('span', { class: 'clean-label', text: spaced('除去率') }),
+          this.progressText,
         ),
-        h('div', { class: 'clean-col grow' },
-          h('div', { class: 'clean-prog-head' },
-            h('span', { class: 'label', text: '除去率' }),
-            this.progressText,
-          ),
+        // 目盛りは評価の境目。どこまで削れば等級が上がるかを帯の上で示す
+        h('div', { class: 'clean-gauge' },
           this.progressBar.el,
+          h('i', { class: 'clean-tick clean-tick--a' }),
+          h('i', { class: 'clean-tick clean-tick--s' }),
         ),
-        h('div', { class: 'clean-col' },
-          h('span', { class: 'label', text: '骨 の 状 態' }),
-          this.boneEl,
+        h('div', { class: 'clean-ranks' },
+          h('span', { text: '乙' }),
+          h('span', { class: 'clean-rank--a', text: '甲' }),
+          h('span', { class: 'clean-rank--s', text: '特' }),
         ),
       ),
-      this.nameEl,
+      h('div', { class: 'clean-col clean-col--dmg' },
+        h('span', { class: 'clean-label', text: spaced('損傷') }),
+        h('div', { class: 'clean-dmg' }, this.boneEl),
+        this.boneNumEl,
+      ),
     );
 
     // ---- 作業面（ここで削る）----
@@ -100,12 +118,14 @@ export class CleanScreen extends Screen {
         h('div', { class: 'clean-dead-zone' }),
         toolBar,
         h('div', { class: 'clean-actions' },
-          button('完了', () => this.finish(), { class: 'btn--primary btn--sm' }),
+          h('span', { class: 'clean-hint', text: spaced('なぞって削る') }),
+          h('span', { class: 'clean-actions-rule' }),
+          button('ここで終える', () => this.finish(), { class: 'clean-end' }),
         ),
       ),
     );
 
-    this.el.append(strip, this.surface, this.rail, deck);
+    this.el.append(head, strip, this.surface, this.rail, deck);
     this.selectTool('pick');
   }
 
@@ -214,17 +234,19 @@ export class CleanScreen extends Screen {
     };
 
     const def = getRevos(p.defId);
-    this.nameEl.textContent = `${def.name} の化石（${'★'.repeat(p.rarity)}）`;
+    this.nameEl.textContent = `${def.name} の化石`;
     this.renderBone();
     this.selectTool('pick');
     this.ui.toast('岩を削って骨を露出させよう', 'info', 2600);
   }
 
   private renderBone(): void {
-    // 損傷は数値ではなく5段の点で出す。数字だと減点が気になりすぎて手が止まる
-    const dots = Math.min(5, Math.floor(this.scene.boneDamage / 4));
-    this.boneEl.textContent = '●'.repeat(5 - dots) + '○'.repeat(dots);
-    this.boneEl.classList.toggle('is-bad', dots >= 3);
+    // 損傷は溜まる側の帯で出す。減っていく点だと「残り」に見えて、
+    // 削ってはいけないものを削っている自覚が出ない
+    const d = this.scene.boneDamage;
+    this.boneEl.style.width = `${Math.min(100, (d / 20) * 100)}%`;
+    this.boneNumEl.textContent = d > 0 ? `−${d.toFixed(1)}` : '0.0';
+    this.boneNumEl.classList.toggle('is-bad', d >= 8);
   }
 
   private finish(): void {

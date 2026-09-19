@@ -6,6 +6,7 @@ import { getRevos, revosShortName } from '../../game/data/revos';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
+import { screenHead } from '../chrome';
 
 /**
  * イベント戦の一覧。
@@ -26,10 +27,10 @@ export class EventScreen extends Screen {
   setData(d: SaveData): void { this.data = d; this.render(); }
 
   build(): void {
-    const strip = h('div', { class: 'status-strip' },
-      button('‹', () => { audio.uiBack(); this.onBack?.(); }, { class: 'btn--sm btn--ghost' }),
-      h('div', { class: 'screen-title', text: 'イベント' }),
-    );
+    const strip = screenHead({
+      eyebrow: '調査依頼', title: 'イベント',
+      onBack: () => this.onBack?.(),
+    });
     this.listEl = h('div', { class: 'event-body' });
     this.el.append(strip, this.listEl);
   }

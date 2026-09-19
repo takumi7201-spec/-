@@ -1,11 +1,11 @@
 import { Screen } from '../UIRoot';
-import { h, button, bar, clear, fmtNum } from '../dom';
+import { h, bar, clear, fmtNum } from '../dom';
 import type { SaveData } from '../../core/Save';
 import { expToNext } from '../../core/Save';
 import { REVOS, getRevos } from '../../game/data/revos';
 import { EVENTS } from '../../game/data/events';
-import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
+import { screenHead } from '../chrome';
 
 /**
  * プロフィール。野帳の巻頭に貼る、調査者の記録票。
@@ -63,10 +63,10 @@ export class ProfileScreen extends Screen {
   setData(d: SaveData): void { this.data = d; this.render(); }
 
   build(): void {
-    const strip = h('div', { class: 'status-strip' },
-      button('‹', () => { audio.uiBack(); this.onBack?.(); }, { class: 'btn--sm btn--ghost' }),
-      h('div', { class: 'screen-title', text: 'プロフィール' }),
-    );
+    const strip = screenHead({
+      eyebrow: '調査記録', title: 'プロフィール',
+      onBack: () => this.onBack?.(),
+    });
     this.bodyEl = h('div', { class: 'prof-body' });
     this.el.append(strip, this.bodyEl);
   }
