@@ -1225,14 +1225,28 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
 .dex-filters { display: grid; flex: none; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .dex-chip { min-height: 34px; padding: 0 4px; border-radius: 10px; font-size: 13px; font-weight: 900; }
 
-/* 並べ替え。絞り込みの下に1段。選択中には向きの三角を付ける */
-.dex-sorts { display: flex; flex: none; align-items: center; gap: 5px; }
-.dex-sort-label { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: var(--ink-faint); flex: none; }
+/* 並べ替え。絞り込みの下に1段。選択中には向きの三角を付ける。
+   軸が5つあるので見出しは畳み、札だけで1行を使い切る */
+.dex-sorts { display: flex; flex: none; align-items: center; gap: 4px; }
+.dex-sort-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+  color: var(--ink-faint); flex: none; margin-right: 1px;
+}
 .dex-sort {
-  flex: 1; min-width: 0; min-height: 30px; padding: 0 4px;
-  border-radius: 9px; font-size: 11px; font-weight: 700; gap: 3px;
+  flex: 1; min-width: 0; min-height: 30px; padding: 0 2px;
+  border-radius: 9px; font-size: 11px; font-weight: 700; gap: 2px;
+  white-space: nowrap;
 }
 .dex-sort-dir { font-size: 8px; opacity: 0.7; }
+/* 狭い端末では見出しを落とす。札のほうが情報量が多い */
+@media (max-width: 380px) { .dex-sort-label { display: none; } }
+
+/* 役割で並べたときの下段。レア度と同じ位置に、同じ大きさで置く */
+.dex-role {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--pen-brown); margin-top: 1px;
+}
+.dex-cell.is-locked .dex-role { color: var(--ink-faint); }
 .dex-chip.is-on {
   background: linear-gradient(180deg, var(--hl-amber-lift), var(--hl-amber));
   color: #3a2a08;

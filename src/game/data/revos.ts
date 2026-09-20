@@ -325,6 +325,22 @@ export function getRevos(id: string): RevosDef {
 /** ★5 は「ホロタイプ」——その種を定義する、ただ1つの標本 */
 export const RARITY_NAMES = ['', 'コモン', 'レア', 'エピック', 'レジェンド', 'ホロタイプ'] as const;
 
+/**
+ * 役割の並び順。
+ *
+ * 役割名の五十音でも英字順でもなく、盤面での立ち位置で並べる——
+ * 守る・殴る・速い・支える・搦める、の順。図鑑を役割で並べたときに、
+ * 編成のどの穴を埋める個体なのかが上から順に読める。
+ */
+export const ROLE_ORDER: Role[] = [
+  'Tank', 'Guardian',
+  'Striker', 'Breaker', 'Finisher',
+  'Sprinter',
+  'Healer', 'Buffer',
+  'Debuffer', 'Technical',
+  'All-round', 'Apex',
+];
+
 /** 役割の表示名。データ側は英語の識別子のまま、画面には日本語だけを出す */
 export const ROLE_NAMES: Record<Role, string> = {
   Tank: '壁役',

@@ -141,7 +141,7 @@ export interface SaveData {
     /** デバッグモードを開いたことがある。拠点にタイルを出すかどうか */
     debug?: boolean;
     /** 図鑑の並び。開くたびに選び直させない */
-    dexSort?: 'index' | 'rarity' | 'element' | 'owned';
+    dexSort?: 'index' | 'rarity' | 'element' | 'role' | 'owned';
     dexDesc?: boolean;
   };
 }

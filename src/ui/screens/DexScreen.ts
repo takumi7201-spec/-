@@ -1,12 +1,12 @@
 import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
 import type { SaveData } from '../../core/Save';
-import { REVOS, type RevosDef } from '../../game/data/revos';
+import { REVOS, ROLE_NAMES, ROLE_ORDER, type RevosDef } from '../../game/data/revos';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
 import { screenHead, spaced } from '../chrome';
 
-type SortKey = 'index' | 'rarity' | 'element' | 'owned';
+type SortKey = 'index' | 'rarity' | 'element' | 'role' | 'owned';
 
 /** 属性の並び順。フィルタの札の並びと揃える——2か所で順番が違うと探せない */
 const ELEMENT_ORDER = ['flame', 'aqua', 'terra', 'gale', 'null'];
@@ -15,6 +15,7 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'index', label: '図鑑順' },
   { key: 'rarity', label: 'レア度' },
   { key: 'element', label: '属性' },
+  { key: 'role', label: '役割' },
   { key: 'owned', label: '所持' },
 ];
 
@@ -136,7 +137,11 @@ export class DexScreen extends Screen {
           h('i', { class: `dot dot--${r.element}` }),
           h('span', { class: 'dex-name', text: r.name }),
         ),
-        h('span', { class: 'dex-rarity', text: '★'.repeat(r.rarity) }),
+        // 役割で並べたときだけ、下段をレア度から役割名に差し替える。
+        // 何を軸に並んでいるのかが札の上で読めないと、並びを確かめられない
+        this.sort === 'role'
+          ? h('span', { class: 'dex-role', text: ROLE_NAMES[r.role] })
+          : h('span', { class: 'dex-rarity', text: '★'.repeat(r.rarity) }),
       );
       cell.title = has ? r.name : `${r.name}（未所持）`;
       this.gridEl.appendChild(cell);
@@ -169,6 +174,12 @@ export class DexScreen extends Screen {
       case 'rarity': {
         const d = a.rarity - b.rarity;
         return d !== 0 ? d * dir : idx;
+      }
+      case 'role': {
+        const d = ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role);
+        if (d !== 0) return d * dir;
+        // 同じ役割の中はレア度の高い順。役割で絞って読むときに強い順で並ぶ
+        return (b.rarity - a.rarity) || idx;
       }
       case 'element': {
         const d = ELEMENT_ORDER.indexOf(a.element) - ELEMENT_ORDER.indexOf(b.element);
