@@ -273,13 +273,16 @@ async function main(): Promise<void> {
 
   // 詳細は1枚の画面。どこから開いたかを覚えて、閉じたらそこへ戻す
   dexScreen.onDetail = (defId) => {
+    const mine = data.roster.filter((u) => u.defId === defId);
     ui.show('detail', {
       defId,
-      owned: data.roster.filter((u) => u.defId === defId),
+      owned: mine,
       back: () => { dexScreen.setData(data); ui.show('dex'); },
-      onEquip: () => { partyScreen.setData(data); ui.show('party'); },
+      // 持っていない個体を編成へ送っても置けない。導線ごと出さない
+      onEquip: mine.length > 0 ? () => { partyScreen.setData(data); ui.show('party'); } : undefined,
     });
   };
+  dexScreen.onPrefChange = () => writeSave(data);
   partyScreen.onDetail = (defId, unit) => {
     ui.show('detail', {
       defId,

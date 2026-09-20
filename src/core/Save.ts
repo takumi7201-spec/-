@@ -140,6 +140,9 @@ export interface SaveData {
     reducedShake: boolean;
     /** デバッグモードを開いたことがある。拠点にタイルを出すかどうか */
     debug?: boolean;
+    /** 図鑑の並び。開くたびに選び直させない */
+    dexSort?: 'index' | 'rarity' | 'element' | 'owned';
+    dexDesc?: boolean;
   };
 }
 

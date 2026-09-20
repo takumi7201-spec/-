@@ -11,7 +11,9 @@ import { holoIconCanvas } from './holoIcon';
  */
 export function revosIcon(defId: string, className = 'revos-icon'): HTMLElement {
   const def = getRevos(defId);
-  if (def.rarity >= 5 && !className.includes('is-silhouette')) {
+  // 伏せた絵・沈めた絵に虹は流さない。未所持ぶんまでキャンバスを回すと、
+  // 図鑑を開いているだけで常時アニメーションが何枚も走る
+  if (def.rarity >= 5 && !className.includes('is-silhouette') && !className.includes('is-dim')) {
     return holoIconCanvas(def.sprite, className, def.name);
   }
   const img = document.createElement('img');

@@ -162,7 +162,11 @@ export class DetailScreen extends Screen {
         h('span', { class: 'num', text: String(Math.max(...owned.map((o) => o.clean))) }),
       );
     } else {
-      this.habitatEl.textContent = r.habitat.map((b) => BIOMES[b]?.name ?? b).join(' / ');
+      // まだ持っていない個体。どこで出るかと、持っていない事実を並べる
+      this.habitatEl.append(
+        h('span', { class: 'det-nothave', text: spaced('未所持') }),
+        r.habitat.map((b) => BIOMES[b]?.name ?? b).join(' / '),
+      );
     }
 
     this.equipBtn.hidden = !p.onEquip;

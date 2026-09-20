@@ -1218,12 +1218,21 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
   top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: calc(var(--safe-b) + 44px);
   left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
   overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: 8px;
   pointer-events: auto;
 }
 /* 属性は6つで固定。横スクロールさせず、等幅で並べ切る */
 .dex-filters { display: grid; flex: none; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .dex-chip { min-height: 34px; padding: 0 4px; border-radius: 10px; font-size: 13px; font-weight: 900; }
+
+/* 並べ替え。絞り込みの下に1段。選択中には向きの三角を付ける */
+.dex-sorts { display: flex; flex: none; align-items: center; gap: 5px; }
+.dex-sort-label { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: var(--ink-faint); flex: none; }
+.dex-sort {
+  flex: 1; min-width: 0; min-height: 30px; padding: 0 4px;
+  border-radius: 9px; font-size: 11px; font-weight: 700; gap: 3px;
+}
+.dex-sort-dir { font-size: 8px; opacity: 0.7; }
 .dex-chip.is-on {
   background: linear-gradient(180deg, var(--hl-amber-lift), var(--hl-amber));
   color: #3a2a08;
@@ -1237,7 +1246,7 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
   background: var(--paper-card); color: var(--ink);
   box-shadow: 0 5px 14px rgba(72, 58, 36, 0.16);
 }
-.dex-art { height: 56px; display: grid; place-items: center; }
+.dex-art { position: relative; height: 56px; display: grid; place-items: center; }
 .dex-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; min-width: 0; }
 .dex-row .dot { width: 7px; height: 7px; border-radius: 2px; flex: none; }
 .dot--void { background: rgba(42, 37, 30, 0.2); }
@@ -1250,12 +1259,24 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
   border: 2px solid transparent;
   box-shadow: 0 7px 18px rgba(150, 110, 160, 0.3);
 }
-/* 未記載の欄は器だけ残す */
+/* 未所持。伏せずに出し、明るさと隅の印だけで区別する */
 .dex-cell.is-locked {
-  background: rgba(255, 253, 248, 0.4);
+  background: rgba(255, 253, 248, 0.46);
   box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.16);
 }
-.dex-cell.is-locked .dex-name, .dex-cell.is-locked .dex-rarity { color: var(--pencil); }
+/* 名前・属性・レア度は未所持でも読める濃さで残す。
+   どれも並べ替えの軸なので、薄くすると並びの意味が確かめられない */
+.dex-cell.is-locked .dex-name { color: var(--ink-soft); }
+.dex-cell.is-locked .dex-rarity { color: var(--ink-faint); }
+.dex-cell.is-locked .dot { opacity: 0.62; }
+/* 隅の印。まだ掘り当てていない、という1文字だけ */
+.dex-flag {
+  position: absolute; right: 6px; top: 4px;
+  width: 17px; height: 17px; border-radius: 5px;
+  display: grid; place-items: center;
+  background: rgba(42, 37, 30, 0.16); color: var(--ink-soft);
+  font-size: 10px; font-weight: 900;
+}
 .dex-name {
   font-size: 10px; font-weight: 700; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1537,8 +1558,9 @@ canvas.slot-icon, canvas.roster-icon, canvas.dex-icon {
 .slot-icon { width: 100%; height: 46px; margin-bottom: 2px; }
 .roster-icon { width: 100%; height: 36px; }
 .dex-icon { width: 100%; height: 52px; }
-/* 未取得はシルエットで見せる。何が居るかは示すが、姿は伏せる */
-.dex-icon.is-silhouette { filter: brightness(0) opacity(0.28); }
+/* 未所持は色を抜いて沈める。姿は見せる——並べ替えの対象になるので、
+   何が並んでいるのか読めないと意味がない */
+.dex-icon.is-dim { filter: grayscale(0.62) opacity(0.62); }
 /* 個体そのものを見せる面。枠で囲わず、後ろに光だけ置く */
 .dex-hero {
   position: relative;
@@ -1671,7 +1693,13 @@ canvas.slot-icon, canvas.roster-icon, canvas.dex-icon {
 .det-foot { margin-top: auto; padding-top: 4px; display: flex; gap: 10px; align-items: flex-end; }
 .det-habitat-main { flex: 1; min-width: 0; }
 .det-habitat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; color: var(--ink-faint); }
-.det-habitat { font-size: 12px; color: var(--ink-line); margin-top: 1px; }
+.det-habitat { font-size: 12px; color: var(--ink-line); margin-top: 1px; display: flex; align-items: center; gap: 6px; }
+/* まだ持っていない個体を開いているときの印 */
+.det-nothave {
+  flex: none; font-size: 9px; font-weight: 900; letter-spacing: 0.14em;
+  padding: 2px 8px; border-radius: 5px;
+  background: rgba(42, 37, 30, 0.14); color: var(--ink-soft);
+}
 .det-equip { height: 48px; min-height: 48px; padding: 0 26px; border-radius: 14px; flex: none; }
 
 body[data-layout='wide'] .det-body { left: 16vw; right: 16vw; }
