@@ -91,15 +91,24 @@ export function banner(onTap?: () => void): {
   };
 }
 
-/** 左の縦列。丸い小札。報せは赤い点だけで、数は出さない */
+/**
+ * 左の縦列。丸い小札。
+ *
+ * 報せは既定では「！」の1点だけ。数を出すのは、その数が行動の量を
+ * 決めるとき——受信箱の未受取のように「何通あるか」で手間が変わる場合に限る。
+ */
 export function railButton(icon: string, label: string, onTap: () => void): {
-  el: HTMLButtonElement; alert(on: boolean): void;
+  el: HTMLButtonElement; alert(on: boolean): void; badge(n: number): void;
 } {
   const el = button(icon, () => { audio.uiTap(); onTap(); }, { class: 'btn--rail rail-btn' });
   el.setAttribute('aria-label', label);
-  const dot = h('span', { class: 'rail-alert', text: '!' , hidden: true });
+  const dot = h('span', { class: 'rail-alert', text: '!', hidden: true });
   el.appendChild(dot);
-  return { el, alert(on) { dot.hidden = !on; } };
+  return {
+    el,
+    alert(on) { dot.textContent = '!'; dot.hidden = !on; },
+    badge(n) { dot.textContent = String(n); dot.hidden = n <= 0; },
+  };
 }
 
 /** 右の色札。色を持てるのは3枚まで——全部に色を付けると優先順位が消える */

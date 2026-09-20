@@ -6,6 +6,7 @@ import { expToNext, dropDecay } from '../../core/Save';
 import { revosIcon } from '../revosIcon';
 import { BIOMES } from '../../voxel/palette';
 import { EVENTS } from '../../game/data/events';
+import { unclaimedCount } from '../../game/mail';
 
 const MAX_HEARTS = 5;
 
@@ -41,7 +42,7 @@ export class HomeScreen extends Screen {
     { key: 'dex', icon: '☰', label: '図鑑', onTap: () => this.onGo?.('dex') },
   ]);
 
-  onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'party' | 'dex' | 'profile' | 'title' | 'debug') => void;
+  onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'mail' | 'party' | 'dex' | 'profile' | 'title' | 'debug') => void;
 
   constructor() { super('home'); }
 
@@ -84,7 +85,7 @@ export class HomeScreen extends Screen {
       rail.appendChild(r.el);
     };
     addRail('profile', '◱', '記録', () => this.onGo?.('profile'));
-    addRail('event', '✉', '便り', () => this.onGo?.('event'));
+    addRail('mail', '✉', 'メールボックス', () => this.onGo?.('mail'));
     addRail('title', '⌂', 'タイトルへ', () => this.onGo?.('title'));
     addRail('debug', '⚙', '検証', () => this.onGo?.('debug'));
 
@@ -160,7 +161,8 @@ export class HomeScreen extends Screen {
     this.cards.get('event')?.badge(open.length);
     // 未解放の導線は暗い札のまま置いておく。消すと「あとで増える」が伝わらない
     this.rails.get('debug')!.el.hidden = this.data.settings.debug !== true;
-    this.rails.get('event')?.alert(open.length > 0);
+    // 受信箱だけ数を出す。何通あるかで受け取りの手間が変わる
+    this.rails.get('mail')?.badge(unclaimedCount(this.data));
 
     // ---- 計器 ----
     // 心は「今日あと何回、目減りせずに潜れるか」。数字ではなく粒で出す

@@ -1761,3 +1761,84 @@ body[data-layout='wide'] .det-body { left: 16vw; right: 16vw; }
 
 body[data-layout='wide'] .sel-body,
 body[data-layout='wide'] .sel-tabs { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   受信箱
+   ログインボーナスと運営からの配布が届く1か所。
+   受け取り済みも残して沈めるだけにする——消すと履歴ごと消える
+   ========================================================================= */
+.screen--mail::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--mail > * { z-index: 1; }
+
+.mail-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: 84px;
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-bottom: 16px;
+  pointer-events: auto;
+}
+.mail-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px 14px;
+  border: 0; border-radius: 15px;
+  background: var(--paper-card);
+  box-shadow: 0 6px 16px rgba(72, 58, 36, 0.16);
+}
+/* 受け取り済みは沈める。読めるが、押す対象ではないと分かる明るさにする */
+.mail-card.is-claimed {
+  background: rgba(255, 253, 248, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.14);
+}
+.mail-head { display: flex; align-items: center; gap: 8px; }
+/* 差出人。運営は朱、ログインは水。同じ受信箱の中で出所を分ける */
+.mail-from {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.2em;
+  padding: 3px 10px; border-radius: 5px; color: #fff6f4;
+}
+.mail-from--staff { background: var(--hl-rose); }
+.mail-from--login { background: #1f7b78; }
+.mail-date { margin-left: auto; font-size: 11px; color: var(--ink-faint); }
+.mail-title { font-size: 16px; font-weight: 900; line-height: 1.3; margin-top: 2px; }
+.mail-desc { margin: 2px 0 6px; font-size: 12px; color: var(--ink-soft); line-height: 1.85; }
+
+.mail-rewards { display: flex; flex-wrap: wrap; gap: 6px; }
+.mail-reward {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px 5px 7px; border-radius: var(--r-md);
+  background: rgba(42, 37, 30, 0.06);
+}
+.mail-reward-icon { width: 28px; height: 28px; }
+.mail-reward-coin {
+  width: 16px; height: 16px; border-radius: 4px;
+  background: var(--hl-amber); display: block;
+  box-shadow: inset 0 -2px 0 rgba(154, 104, 16, 0.4);
+}
+.mail-reward-name { font-size: 12px; font-weight: 700; }
+.mail-go {
+  margin-top: 10px; min-height: 46px; border-radius: 12px;
+  background: var(--paper-card); color: var(--ink);
+  font-weight: 900; letter-spacing: 0.08em;
+  box-shadow: inset 0 0 0 2px var(--hl-amber), 0 4px 12px rgba(72, 58, 36, 0.14);
+}
+.mail-done {
+  display: flex; align-items: center; gap: 7px; margin-top: 8px;
+  padding-top: 8px; border-top: 1px solid var(--rule);
+  font-size: 11px; color: var(--ink-faint);
+}
+.mail-done-mark { color: var(--pen-green); font-size: 13px; }
+
+.mail-empty { padding: 24px 6px; }
+.mail-empty-line { font-size: 13px; line-height: 2; }
+.mail-empty-line.dim { color: var(--ink-soft); }
+
+.deck--mail { justify-content: stretch; }
+.deck--mail .btn { flex: 1; height: 54px; min-height: 54px; border-radius: 15px; }
+
+body[data-layout='wide'] .mail-body { left: 18vw; right: 18vw; }

@@ -31,6 +31,29 @@ export interface OwnedRevos {
   debug?: boolean;
 }
 
+/** 便りに添える品。ここに無い種類は配らない——受け取り側で分岐が増える */
+export type MailReward =
+  | { kind: 'coin'; amount: number }
+  /** 未精錬のまま受信箱から届く。削る手間は省かない */
+  | { kind: 'fossil'; defId: string; rarity: number; biome: BiomeId };
+
+export interface MailItem {
+  id: string;
+  /** login: ログインボーナス / staff: 運営からの配布 */
+  from: 'login' | 'staff';
+  title: string;
+  body: string;
+  rewards: MailReward[];
+  sentAt: number;
+  /**
+   * 受け取った時刻。受け取り済みの便りも一覧に残す——
+   * 何をいつ貰ったかを後から確かめられないと、配布の履歴が消える
+   */
+  claimedAt?: number;
+  /** 期限。過ぎたものは受け取れない。無期限は undefined */
+  expiresAt?: number;
+}
+
 export interface SaveData {
   version: number;
   createdAt: number;
@@ -45,6 +68,15 @@ export interface SaveData {
   stageProgress: number;
   /** クリア済みイベントの id。報酬のリヴォスは初回だけ配る */
   events: { cleared: string[] };
+  /** 受信箱。新しいものが先頭 */
+  mail: MailItem[];
+  /**
+   * ログインの記録。
+   *
+   * 連続日数は「昨日も来たか」で決める。1日でも空けば 1 に戻す——
+   * 途切れても総日数は残すので、周回の位置（7日周期のどこか）は進み続ける。
+   */
+  login: { lastDate: string; streak: number; total: number; deliveredStaff: string[] };
   /**
    * 記録。
    *
@@ -111,10 +143,15 @@ export interface SaveData {
   };
 }
 
-export function todayKey(): string {
+export function todayKey(at = Date.now()): string {
   // 4:00 JST 区切り。深夜プレイが「翌日扱い」にならないようにする
-  const now = new Date(Date.now() + 9 * 3600_000 - 4 * 3600_000);
+  const now = new Date(at + 9 * 3600_000 - 4 * 3600_000);
   return now.toISOString().slice(0, 10);
+}
+
+/** 1日前の鍵。連続ログインの判定に使う */
+export function yesterdayKey(at = Date.now()): string {
+  return todayKey(at - 24 * 3600_000);
 }
 
 export function defaultSave(): SaveData {
@@ -135,6 +172,8 @@ export function defaultSave(): SaveData {
     unlockedBiomes: ['canyon'],
     stageProgress: 0,
     events: { cleared: [] },
+    mail: [],
+    login: { lastDate: '', streak: 0, total: 0, deliveredStaff: [] },
     stats: {
       runs: 0, voxelsDug: 0, found: 0, bestRarity: 0, biomeRuns: {},
       fossils: 0, bestClean: 0, sRanks: 0,
@@ -201,6 +240,8 @@ export function load(): SaveData {
       player: { ...base.player, ...(data.player ?? {}) },
       party: { ...base.party, ...(data.party ?? {}) },
       events: { ...base.events, ...(data.events ?? {}) },
+      mail: data.mail ?? [],
+      login: { ...base.login, ...(data.login ?? {}) },
       stats: {
         ...base.stats,
         ...(data.stats ?? {}),

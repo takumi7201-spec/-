@@ -21,6 +21,8 @@ import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, teamAnchor, s
 import { advanceHoloTime } from './fx/SpriteUnit';
 import { buildEventTeam, type EventDef } from './game/data/events';
 import { BattleSelectScreen, stageCoins } from './ui/screens/BattleSelectScreen';
+import { MailScreen } from './ui/screens/MailScreen';
+import { grantLogin, grantStaffMail } from './game/mail';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
@@ -104,12 +106,13 @@ async function main(): Promise<void> {
   const partyScreen = new PartyScreen();
   const dexScreen = new DexScreen();
   const selectScreen = new BattleSelectScreen();
+  const mailScreen = new MailScreen();
   const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
   const detailScreen = new DetailScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -124,7 +127,27 @@ async function main(): Promise<void> {
 
   // ---------------------------------------------------------------- 遷移
 
+  /**
+   * 受信箱への配布。
+   *
+   * 起動時だけでなく拠点へ戻るたびに確かめる——開きっぱなしで日を
+   * またいだときに、次の起動まで届かないのは事故に見える。
+   */
+  function deliverMail(announce: boolean): void {
+    // 運営ぶんを先に積んでからログインを積む。どちらも先頭へ差し込むので、
+    // この順なら「今日のぶん」が受信箱の一番上に来る
+    const gotStaff = grantStaffMail(data);
+    const gotLogin = grantLogin(data);
+    if (gotLogin || gotStaff > 0) {
+      writeSave(data);
+      if (announce) {
+        ui.toast(gotLogin ? `ログインボーナスが届いた（${data.login.streak} 日目）` : '運営から便りが届いた', 'info', 3000);
+      }
+    }
+  }
+
   function goHome(): void {
+    deliverMail(true);
     home.setGuest(data.party.order?.[0]
       ? data.roster.find((r) => r.uid === data.party.order?.[0])?.defId ?? data.roster[0]?.defId ?? null
       : data.roster[0]?.defId ?? null);
@@ -239,6 +262,7 @@ async function main(): Promise<void> {
         selectScreen.setData(data);
         ui.show('battleSelect', { mode: 'event' });
         break;
+      case 'mail': mailScreen.setData(data); ui.show('mail'); break;
       case 'debug': openDebug(); break;
       case 'party': partyScreen.setData(data); ui.show('party'); break;
       case 'dex': dexScreen.setData(data); ui.show('dex'); break;
@@ -440,6 +464,12 @@ async function main(): Promise<void> {
     void startClean(s.defId, s.rarity);
   };
 
+  mailScreen.onBack = () => goHome();
+  mailScreen.onClaim = () => {
+    writeSave(data);
+    homeScreen.setData(data);
+  };
+
   selectScreen.onBack = () => goHome();
   selectScreen.onNormal = (stage) => { void startBattle(null, stage); };
   selectScreen.onEvent = (ev) => { void startBattle(ev); };
@@ -514,6 +544,7 @@ async function main(): Promise<void> {
     else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
     else if (jump === 'event') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'event' }); }
     else if (jump === 'select') { selectScreen.setData(data); ui.show('battleSelect'); }
+    else if (jump === 'mail') { deliverMail(false); mailScreen.setData(data); ui.show('mail'); }
     else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
     else if (jump === 'profile') { profileScreen.setData(data); ui.show('profile'); }
     else if (jump === 'debug') openDebug();
