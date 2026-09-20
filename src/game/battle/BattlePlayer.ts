@@ -242,10 +242,12 @@ export class BattlePlayer {
           // ここを削ると必殺技が「ただの強い通常攻撃」に見える
           return 0.4 * Math.max(0.5, beat) + 0.24 * beat;
         }
-        this.scene.lunge(e.uid, this.pendingTarget ?? e.uid);
-        // 踏み込みの絵は 0.95 秒ぶん走るが、再生機はその終わりを待たない。
+        // 踏み込みに使える時間をそのまま渡す。打点が出る時刻に着いていないと、
+        // 届く前に当たって見える。戻りの絵は再生機を待たせない——
         // 待たないぶんが、次の個体の動きと重なる
-        return 0.26 * Math.max(0.5, beat);
+        const strikeIn = 0.26 * Math.max(0.5, beat);
+        this.scene.lunge(e.uid, this.pendingTarget ?? e.uid, strikeIn);
+        return strikeIn;
       }
 
       case 'damage': {
