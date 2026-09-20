@@ -93,6 +93,10 @@ export class DetailScreen extends Screen {
     const ls = u ? 1 + 0.055 * (u.level - 1) : 1;
     const mc = u ? cleanMultiplier(u.clean) : 1;
     const val = (base: number): number => Math.round(base * ls * mc);
+    // 精錬でどれだけ足された（削られた）か。クリーン度50を素の状態として、
+    // そこからの差を別の色で出す——倍率のままでは、削った手間が数字に見えない
+    const cleanDelta = (base: number, scaled: boolean): number =>
+      u && scaled ? Math.round(base * ls * mc) - Math.round(base * ls) : 0;
 
     clear(this.artEl);
     this.artEl.appendChild(revosIcon(r.id, 'det-art-img'));
@@ -114,16 +118,23 @@ export class DetailScreen extends Screen {
     this.latinEl.textContent = r.en;
 
     clear(this.statsEl);
-    const rows: [string, number, number, string][] = [
-      ['体力', val(r.hp), STAT_CEIL.hp, '#3fa772'],
-      ['攻撃', val(r.atk), STAT_CEIL.atk, '#de523c'],
-      ['防御', val(r.def), STAT_CEIL.def, '#3f97d6'],
-      ['速度', val(r.spd), STAT_CEIL.spd, 'var(--hl-amber)'],
+    // クリーン度が掛かるのは体力・攻撃・防御だけ。速度には乗らない
+    const rows: [string, number, number, string, number][] = [
+      ['体力', val(r.hp), STAT_CEIL.hp, '#3fa772', cleanDelta(r.hp, true)],
+      ['攻撃', val(r.atk), STAT_CEIL.atk, '#de523c', cleanDelta(r.atk, true)],
+      ['防御', val(r.def), STAT_CEIL.def, '#3f97d6', cleanDelta(r.def, true)],
+      ['速度', Math.round(r.spd * ls), STAT_CEIL.spd, 'var(--hl-amber)', 0],
     ];
-    for (const [k, v, ceil, c] of rows) {
+    for (const [k, v, ceil, c, delta] of rows) {
       this.statsEl.appendChild(h('div', { class: 'det-stat' },
         h('div', { class: 'det-stat-label', text: k }),
         h('div', { class: 'det-stat-num num', text: v.toLocaleString('ja-JP') }),
+        delta !== 0
+          ? h('div', {
+            class: `det-stat-delta num ${delta > 0 ? 'is-up' : 'is-down'}`,
+            text: `${delta > 0 ? '+' : '−'}${Math.abs(delta)}`,
+          })
+          : null,
         h('div', { class: 'det-stat-bar' },
           h('i', { style: `width:${Math.min(100, (v / ceil) * 100)}%;background:${c}` }),
         ),
@@ -156,6 +167,14 @@ export class DetailScreen extends Screen {
         h('span', { class: 'num', text: `Lv${u.level}` }),
         ` · ${cleanRank(u.clean)}ランク（クリーン度 ${u.clean}）`,
       );
+      // 精錬ぶんの合計を1行にまとめる。個々の +NN が何の色かを説明する
+      const sum = cleanDelta(r.hp, true) + cleanDelta(r.atk, true) + cleanDelta(r.def, true);
+      if (sum !== 0) {
+        this.habitatEl.append(h('span', {
+          class: `det-clean-sum ${sum > 0 ? 'is-up' : 'is-down'}`,
+          text: `精錬 ${sum > 0 ? '+' : '−'}${Math.abs(sum)}`,
+        }));
+      }
     } else if (owned.length > 0) {
       this.habitatEl.append(
         '所持 ', h('span', { class: 'num', text: String(owned.length) }), ' 体 — 最高クリーン度 ',

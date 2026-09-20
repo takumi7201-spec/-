@@ -159,13 +159,27 @@ export interface CleanScore {
   rockRatio: number;
   timeRatio: number;
   boneDamage: number;
+  /** 損傷で下がった上限。作業中も同じ式で出して画面に見せる */
+  cap: number;
+}
+
+/** 骨1点の損傷が上限を何点下げるか */
+const CAP_PER_DAMAGE = 3;
+
+/** 損傷から到達できる上限を出す。作業中の表示もここを通す */
+export function cleanCap(boneDamage: number): number {
+  return Math.max(0, Math.round(100 - CAP_PER_DAMAGE * boneDamage));
 }
 
 /**
- * C = clamp(88·Rrock + 12·Rtime − 2.5·Dbone, 0, 100)
+ * C = min(88·Rrock + 12·Rtime, 100 − 3·Dbone)
  *
- * 満点は「岩100%除去・骨無傷・時間の大半を残す」でのみ到達する。
- * 上限は意図的に厳しい。
+ * 損傷は点を引くのではなく、上限を下げる。
+ *
+ * 以前は別枠で引いていたので、丁寧に全部剥がしても骨を数回こすった
+ * だけで下の段まで落ちた。削り切れていない側の失点と二重取りになっていて、
+ * 「どちらを直せば伸びるのか」が読めない。
+ * 上限として効かせれば、損傷ぶんの天井まではこれまで通り作業で埋められる。
  */
 export function scoreClean(
   removedRock: number, rockTotal: number,
@@ -174,10 +188,11 @@ export function scoreClean(
 ): CleanScore {
   const rockRatio = rockTotal > 0 ? Math.min(1, removedRock / rockTotal) : 1;
   const timeRatio = limitTime > 0 ? Math.max(0, Math.min(1, remainTime / limitTime)) : 0;
-  const raw = 88 * rockRatio + 12 * timeRatio - 2.5 * boneDamage;
-  const clean = Math.max(0, Math.min(100, Math.round(raw)));
+  const work = 88 * rockRatio + 12 * timeRatio;
+  const cap = cleanCap(boneDamage);
+  const clean = Math.max(0, Math.min(cap, Math.round(work)));
   const rank = clean >= 95 ? 'S' : clean >= 85 ? 'A' : clean >= 70 ? 'B' : clean >= 50 ? 'C' : 'D';
-  return { clean, rank, rockRatio, timeRatio, boneDamage };
+  return { clean, rank, rockRatio, timeRatio, boneDamage, cap };
 }
 
 /** クリーン度 → HP/ATK/DEF の倍率。SPD には掛けない */

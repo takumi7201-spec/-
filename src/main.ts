@@ -345,7 +345,8 @@ async function main(): Promise<void> {
         { label: 'ランク', value: score.rank, kind: 'rank' },
         { label: 'クリーン度', value: `${score.clean}`, kind: 'exp' },
         { label: '岩の除去', value: `${Math.round(score.rockRatio * 100)}%` },
-        { label: '骨の損傷', value: score.boneDamage > 0 ? `-${score.boneDamage.toFixed(1)}` : 'なし' },
+        // 損傷は点を引かず上限を下げる。引かれた点ではなく、届かなくなった天井を出す
+        { label: '骨の損傷', value: score.boneDamage > 0 ? `上限 ${score.cap}` : 'なし' },
         ...(score.rank === 'S' ? [{ label: '解放', value: 'スキルスロット3枠目', kind: 'new' as const }] : []),
         isNew
           ? { label: '新種を入手', value: label(defId), kind: 'new' as const }

@@ -616,6 +616,15 @@ body[data-layout='wide'] .battle-log { display: block; width: 320px; max-height:
 .clean-gauge { position: relative; }
 .clean-gauge .bar { height: 14px; }
 .clean-gauge .bar > i { background: linear-gradient(90deg, var(--hl-amber-deep), var(--hl-amber) 54%, #ffd86e); }
+/* 損傷で下がった天井。ここから先は埋まらない、と帯の上で示す */
+.clean-cap {
+  position: absolute; top: -2px; bottom: -2px; right: 0; width: auto;
+  background: repeating-linear-gradient(-45deg,
+    rgba(232, 80, 60, 0.28) 0 3px, rgba(232, 80, 60, 0.12) 3px 6px);
+  border-left: 2px solid var(--hl-rose);
+  border-radius: 0 7px 7px 0;
+  pointer-events: none;
+}
 .clean-tick { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--paper-card); }
 .clean-tick--a { left: 70%; }
 .clean-tick--s { left: 85%; }
@@ -646,17 +655,9 @@ body[data-layout='wide'] .battle-log { display: block; width: 320px; max-height:
   cursor: crosshair;
 }
 
-/* スポット光。作業面の中心に置く。岩そのものは3Dなので、
-   板ではなく光だけで「ここを見ろ」を作る */
-.screen--clean::before {
-  content: ''; position: absolute;
-  left: 50%; top: 46%; transform: translate(-50%, -50%);
-  width: 262px; height: 262px; border-radius: 50%;
-  background: rgba(255, 251, 240, 0.6);
-  filter: blur(28px);
-  pointer-events: none;
-  z-index: 0;
-}
+/* 作業面にはUI側の飾りを置かない。
+   #ui は3Dの上の層なので、ここに光を敷くと岩の中心が白く抜ける——
+   「何が岩で何が骨か」を一番見たい場所を、演出で潰していた */
 
 /* 回転レール。指を離さずにY軸回転できる */
 .clean-rail {
@@ -1684,7 +1685,21 @@ canvas.slot-icon, canvas.roster-icon, canvas.dex-icon {
   box-shadow: 0 5px 14px rgba(72, 58, 36, 0.14);
 }
 .det-stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-faint); }
+.det-stat { position: relative; }
 .det-stat-num { font-size: 19px; line-height: 1.15; }
+/* 精錬でどれだけ乗ったか。素の値とは別の色で、数字の右肩に出す */
+.det-stat-delta {
+  position: absolute; right: 9px; top: 9px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+}
+.det-stat-delta.is-up { color: var(--pen-green); }
+.det-stat-delta.is-down { color: var(--pen-red); }
+.det-clean-sum {
+  flex: none; font-size: 10px; font-weight: 900; letter-spacing: 0.06em;
+  padding: 2px 8px; border-radius: 5px;
+}
+.det-clean-sum.is-up { background: rgba(46, 122, 80, 0.16); color: var(--pen-green); }
+.det-clean-sum.is-down { background: rgba(194, 58, 40, 0.14); color: var(--pen-red); }
 .det-stat-bar {
   position: relative; height: 4px; border-radius: 2px;
   background: rgba(42, 37, 30, 0.1); margin-top: 5px; overflow: hidden;

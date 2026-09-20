@@ -39,19 +39,37 @@ export const TOOLS: Record<ToolId, ToolSpec> = {
    * それだと当てるたびに弾かれるだけの道具になっていた。
    * 硬岩はピックのほうが圧倒的に速い——その関係は残っている。
    */
-  pick: { id: 'pick', name: 'ピック', radius: 2.4, continuous: false, rate: 0, breaksHard: true, bonePenalty: 4, surfaceOnly: false },
-  drill: { id: 'drill', name: 'ドリル', radius: 1.5, continuous: true, rate: 22, breaksHard: true, hardRate: 0.34, bonePenalty: 1, surfaceOnly: false },
+  pick: { id: 'pick', name: 'ピック', radius: 2.4, continuous: false, rate: 0, breaksHard: true, bonePenalty: 1, surfaceOnly: false },
+  drill: { id: 'drill', name: 'ドリル', radius: 1.5, continuous: true, rate: 22, breaksHard: true, hardRate: 0.34, bonePenalty: 0.35, surfaceOnly: false },
   brush: { id: 'brush', name: 'ブラシ', radius: 3.2, continuous: true, rate: 12, breaksHard: false, bonePenalty: 0, surfaceOnly: true },
 };
 
+/**
+ * 1回の接触で入る損傷の上限。
+ *
+ * 損傷は触れた骨ボクセルの数ぶん積む。ピックは半径2.4の球なので、
+ * 骨の真上に一度置いただけで20ボクセル以上をまとめて削ることがあり、
+ * そのまま積むと「一度の押し間違いでその化石は終わり」になる。
+ * 失敗は痛いが、取り返せる幅を残す。
+ */
+const MAX_HIT_DAMAGE = 6;
+
 const VOX = 0.052;
 
+/*
+ * 岩は暖色の土、骨は冷たい白。
+ *
+ * 以前は SKIN(d8b878) と BONE(f2e6c6) がどちらも暖かい明色で、
+ * 明るい作業台の上では地続きに見えていた。削っていいものと
+ * 削ってはいけないものが同じ色なら、画面を見て判断できない。
+ * 岩側を沈めて彩度を上げ、骨だけを青寄りの白へ振る。
+ */
 const CLEAN_PALETTE = buildPalette([
   0x000000,
-  0x3a3733, // HARD  暗く硬そうに
-  0x9b8260, // SOFT
-  0xd8b878, // SKIN  骨が透けて見える層
-  0xf2e6c6, // BONE
+  0x413a33, // HARD  黒に近い硬岩
+  0x8a6d45, // SOFT  土そのものの色
+  0xcfa97a, // SKIN  骨が透けはじめた層。岩の側だが、明るくして警告にする
+  0xf4f7fb, // BONE  冷たい白。岩の暖色と混ざらない
   0xa8482e, // SCAR
 ]);
 
@@ -107,8 +125,10 @@ export class CleanScene {
 
     this.material = createVoxelMaterial({
       voxelSize: VOX,
-      colorJitter: 0.14,
-      edgeDarkness: 0.1,
+      // 粒のばらつきは抑え、面の境目は濃く出す。
+      // 塊の輪郭が読めないと、どこまで削ったのかが分からない
+      colorJitter: 0.07,
+      edgeDarkness: 0.34,
       aoDirect: 0.3,
       rimColor: 0xffd9a0,
       rimStrength: 0.22,
@@ -277,8 +297,9 @@ export class CleanScene {
     }
 
     if (boneHit > 0) {
-      this.boneDamage += boneHit * spec.bonePenalty;
-      this.events.onBoneHit?.(boneHit * spec.bonePenalty);
+      const dmg = Math.min(MAX_HIT_DAMAGE, boneHit * spec.bonePenalty);
+      this.boneDamage += dmg;
+      this.events.onBoneHit?.(dmg);
       audio.uiError();
       this.debris.burst(world, 0xa8482e, 10, { speed: 1.2, up: 1.4, life: 0.6, size: 0.7 });
     } else if (removed > 0) {

@@ -4,6 +4,7 @@ import type { CleanScene, ToolId } from '../../scenes/CleanScene';
 import { TOOLS } from '../../scenes/CleanScene';
 import type { CleanScore } from '../../game/FossilBlock';
 import { getRevos } from '../../game/data/revos';
+import { cleanCap } from '../../game/FossilBlock';
 import { screenHead, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
@@ -25,6 +26,7 @@ export class CleanScreen extends Screen {
   private progressText!: HTMLElement;
   private boneEl!: HTMLElement;
   private boneNumEl!: HTMLElement;
+  private capEl!: HTMLElement;
   private nameEl!: HTMLElement;
   private surface!: HTMLElement;
   private toolBtns = new Map<ToolId, HTMLButtonElement>();
@@ -74,6 +76,8 @@ export class CleanScreen extends Screen {
         // 目盛りは評価の境目。どこまで削れば等級が上がるかを帯の上で示す
         h('div', { class: 'clean-gauge' },
           this.progressBar.el,
+          // 損傷で届かなくなった天井。削った帯がここで止まる
+          (this.capEl = h('i', { class: 'clean-cap' })),
           h('i', { class: 'clean-tick clean-tick--a' }),
           h('i', { class: 'clean-tick clean-tick--s' }),
         ),
@@ -244,9 +248,14 @@ export class CleanScreen extends Screen {
     // 損傷は溜まる側の帯で出す。減っていく点だと「残り」に見えて、
     // 削ってはいけないものを削っている自覚が出ない
     const d = this.scene.boneDamage;
-    this.boneEl.style.width = `${Math.min(100, (d / 20) * 100)}%`;
-    this.boneNumEl.textContent = d > 0 ? `−${d.toFixed(1)}` : '0.0';
-    this.boneNumEl.classList.toggle('is-bad', d >= 8);
+    // 帯は上限が0になる損傷量（100/3）を満タンとする
+    this.boneEl.style.width = `${Math.min(100, (d / (100 / 3)) * 100)}%`;
+    // 損傷は点を引かず上限を下げる。下がった天井を除去率の帯の上に出す
+    const cap = cleanCap(d);
+    this.capEl.style.left = `${cap}%`;
+    this.capEl.hidden = cap >= 100;
+    this.boneNumEl.textContent = d > 0 ? `上限 ${cap}` : '無傷';
+    this.boneNumEl.classList.toggle('is-bad', cap < 85);
   }
 
   private finish(): void {
