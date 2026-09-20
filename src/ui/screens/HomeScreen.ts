@@ -1,12 +1,14 @@
 import { Screen } from '../UIRoot';
-import { h, bar, clear, fmtNum } from '../dom';
-import { banner, cardButton, identity, plate, railButton, tabBar } from '../chrome';
+import { h, bar, button, clear, fmtNum } from '../dom';
+import { banner, cardButton, identity, plate, railButton, spaced, tabBar } from '../chrome';
 import type { SaveData } from '../../core/Save';
 import { expToNext, dropDecay } from '../../core/Save';
 import { revosIcon } from '../revosIcon';
 import { BIOMES } from '../../voxel/palette';
 import { EVENTS } from '../../game/data/events';
 import { unclaimedCount } from '../../game/mail';
+import { missionRatio, nearestMission, readyCount } from '../../game/missions';
+import { unreadNews } from '../../game/news';
 
 const MAX_HEARTS = 5;
 
@@ -32,6 +34,11 @@ export class HomeScreen extends Screen {
   private expBar = bar('bar--exp', 0);
   private expTextEl!: HTMLElement;
   private goalPlate = plate('次の目標', { tone: 'plain' });
+  private misNameEl!: HTMLElement;
+  private misCountEl!: HTMLElement;
+  private misBar = bar('bar--exp', 0);
+  private misMoreEl!: HTMLButtonElement;
+  private misBadgeEl!: HTMLElement;
   private cards = new Map<string, ReturnType<typeof cardButton>>();
   private rails = new Map<string, ReturnType<typeof railButton>>();
   private tabs = tabBar([
@@ -42,7 +49,8 @@ export class HomeScreen extends Screen {
     { key: 'dex', icon: '☰', label: '図鑑', onTap: () => this.onGo?.('dex') },
   ]);
 
-  onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'mail' | 'party' | 'dex' | 'profile' | 'title' | 'debug') => void;
+  onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'news' | 'shop' | 'mission'
+    | 'mail' | 'party' | 'dex' | 'profile' | 'title' | 'debug') => void;
 
   constructor() { super('home'); }
 
@@ -97,8 +105,10 @@ export class HomeScreen extends Screen {
       this.cards.set(key, c);
       cards.appendChild(c.el);
     };
-    addCard('clean', '◈', '精錬', 'amber', () => this.onGo?.('clean'));
-    addCard('event', '✦', '依頼', 'rose', () => this.onGo?.('event'));
+    // 精錬は「発掘」の中へ移した。掘るのと削るのはひと続きの作業なので、
+    // 入口を2か所に割らない。空いた枠には、外から届くものを置く
+    addCard('news', '▤', 'ニュース', 'rose', () => this.onGo?.('news'));
+    addCard('shop', '✦', 'ショップ', 'amber', () => this.onGo?.('shop'));
 
     // ---- 計器。心と帯 ----
     this.heartsEl = h('div', { class: 'hearts' });
@@ -112,8 +122,24 @@ export class HomeScreen extends Screen {
 
     const foot = h('div', { class: 'home-foot' }, gauge, this.goalPlate.el);
 
+    // ---- ミッション。ステージの上に1件だけ ----
+    // 一覧を常に出すと、拠点が表になる。出すのは「次に片付くもの」1件で、
+    // 残りは横のボタンの向こうに畳む
+    this.misNameEl = h('span', { class: 'mission-name' });
+    this.misCountEl = h('span', { class: 'mission-count num' });
+    this.misBadgeEl = h('span', { class: 'mission-badge num', hidden: true });
+    const strip = button('', () => this.onGo?.('mission'), { class: 'mission-strip' });
+    strip.append(
+      h('span', { class: 'mission-eyebrow', text: spaced('ミッション') }),
+      this.misNameEl,
+      h('span', { class: 'mission-gauge' }, this.misBar.el, this.misCountEl),
+    );
+    this.misMoreEl = button('一覧', () => this.onGo?.('mission'), { class: 'btn--sm mission-more' });
+    this.misMoreEl.appendChild(this.misBadgeEl);
+    const mission = h('div', { class: 'home-mission' }, strip, this.misMoreEl);
+
     this.tabs.select('home');
-    this.el.append(head, bannerWrap, rail, cards, foot, this.tabs.el);
+    this.el.append(head, bannerWrap, rail, cards, mission, foot, this.tabs.el);
   }
 
   enter(): void { this.refresh(); }
@@ -156,9 +182,8 @@ export class HomeScreen extends Screen {
     }
 
     // ---- 右の色札 ----
-    const stock = this.data.stock.length;
-    this.cards.get('clean')?.badge(stock);
-    this.cards.get('event')?.badge(open.length);
+    this.cards.get('news')?.badge(unreadNews(this.data));
+    this.cards.get('shop')?.badge(0);
     // 未解放の導線は暗い札のまま置いておく。消すと「あとで増える」が伝わらない
     this.rails.get('debug')!.el.hidden = this.data.settings.debug !== true;
     // 受信箱だけ数を出す。何通あるかで受け取りの手間が変わる
@@ -183,6 +208,25 @@ export class HomeScreen extends Screen {
     const biome = Object.values(BIOMES).find((b) => stage >= b.level[0] && stage <= b.level[1])
       ?? Object.values(BIOMES)[0];
     this.goalPlate.set(`ステージ ${stage}`, biome.name);
+
+    // ---- ミッション ----
+    const near = nearestMission(this.data);
+    const ready = readyCount(this.data);
+    if (near) {
+      const now = Math.min(near.goal, near.progress(this.data));
+      this.misNameEl.textContent = near.name;
+      this.misBar.set(missionRatio(this.data, near));
+      this.misCountEl.textContent = `${fmtNum(now)} / ${fmtNum(near.goal)}${near.unit}`;
+    } else {
+      // すべて受け取り終えた状態。空の帯を出すより、その事実を書く
+      this.misNameEl.textContent = 'すべて受け取り済み';
+      this.misBar.set(1);
+      this.misCountEl.textContent = '—';
+    }
+    // 受け取れるものがあるときだけ帯を光らせる。常時光ると合図にならない
+    this.misNameEl.parentElement?.classList.toggle('is-ready', ready > 0);
+    this.misBadgeEl.textContent = String(ready);
+    this.misBadgeEl.hidden = ready === 0;
 
     // ---- タブの報せ ----
     this.tabs.badge('party', this.data.roster.length === 0 ? 0 : 0);

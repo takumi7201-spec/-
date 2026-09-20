@@ -128,7 +128,35 @@ export interface SaveData {
     /** 累計プレイ時間（秒） */
     playSeconds: number;
   };
-  daily: { date: string; runs: number };
+  /**
+   * ミッション。
+   *
+   * 達成の判定は保存しない——条件はすべて stats と手持ちから引ける。
+   * 持つのは「受け取ったかどうか」だけにして、条件を足したり直したりしても
+   * 既存の進捗が壊れないようにする。
+   */
+  missions: {
+    /** 実績の受取済み id */
+    claimed: string[];
+    /** 日課。日付が変われば claimed ごと空にする */
+    daily: { date: string; claimed: string[] };
+  };
+  /** 読んだお知らせの id。未読の数だけ拠点に出す */
+  news: { read: string[] };
+  /** 商店。日ごとの購入回数を数える */
+  shop: { date: string; bought: Record<string, number> };
+  daily: {
+    date: string;
+    runs: number;
+    /**
+     * 日課の数取り。
+     *
+     * stats は累計しか持たないので、「今日やったか」が引けない。
+     * 累計との差を覚えるやり方だと、日付が変わる瞬間を跨いだときに
+     * ずれる——その日のぶんだけを別に数える。
+     */
+    counts: Record<string, number>;
+  };
   settings: {
     quality: QualityTier | 'auto';
     /** true: 右半分で移動・左半分で視点（既定） */
@@ -184,7 +212,10 @@ export function defaultSave(): SaveData {
       kos: 0, damage: 0, bestHit: 0, odFired: 0, fastestWin: 0, sorties: {},
       playSeconds: 0,
     },
-    daily: { date: todayKey(), runs: 0 },
+    missions: { claimed: [], daily: { date: todayKey(), claimed: [] } },
+    news: { read: [] },
+    shop: { date: todayKey(), bought: {} },
+    daily: { date: todayKey(), runs: 0, counts: {} },
     settings: {
       quality: 'auto',
       swapSides: true,
@@ -231,7 +262,7 @@ export function load(): SaveData {
     if (data.version !== SAVE_VERSION) return migrate(data);
     // 日付が変わっていたら周回数をリセット（逓減ドロップの基準）
     const t = todayKey();
-    if (data.daily?.date !== t) data.daily = { date: t, runs: 0 };
+    if (data.daily?.date !== t) data.daily = { date: t, runs: 0, counts: {} };
     migrateDefIds(data);
     const base = defaultSave();
     // 浅いマージだと、後から足した設定キーが既存プレイヤーに一生届かない。
@@ -245,6 +276,13 @@ export function load(): SaveData {
       events: { ...base.events, ...(data.events ?? {}) },
       mail: data.mail ?? [],
       login: { ...base.login, ...(data.login ?? {}) },
+      missions: {
+        claimed: data.missions?.claimed ?? [],
+        daily: { ...base.missions.daily, ...(data.missions?.daily ?? {}) },
+      },
+      news: { read: data.news?.read ?? [] },
+      shop: { ...base.shop, ...(data.shop ?? {}), bought: { ...(data.shop?.bought ?? {}) } },
+      daily: { ...base.daily, ...(data.daily ?? {}), counts: { ...(data.daily?.counts ?? {}) } },
       stats: {
         ...base.stats,
         ...(data.stats ?? {}),
@@ -285,6 +323,27 @@ export function saveDebounced(data: SaveData, ms = 600): void {
 
 export function clearSave(): void {
   try { localStorage.removeItem(KEY); } catch { /* noop */ }
+}
+
+/**
+ * 日付をまたいだぶんを巻き戻す。
+ *
+ * 起動時にしか見ていないと、開きっぱなしで 4 時を越えたときに
+ * 日課が前日のまま止まる。拠点へ戻るたびに通す。
+ */
+export function rollDaily(data: SaveData, at = Date.now()): boolean {
+  const t = todayKey(at);
+  let moved = false;
+  if (data.daily.date !== t) { data.daily = { date: t, runs: 0, counts: {} }; moved = true; }
+  if (data.missions.daily.date !== t) { data.missions.daily = { date: t, claimed: [] }; moved = true; }
+  if (data.shop.date !== t) { data.shop = { date: t, bought: {} }; moved = true; }
+  return moved;
+}
+
+/** 今日ぶんの数取り。累計（stats）を足す側と必ず対で呼ぶ */
+export function countToday(data: SaveData, key: string, n = 1): void {
+  rollDaily(data);
+  data.daily.counts[key] = (data.daily.counts[key] ?? 0) + n;
 }
 
 /** 当日のN周目におけるレア以上の出現率倍率。壁ではなく勾配で止める */

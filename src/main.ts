@@ -22,6 +22,10 @@ import { advanceHoloTime } from './fx/SpriteUnit';
 import { buildEventTeam, type EventDef } from './game/data/events';
 import { BattleSelectScreen, stageCoins } from './ui/screens/BattleSelectScreen';
 import { MailScreen } from './ui/screens/MailScreen';
+import { DigSelectScreen } from './ui/screens/DigSelectScreen';
+import { MissionScreen } from './ui/screens/MissionScreen';
+import { NewsScreen } from './ui/screens/NewsScreen';
+import { ShopScreen } from './ui/screens/ShopScreen';
 import { grantLogin, grantStaffMail } from './game/mail';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
@@ -31,6 +35,7 @@ import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
 import {
   load as loadSave, save as writeSave, defaultSave, dropDecay, addExp, addPlayerExp,
+  countToday, rollDaily,
   type SaveData,
 } from './core/Save';
 import type { BiomeId } from './voxel/palette';
@@ -107,12 +112,16 @@ async function main(): Promise<void> {
   const dexScreen = new DexScreen();
   const selectScreen = new BattleSelectScreen();
   const mailScreen = new MailScreen();
+  const digSelectScreen = new DigSelectScreen();
+  const missionScreen = new MissionScreen();
+  const newsScreen = new NewsScreen();
+  const shopScreen = new ShopScreen();
   const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
   const detailScreen = new DetailScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -147,6 +156,9 @@ async function main(): Promise<void> {
   }
 
   function goHome(): void {
+    // 開きっぱなしで 4 時を越えることがある。起動時にしか見ていないと、
+    // 日課が前日のまま止まったまま遊び続けることになる
+    if (rollDaily(data)) writeSave(data);
     deliverMail(true);
     home.setGuest(data.party.order?.[0]
       ? data.roster.find((r) => r.uid === data.party.order?.[0])?.defId ?? data.roster[0]?.defId ?? null
@@ -171,6 +183,10 @@ async function main(): Promise<void> {
      */
     data.stats.runs++;
     data.stats.biomeRuns[biome] = (data.stats.biomeRuns[biome] ?? 0) + 1;
+    countToday(data, 'dig');
+    // 降りた時点で書く。周回の終わりまで待つと、途中で閉じたぶんが
+    // 記録からも日課からも消える——降りた事実は成果と別に残す
+    writeSave(data);
     boot.classList.remove('hidden');
     await progress(0.35, 'エリアを生成しています…');
     const seed = (Date.now() ^ (data.daily.runs * 7919)) >>> 0;
@@ -251,8 +267,12 @@ async function main(): Promise<void> {
 
   homeScreen.onGo = (where) => {
     switch (where) {
-      case 'dig': void startRun(data.unlockedBiomes[0] ?? 'canyon'); break;
+      // 掘るのと削るのはひと続きの作業。同じ面で選ばせる
+      case 'dig': digSelectScreen.setData(data); ui.show('digSelect'); break;
       case 'clean': stockScreen.setData(data); ui.show('stock'); break;
+      case 'mission': missionScreen.setData(data); ui.show('mission'); break;
+      case 'news': newsScreen.setData(data); ui.show('news'); break;
+      case 'shop': shopScreen.setData(data); ui.show('shop'); break;
       case 'battle':
         selectScreen.setData(data);
         // 明示して開く。前に見ていた側が残ると、タブの名前と中身がずれる
@@ -335,6 +355,7 @@ async function main(): Promise<void> {
     data.stats.fossils++;
     data.stats.bestClean = Math.max(data.stats.bestClean, score.clean);
     if (score.rank === 'S') data.stats.sRanks++;
+    countToday(data, 'clean');
     addPlayerExp(data, 60 + Math.round(score.clean * 0.6));
     writeSave(data);
     showResult({
@@ -366,7 +387,9 @@ async function main(): Promise<void> {
       data.stats.bestHit = Math.max(data.stats.bestHit, t.bestHit);
       data.stats.kos += t.kos;
       data.stats.odFired += t.odFired;
+      countToday(data, 'od', t.odFired);
     }
+    countToday(data, 'battle');
     // 出撃回数。誰を連れて行きがちかは、勝敗と別に残しておく
     for (const uid of buildTeamSetup(data.roster, data.party.order, data.party.formation)?.members.map((m) => m.defId) ?? []) {
       data.stats.sorties[uid] = (data.stats.sorties[uid] ?? 0) + 1;
@@ -377,6 +400,7 @@ async function main(): Promise<void> {
     if (winner === 0) {
       data.stats.wins++;
       data.stats.streak++;
+      countToday(data, 'win');
       data.stats.bestStreak = Math.max(data.stats.bestStreak, data.stats.streak);
       const turns = player?.sim.turnCount ?? 0;
       // 0 は「未達成」。初回は無条件に入れないと、いつまでも 0 のまま
@@ -460,13 +484,28 @@ async function main(): Promise<void> {
   };
 
   profileScreen.onBack = () => goHome();
-  stockScreen.onBack = () => goHome();
+  // 精錬の一覧から戻る先は発掘の面。拠点まで戻すと、
+  // もう1つ削りに行くのに毎回タブを踏み直すことになる
+  stockScreen.onBack = () => { digSelectScreen.setData(data); ui.show('digSelect'); };
   stockScreen.onClean = (entry) => {
     const [s] = data.stock.splice(entry.index, 1);
     if (!s) { ui.toast('その化石はもう無い', 'warn'); stockScreen.setData(data); return; }
     writeSave(data);
     void startClean(s.defId, s.rarity);
   };
+
+  digSelectScreen.onBack = () => goHome();
+  digSelectScreen.onGo = (biome) => { void startRun(biome); };
+  digSelectScreen.onClean = () => { stockScreen.setData(data); ui.show('stock'); };
+
+  missionScreen.onBack = () => goHome();
+  missionScreen.onClaim = () => { writeSave(data); homeScreen.setData(data); };
+
+  newsScreen.onBack = () => goHome();
+  newsScreen.onRead = () => { writeSave(data); homeScreen.setData(data); };
+
+  shopScreen.onBack = () => goHome();
+  shopScreen.onBuy = () => { writeSave(data); homeScreen.setData(data); };
 
   mailScreen.onBack = () => goHome();
   mailScreen.onClaim = () => {
@@ -549,6 +588,10 @@ async function main(): Promise<void> {
     else if (jump === 'event') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'event' }); }
     else if (jump === 'select') { selectScreen.setData(data); ui.show('battleSelect'); }
     else if (jump === 'mail') { deliverMail(false); mailScreen.setData(data); ui.show('mail'); }
+    else if (jump === 'digSelect') { digSelectScreen.setData(data); ui.show('digSelect'); }
+    else if (jump === 'mission') { missionScreen.setData(data); ui.show('mission'); }
+    else if (jump === 'news') { newsScreen.setData(data); ui.show('news'); }
+    else if (jump === 'shop') { shopScreen.setData(data); ui.show('shop'); }
     else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
     else if (jump === 'profile') { profileScreen.setData(data); ui.show('profile'); }
     else if (jump === 'debug') openDebug();

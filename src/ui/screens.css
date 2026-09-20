@@ -1902,3 +1902,326 @@ body[data-layout='wide'] .sel-tabs { left: 18vw; right: 18vw; }
 .deck--mail .btn { flex: 1; height: 54px; min-height: 54px; border-radius: 15px; }
 
 body[data-layout='wide'] .mail-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   ミッションの帯（拠点）
+   一覧を拠点に広げない。出すのは「次に片付くもの」1件で、
+   残りは横のボタンの向こうへ畳む
+   ========================================================================= */
+.home-mission {
+  position: absolute;
+  bottom: 188px;
+  left: calc(var(--gutter) + var(--safe-l));
+  right: calc(var(--gutter) + var(--safe-r));
+  display: flex; align-items: stretch; gap: 8px;
+  pointer-events: none;
+}
+.home-mission > * { pointer-events: auto; }
+.mission-strip {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px;
+  min-height: 0; padding: 8px 12px 9px;
+  border: 0; border-radius: 13px;
+  background: rgba(255, 253, 248, 0.82); color: var(--ink);
+  box-shadow: 0 6px 18px rgba(72, 58, 36, 0.16);
+  text-align: left;
+}
+/* 受け取れるものがあるときだけ枠を光らせる。常時光ると合図にならない */
+.mission-strip.is-ready {
+  background: linear-gradient(100deg, rgba(255, 220, 140, 0.92), rgba(255, 250, 236, 0.95));
+  box-shadow: inset 0 0 0 2px var(--hl-amber), 0 6px 18px rgba(197, 138, 30, 0.24);
+}
+.mission-eyebrow {
+  font-size: 8px; font-weight: 700; letter-spacing: 0.22em; color: var(--ink-faint);
+}
+.mission-name {
+  font-size: 13px; font-weight: 900; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mission-gauge { position: relative; display: block; margin-top: 3px; }
+.mission-gauge .bar { height: 13px; border-radius: 7px; }
+.mission-count {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-size: 10px; color: var(--paper-card);
+  text-shadow: 0 1px 2px rgba(42, 37, 30, 0.6);
+  pointer-events: none;
+}
+.mission-more {
+  position: relative; flex: none; width: 64px;
+  border-radius: 13px; font-size: 12px; font-weight: 900; letter-spacing: 0.1em;
+}
+.mission-badge {
+  position: absolute; right: -5px; top: -5px;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--hl-rose); color: #fff6f4;
+  font-size: 10px; font-weight: 700;
+  display: grid; place-items: center; line-height: 1;
+}
+body[data-layout='wide'] .home-mission {
+  left: 50%; right: auto; width: min(520px, 90vw); transform: translateX(-50%);
+}
+
+/* =========================================================================
+   発掘の入口
+   出発と精錬をひと続きの作業として同じ面に並べる
+   ========================================================================= */
+.screen--digSelect::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--digSelect > * { z-index: 1; }
+
+.digsel-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 10px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+/* 2枚とも同じ高さ。片方だけ大きいと、そちらが既定の選択に見える。
+   画面いっぱいには伸ばさない——札が縦長になるほど中身が薄く見える */
+/* 縦並びの子は既定で親幅まで伸びるが、最小内容幅のほうが広いと
+   そちらが勝って画面からはみ出す。潰せることを明示する */
+.digsel-slot { flex: 1 1 0; min-height: 150px; max-height: 250px; display: flex; min-width: 0; }
+.digsel-card {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 13px;
+  padding: 16px 16px 16px 14px;
+  border: 0; border-radius: 18px;
+  color: var(--ink); text-align: left;
+  box-shadow: 0 8px 22px rgba(72, 58, 36, 0.18);
+}
+.digsel-card--go {
+  background: linear-gradient(104deg, rgba(255, 214, 120, 0.94), rgba(255, 247, 226, 0.96));
+}
+.digsel-card--clean {
+  background: linear-gradient(104deg, rgba(168, 214, 226, 0.88), rgba(247, 252, 254, 0.96));
+}
+.digsel-card.is-empty {
+  background: rgba(255, 253, 248, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.14);
+}
+.digsel-mark {
+  flex: none; width: 46px; height: 46px; border-radius: 14px;
+  display: grid; place-items: center;
+  font-size: 22px; color: var(--on-plate);
+  background: var(--plate);
+}
+.digsel-card.is-empty .digsel-mark { background: rgba(42, 37, 30, 0.28); }
+.digsel-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.digsel-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: var(--ink-faint); }
+.digsel-title { font-size: 18px; font-weight: 900; line-height: 1.25; }
+.digsel-note { font-size: 11px; color: var(--ink-soft); line-height: 1.6; }
+.digsel-meta {
+  display: flex; align-items: center; gap: 9px; margin-top: 5px; min-width: 0;
+}
+/* 名前の列が伸びると、親の最小幅ごと押し広げて右端の「削る」が枠外へ落ちる */
+.digsel-names { flex: 1 1 auto; }
+.digsel-hearts { flex: none; }
+.digsel-eff { font-size: 11px; color: var(--pen-brown); }
+.digsel-eff.is-low { color: var(--hl-rose); }
+.digsel-faces { display: flex; gap: 2px; flex: none; }
+.digsel-face { width: 30px; height: 30px; }
+.digsel-names {
+  font-size: 10px; color: var(--ink-soft); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.digsel-go {
+  flex: none; font-size: 13px; font-weight: 900; letter-spacing: 0.12em;
+  color: var(--hl-amber-deep);
+}
+.digsel-card--clean .digsel-go { color: #1c6f8c; }
+.digsel-card.is-empty .digsel-go { color: var(--ink-faint); }
+
+body[data-layout='wide'] .digsel-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   ミッションの一覧
+   日課と記録をタブで割る。報酬の桁が2つ違うものを同じ表に混ぜない
+   ========================================================================= */
+.screen--mission::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--mission > * { z-index: 1; }
+
+.mis-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 56px); bottom: 84px;
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 9px;
+  padding-bottom: 16px;
+  pointer-events: auto;
+}
+.mis-note { font-size: 11px; color: var(--ink-faint); letter-spacing: 0.04em; padding: 2px 2px 0; }
+.mis-card {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 11px 13px 13px;
+  border: 0; border-radius: 15px;
+  background: var(--paper-card);
+  box-shadow: 0 6px 16px rgba(72, 58, 36, 0.16);
+}
+.mis-card.is-ready {
+  background: linear-gradient(100deg, rgba(255, 220, 140, 0.92), rgba(255, 250, 236, 0.96));
+  box-shadow: 0 7px 18px rgba(197, 138, 30, 0.26);
+}
+/* 受け取り済みは沈める。消すと、残りが有るのか無いのかが空の表から読めない */
+.mis-card.is-claimed {
+  background: rgba(255, 253, 248, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.14);
+}
+.mis-head { display: flex; align-items: center; gap: 8px; }
+.mis-tag {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.18em;
+  padding: 3px 9px; border-radius: 5px; color: #fff6f4;
+}
+.mis-tag--daily { background: #1f7b78; }
+.mis-tag--record { background: var(--pen-brown); }
+.mis-name { font-size: 15px; font-weight: 900; line-height: 1.25; min-width: 0; }
+.mis-coin {
+  margin-left: auto; flex: none;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; color: var(--pen-brown);
+}
+.mis-desc { font-size: 11px; color: var(--ink-soft); line-height: 1.7; }
+.mis-gauge { position: relative; margin-top: 5px; }
+.mis-gauge .bar { height: 15px; border-radius: 8px; }
+/* 帯の中に1行で置く。grid だと子要素が段に割れて、分母が帯の外へ落ちる */
+.mis-count {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 11px; color: var(--paper-card);
+  text-shadow: 0 1px 2px rgba(42, 37, 30, 0.6);
+  pointer-events: none;
+}
+.mis-count .is-done { color: #ffe9a8; }
+.mis-go {
+  margin-top: 10px; min-height: 44px; border-radius: 12px;
+  background: var(--paper-card); color: var(--ink);
+  font-weight: 900; letter-spacing: 0.08em;
+  box-shadow: inset 0 0 0 2px var(--hl-amber), 0 4px 12px rgba(72, 58, 36, 0.14);
+}
+.mis-done, .mis-pending {
+  display: flex; align-items: center; gap: 7px; margin-top: 8px;
+  padding-top: 8px; border-top: 1px solid var(--rule);
+  font-size: 11px; color: var(--ink-faint);
+}
+.mis-done-mark { color: var(--pen-green); font-size: 13px; }
+
+body[data-layout='wide'] .mis-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   ニュース
+   読むだけの面。既読は開いた時点でまとめて付ける
+   ========================================================================= */
+.screen--news::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--news > * { z-index: 1; }
+
+.news-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+.news-card {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 12px 14px 14px;
+  border: 0; border-radius: 15px;
+  background: var(--paper-card);
+  box-shadow: 0 6px 16px rgba(72, 58, 36, 0.16);
+}
+.news-card.is-new { box-shadow: inset 0 0 0 2px var(--hl-rose), 0 6px 16px rgba(72, 58, 36, 0.16); }
+.news-head { display: flex; align-items: center; gap: 8px; }
+.news-tag {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.2em;
+  padding: 3px 10px; border-radius: 5px; color: #fff6f4;
+}
+.news-tag--update { background: #1f7b78; }
+.news-tag--event { background: var(--hl-rose); }
+.news-tag--notice { background: var(--pen-brown); }
+.news-date { font-size: 11px; color: var(--ink-faint); }
+.news-new {
+  margin-left: auto; font-size: 9px; font-weight: 900; letter-spacing: 0.16em;
+  color: var(--hl-rose);
+}
+.news-title { font-size: 16px; font-weight: 900; line-height: 1.35; margin-top: 2px; }
+.news-desc { margin: 4px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.95; }
+
+body[data-layout='wide'] .news-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   アイテムショップ
+   売るのは手間の入口だけ。買えないものも棚から消さずに暗く置く
+   ========================================================================= */
+.screen--shop::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--shop > * { z-index: 1; }
+
+.shop-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 9px;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+.shop-note { font-size: 11px; color: var(--ink-faint); letter-spacing: 0.04em; padding: 2px 2px 0; }
+.shop-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 13px;
+  border-radius: 15px;
+  background: var(--paper-card);
+  box-shadow: 0 6px 16px rgba(72, 58, 36, 0.16);
+}
+.shop-card.is-off {
+  background: rgba(255, 253, 248, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.14);
+}
+.shop-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.shop-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.shop-kind {
+  flex: none;
+  font-size: 9px; font-weight: 900; letter-spacing: 0.18em;
+  padding: 3px 9px; border-radius: 5px; color: #fff6f4;
+}
+.shop-kind--rough { background: var(--pen-brown); }
+.shop-kind--permit { background: #1f7b78; }
+.shop-name { font-size: 15px; font-weight: 900; min-width: 0; }
+.shop-desc { font-size: 11px; color: var(--ink-soft); line-height: 1.7; }
+.shop-left { font-size: 10px; color: var(--ink-faint); }
+.shop-left.is-out { color: var(--hl-rose); }
+.shop-buy { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.shop-price {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 14px; color: var(--pen-brown);
+}
+.shop-price.is-poor { color: var(--hl-rose); }
+.shop-go { min-width: 72px; border-radius: 11px; font-weight: 900; letter-spacing: 0.1em; }
+.shop-got { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 2px; }
+.shop-got-icon { width: 96px; height: 96px; }
+.shop-got-name { font-size: 17px; font-weight: 900; }
+.shop-got-sub { font-size: 12px; color: var(--pen-brown); letter-spacing: 0.08em; }
+.shop-got-note { font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
+
+body[data-layout='wide'] .shop-body { left: 18vw; right: 18vw; }
