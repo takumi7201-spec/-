@@ -20,14 +20,16 @@ export type PassiveId =
   | 'heatreflect' | 'tide' | 'shearwind' | 'immutable' | 'resonance'
   | 'traction' | 'overheat' | 'pursuit' | 'deepreign'
   | 'oldtyrant' | 'archivesail'
-  | 'skygrasp' | 'platescreen' | 'greatbeak';
+  | 'skygrasp' | 'platescreen' | 'greatbeak'
+  | 'islandapex' | 'earthbreath';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
   | 'scorchring' | 'tideheal' | 'erosionstorm' | 'obsidiancut' | 'resonantlight'
   | 'faulthaul' | 'greateruption' | 'crushbite' | 'abyssalmaw'
   | 'galemaw' | 'stratarecord'
-  | 'skyreign' | 'spikebore' | 'leapstrike';
+  | 'skyreign' | 'spikebore' | 'leapstrike'
+  | 'hatzegwing' | 'grindfeed';
 
 export interface RevosDef {
   id: string;
@@ -271,6 +273,42 @@ export const REVOS: RevosDef[] = [
     build: { archetype: 'pterosaur', seed: 17181, bulk: 1.02, scale: 1.16, crest: true },
     habitat: ['canyon', 'frostpeak'], rarity: 5,
     flavor: '翼を広げれば10mを超える、空を飛んだ最大の生き物。地に降りればキリンの背丈で歩き、見上げる空には競合がいなかった。',
+  },
+  {
+    id: 'hatzegopteryx', name: 'ハツェゴプテリクス', short: 'ハツェゴ',
+    en: 'Hatzegopteryx', element: 'flame', role: 'All-round',
+    hp: 1230, atk: 118, def: 100, spd: 110, basicPower: 87,
+    passive: {
+      id: 'islandapex', name: '島の頂点',
+      desc: 'このユニットの攻撃が通ったとき、一度だけ 攻撃 +20%（戦闘中ずっと残る）。',
+    },
+    od: {
+      id: 'hatzegwing', name: 'ハツェグの翼',
+      desc: '敵全体に大ダメージ ＋ 味方全体の 速度 +10%（4行動）。', power: 83,
+    },
+    defaultPref: 'front',
+    sprite: 'hatzegopteryx',
+    build: { archetype: 'pterosaur', seed: 19191, bulk: 1.14, scale: 1.12, crest: true },
+    habitat: ['emberfield', 'canyon'], rarity: 5,
+    flavor: '島には大型の獣脚類がいなかった。翼を畳んで四足で歩き、地上の獲物を狩る翼竜が、そこでは頂点に立っていた。',
+  },
+  {
+    id: 'brachiosaurus', name: 'ブラキオサウルス', short: 'ブラキオ',
+    en: 'Brachiosaurus', element: 'terra', role: 'Healer',
+    hp: 2140, atk: 100, def: 150, spd: 80, basicPower: 80,
+    passive: {
+      id: 'earthbreath', name: '大地の伊吹',
+      desc: '味方が受ける回復量 +15%（自分の回復も含む）。',
+    },
+    od: {
+      id: 'grindfeed', name: '磨り潰し消化',
+      desc: '味方全体に再生（5秒）。合計で自分の最大 体力 の 1/5 ぶんを回復する。', power: 0,
+    },
+    defaultPref: 'lowhp',
+    sprite: 'brachiosaurus',
+    build: { archetype: 'sauropod', seed: 20202, bulk: 1.3, scale: 1.24 },
+    habitat: ['canyon', 'emberfield'], rarity: 5,
+    flavor: '前肢が後肢より長い、傾いた体。胃石で磨り潰して呑み下す消化のために、数十キロの石を抱えて歩いていた。',
   },
   {
     id: 'stegosaurus', name: 'ステゴサウルス', en: 'Stegosaurus', element: 'flame', role: 'Guardian',

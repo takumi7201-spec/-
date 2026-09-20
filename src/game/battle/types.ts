@@ -72,10 +72,19 @@ export interface Mod {
 }
 
 export interface StatusEffect {
-  kind: 'burn';
+  kind: 'burn' | 'regen';
   turns: number;
-  /** 最大HP比 */
+  /** burn: 最大HP比 / regen: 1回あたりの回復量（実数） */
   value: number;
+  /**
+   * regen の残り回復量。これを撃ち切ると、期限前でも消える。
+   *
+   * 「5秒かけて総量Xを回復」を秒だけで表すと、速い個体ほど多く受け取る。
+   * 総量を持たせて上限を切れば、受け取りの早さだけが速度で変わる。
+   */
+  pool?: number;
+  /** 時間で切れるものの失効時刻（Mod.until と同じ単位） */
+  until?: number;
   source: string;
 }
 
@@ -151,7 +160,7 @@ export type BattleEvent =
   | { t: 'shield'; uid: string; amount: number }
   | { t: 'mod'; uid: string; kind: ModKind; value: number; turns: number; label: string }
   | { t: 'status'; uid: string; kind: 'burn'; applied: boolean }
-  | { t: 'statusTick'; uid: string; kind: 'burn'; amount: number; hp: number }
+  | { t: 'statusTick'; uid: string; kind: 'burn' | 'regen'; amount: number; hp: number }
   | { t: 'od'; uid: string; value: number }
   | { t: 'odReady'; uid: string }
   | { t: 'ko'; uid: string; by: string }

@@ -41,8 +41,9 @@ const OD_RECOVERY: Record<string, number> = {
   stratarecord: 0.28,
   spikebore: 0.5, leapstrike: 0.5,
   skyreign: 0.28,
+  hatzegwing: 0.85,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
-  rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28,
+  rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28, grindfeed: 0.28,
 };
 const MAX_TURNS = 200;
 
@@ -54,6 +55,17 @@ const MAX_TURNS = 200;
  * 標準速の秒数を固定値として持つ。
  */
 const SKYREIGN_DURATION = Math.round(10 / 0.055);
+/** 「磨り潰し消化」の再生時間。5秒を戦闘内時刻へ換算する */
+const GRINDFEED_DURATION = Math.round(5 / 0.055);
+/**
+ * 「磨り潰し消化」の配り方。
+ *
+ * 5秒は、この戦闘の時計ではSPD100の個体が1回動くかどうかという長さしかない。
+ * 全部を再生に回すと、撃った瞬間は何も起きずに終わることが多い。
+ * 撃った時点で半分を渡し、残りを5秒のあいだの行動ごとに配る。
+ */
+const GRINDFEED_INSTANT = 0.5;
+const GRINDFEED_TICK = 0.34;
 /*
  * SPD を上げる時間制のバフは、上げ幅がそのまま「その窓の中で何回動けるか」に
  * なるので、自分の持続を自分で買う。+10% では窓の中に1回も増えず、★5の
@@ -403,6 +415,7 @@ export class BattleSim {
 
     if (dealt > 0) {
       const p = passiveOf(actor);
+      this.tickIslandApex(actor, ev);
       if (p === 'embers' && this.rng.chance(0.32)) this.applyBurn(target, ev, actor.uid);
       if (p === 'shearwind') {
         const st = actor.stacks.shear ?? 0;
@@ -564,6 +577,33 @@ export class BattleSim {
         if (t.alive) this.addMod(t, { kind: 'taken', value: 0.25, turns: 3, source: 'leapstrike' }, ev, '被ダメ上昇');
         break;
       }
+      case 'hatzegwing': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
+        let landed = 0;
+        for (const e of enemies) landed += this.dealDamage(actor, e, power, ev);
+        for (const a of allies) {
+          this.addMod(a, { kind: 'spd', value: 0.10, turns: 4, source: 'hatzegwing' }, ev, 'SPD上昇');
+        }
+        if (landed > 0) this.tickIslandApex(actor, ev);
+        break;
+      }
+      case 'grindfeed': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: allies.map((a) => a.uid) });
+        // 総量は自分の最大体力の 1/5。5秒のあいだ、行動が回るたびに分けて渡す
+        const total = Math.round(actor.maxHp * 0.2 * mod);
+        const instant = Math.round(total * GRINDFEED_INSTANT);
+        const per = Math.max(1, Math.round(total * GRINDFEED_TICK));
+        const until = this.clockV + GRINDFEED_DURATION;
+        for (const a of allies) {
+          this.heal(actor, a, instant, ev);
+          a.statuses = a.statuses.filter((st) => !st.source.endsWith('|grindfeed'));
+          a.statuses.push({
+            kind: 'regen', turns: 99, value: per, pool: total - instant, until,
+            source: actor.uid + '|grindfeed',
+          });
+        }
+        break;
+      }
       case 'greateruption': {
         ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
         for (const e of enemies) {
@@ -705,10 +745,25 @@ export class BattleSim {
     return remaining;
   }
 
+  /**
+   * 「島の頂点」: 初めて攻撃を通した1回だけ、以後ずっと攻撃が上がる。
+   *
+   * 何度も積まないのは、頂点に立つのは一度きりだという読み方をそのまま
+   * 残すため。効果は戦闘が終わるまで消えない。
+   */
+  private tickIslandApex(actor: Fighter, ev: BattleEvent[]): void {
+    if (passiveOf(actor) !== 'islandapex') return;
+    if (actor.stacks.apex) return;
+    actor.stacks.apex = 1;
+    this.addMod(actor, { kind: 'atk', value: 0.20, turns: 999, source: 'islandapex' }, ev, '島の頂点');
+  }
+
   private heal(src: Fighter, target: Fighter, amount: number, ev: BattleEvent[]): void {
     if (!target.alive) return;
+    // 「大地の伊吹」: 味方が受け取る回復を底上げする。誰が撃った回復でも効く
+    const boost = this.alive(target.side).some((a) => passiveOf(a) === 'earthbreath') ? 1.15 : 1;
     const before = target.hp;
-    target.hp = Math.min(target.maxHp, target.hp + amount);
+    target.hp = Math.min(target.maxHp, target.hp + Math.round(amount * boost));
     src.healed += target.hp - before;
     ev.push({ t: 'heal', uid: target.uid, from: src.uid, amount: target.hp - before, hp: target.hp });
   }
@@ -806,6 +861,11 @@ export class BattleSim {
    */
   private sweepTimedMods(): void {
     for (const f of this.fighters) {
+      // 秒で切れる再生も同じところで落とす。行動が回らないまま期限を
+      // 過ぎた個体に、あとから遡って回復が入るのを防ぐ
+      if (f.statuses.some((s) => s.until !== undefined && this.clockV >= s.until)) {
+        f.statuses = f.statuses.filter((s) => s.until === undefined || this.clockV < s.until);
+      }
       if (f.mods.some((m) => m.until !== undefined && this.clockV >= m.until)) {
         f.mods = f.mods.filter((m) => m.until === undefined || this.clockV < m.until);
       }
@@ -821,6 +881,16 @@ export class BattleSim {
 
   private tickStatuses(f: Fighter, ev: BattleEvent[]): void {
     for (const s of f.statuses) {
+      if (s.kind === 'regen') {
+        const left = s.pool ?? 0;
+        if (left <= 0) { s.turns = 0; continue; }
+        const amount = Math.min(s.value, left);
+        s.pool = left - amount;
+        const src = this.fighters.find((x) => s.source.startsWith(x.uid + '|')) ?? f;
+        this.heal(src, f, amount, ev);
+        if ((s.pool ?? 0) <= 0) s.turns = 0;
+        continue;
+      }
       if (s.kind === 'burn') {
         const dmg = Math.max(1, Math.round(f.maxHp * s.value));
         f.hp = Math.max(0, f.hp - dmg);
