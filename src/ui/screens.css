@@ -896,7 +896,7 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
   border: 0; border-radius: var(--r-md);
   min-width: 0;
 }
-.event-foe-icon { width: 100%; height: 40px; }
+.event-foe-icon { width: 100%; height: 46px; }
 .event-foe .chip { height: 17px; font-size: 9px; padding: 0 5px; }
 .event-foe-name { font-size: 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .event-meta { font-size: 11px; color: var(--ink-faint); text-align: right; }
@@ -1559,15 +1559,18 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
 
 /* =========================================================================
    リヴォスのスプライト（ドット絵なので拡大は nearest）
+
+   縦横比の面倒は .revos-sprite 1つで見る。revosIcon() が必ず付けるので、
+   置き場所を増やしてもここに足し忘れることがない
    ========================================================================= */
-.revos-icon, .inv-silho, .slot-icon, .roster-icon, .dex-icon, .dex-hero-img {
+.revos-sprite {
   image-rendering: pixelated;
   display: block;
   object-fit: contain;
 }
 /* ★5 は img ではなくキャンバスで返る。キャンバスには object-fit が効かず、
    横長の枠に入れると絵が伸びる。高さ基準にして正方形を保つ */
-canvas.slot-icon, canvas.roster-icon, canvas.dex-icon {
+canvas.revos-sprite {
   width: auto; aspect-ratio: 1; margin-left: auto; margin-right: auto;
 }
 .slot-icon { width: 100%; height: 46px; margin-bottom: 2px; }
