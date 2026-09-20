@@ -17,10 +17,10 @@ import { CleanScene } from './scenes/CleanScene';
 import { BattleScene } from './scenes/BattleScene';
 import { HomeScene } from './scenes/HomeScene';
 import { BattlePlayer } from './game/battle/BattlePlayer';
-import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, teamAnchor } from './game/party';
+import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, teamAnchor, stagePreview } from './game/party';
 import { advanceHoloTime } from './fx/SpriteUnit';
 import { buildEventTeam, type EventDef } from './game/data/events';
-import { EventScreen } from './ui/screens/EventScreen';
+import { BattleSelectScreen, stageCoins } from './ui/screens/BattleSelectScreen';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
@@ -78,6 +78,12 @@ async function main(): Promise<void> {
   let activeEvent: EventDef | null = null;
   /** 直前に挑んだイベント。リザルトの「もう一度」で同じ相手へ戻す */
   let lastEvent: EventDef | null = null;
+  /**
+   * 挑戦中の段。通常戦でどの段を選んだかは進行度と一致しない——
+   * 到達済みの段へ戻れるようにしたので、勝っても進めない戦いがある
+   */
+  let activeStage = 1;
+  let lastStage = 1;
   /** 直前の周回の成果。リザルトで見せる */
   let pendingResult: ResultData | null = null;
 
@@ -97,13 +103,13 @@ async function main(): Promise<void> {
   const battleScreen = new BattleScreen();
   const partyScreen = new PartyScreen();
   const dexScreen = new DexScreen();
-  const eventScreen = new EventScreen();
+  const selectScreen = new BattleSelectScreen();
   const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
   const detailScreen = new DetailScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, eventScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -167,16 +173,19 @@ async function main(): Promise<void> {
     setTimeout(() => boot.classList.add('hidden'), 200);
   }
 
-  async function startBattle(ev: EventDef | null = null): Promise<void> {
+  async function startBattle(ev: EventDef | null = null, stage = data.stageProgress + 1): Promise<void> {
     const mine = buildTeamSetup(data.roster, data.party.order, data.party.formation, data.party.targetPrefs);
     if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); goHome(); return; }
     activeEvent = ev;
     lastEvent = ev;
+    activeStage = Math.max(1, stage);
+    lastStage = activeStage;
     boot.classList.remove('hidden');
     await progress(0.4, ev ? '記録を読み出しています…' : '闘技場を生成しています…');
-    const seed = (Date.now() ^ (data.stageProgress * 104729)) >>> 0;
-    battle.buildArena(ev ? ev.biome : (data.unlockedBiomes[0] ?? 'canyon'), seed);
-    const foes = ev ? buildEventTeam(ev) : buildEnemyTeam(data.stageProgress, seed, teamAnchor(mine));
+    const seed = (Date.now() ^ (activeStage * 104729)) >>> 0;
+    // 段ごとに舞台を変える。選択画面が予告した地層と実際の闘技場を一致させる
+    battle.buildArena(ev ? ev.biome : stagePreview(activeStage).biome, seed);
+    const foes = ev ? buildEventTeam(ev) : buildEnemyTeam(activeStage, seed, teamAnchor(mine));
     player = new BattlePlayer(seed, mine, foes, battle);
     battleScreen.setPlayer(player);
     player.speed = data.settings.battleSpeed;
@@ -221,8 +230,15 @@ async function main(): Promise<void> {
     switch (where) {
       case 'dig': void startRun(data.unlockedBiomes[0] ?? 'canyon'); break;
       case 'clean': stockScreen.setData(data); ui.show('stock'); break;
-      case 'battle': void startBattle(); break;
-      case 'event': eventScreen.setData(data); ui.show('event'); break;
+      case 'battle':
+        selectScreen.setData(data);
+        // 明示して開く。前に見ていた側が残ると、タブの名前と中身がずれる
+        ui.show('battleSelect', { mode: 'normal' });
+        break;
+      case 'event':
+        selectScreen.setData(data);
+        ui.show('battleSelect', { mode: 'event' });
+        break;
       case 'debug': openDebug(); break;
       case 'party': partyScreen.setData(data); ui.show('party'); break;
       case 'dex': dexScreen.setData(data); ui.show('dex'); break;
@@ -356,8 +372,12 @@ async function main(): Promise<void> {
           }
         }
       } else {
-        data.stageProgress++;
-        coins = 120 + data.stageProgress * 40;
+        // 到達済みの段へ戻れるようにしたので、勝っても進むとは限らない。
+        // 進むのは未踏の段（＝いまの進行度の1つ先）を抜いたときだけ
+        const advanced = activeStage > data.stageProgress;
+        if (advanced) data.stageProgress = activeStage;
+        coins = stageCoins(activeStage, !advanced);
+        if (!advanced) rows.push({ label: '再挑戦', value: `ステージ ${activeStage}` });
       }
       data.player.coins += coins;
       rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
@@ -404,7 +424,7 @@ async function main(): Promise<void> {
       title: winner === 0 ? '勝 利' : winner === 1 ? '敗 北' : '引 き 分 け',
       subtitle: ev
         ? `${ev.name} — ${player?.sim.turnCount ?? 0} 手で決着`
-        : `ステージ ${data.stageProgress} — ${player?.sim.turnCount ?? 0} 手で決着`,
+        : `ステージ ${activeStage} — ${player?.sim.turnCount ?? 0} 手で決着`,
       good: winner === 0,
       cast: setup?.members.map((m) => m.defId) ?? [],
       rows,
@@ -420,8 +440,9 @@ async function main(): Promise<void> {
     void startClean(s.defId, s.rarity);
   };
 
-  eventScreen.onBack = () => goHome();
-  eventScreen.onChallenge = (ev) => { void startBattle(ev); };
+  selectScreen.onBack = () => goHome();
+  selectScreen.onNormal = (stage) => { void startBattle(null, stage); };
+  selectScreen.onEvent = (ev) => { void startBattle(ev); };
 
   /**
    * デバッグモードを開く。
@@ -463,7 +484,7 @@ async function main(): Promise<void> {
       if (data.stock.length > 0) { stockScreen.setData(data); ui.show('stock'); return; }
       void startBattle();
     } else {
-      void startBattle(lastEvent);
+      void startBattle(lastEvent, lastStage);
     }
   };
 
@@ -491,7 +512,8 @@ async function main(): Promise<void> {
     else if (jump === 'home') goHome();
     else if (jump === 'party') { partyScreen.setData(data); ui.show('party'); }
     else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
-    else if (jump === 'event') { eventScreen.setData(data); ui.show('event'); }
+    else if (jump === 'event') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'event' }); }
+    else if (jump === 'select') { selectScreen.setData(data); ui.show('battleSelect'); }
     else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
     else if (jump === 'profile') { profileScreen.setData(data); ui.show('profile'); }
     else if (jump === 'debug') openDebug();

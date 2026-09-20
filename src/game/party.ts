@@ -3,6 +3,7 @@ import type { OwnedRevos, SaveData } from '../core/Save';
 import { makeUid } from '../core/Save';
 import type { FormationId, TargetPref, TeamSetup } from './battle/types';
 import { Rng } from '../voxel/VoxelPainter';
+import { BIOMES, type BiomeId } from '../voxel/palette';
 
 /** 所持ユニットから編成を作る。足りなければ先頭から埋める */
 export function buildTeamSetup(
@@ -73,17 +74,45 @@ export interface TeamAnchor { level: number; clean: number; }
  * 実測でこの置き方の勝率は 61〜81%、終盤ほど低いが、それは相手の
  * レア度が上がるからで、編成を組み替えれば戻せる範囲に収まる。
  */
+/**
+ * ステージが決めるもの。
+ *
+ * レベルではなく「誰と当たるか」。選択画面もここから読む——
+ * 表示用に別の表を持つと、片方だけ直したときに嘘の予告になる。
+ */
+export interface StagePreview {
+  theme: 'flame' | 'aqua' | 'terra' | 'gale' | 'null';
+  rarityCap: number;
+  formation: FormationId;
+  cleanBonus: number;
+  /** 闘技場の地層。選択画面の表示と実際の舞台を同じ1か所から引く */
+  biome: BiomeId;
+}
+
+const STAGE_THEMES = ['flame', 'aqua', 'terra', 'gale', 'null'] as const;
+const STAGE_FORMATIONS = ['wedge', 'rush', 'ring', 'metro'] as FormationId[];
+
+export function stagePreview(stage: number): StagePreview {
+  const biome = Object.values(BIOMES).find((b) => stage >= b.level[0] && stage <= b.level[1])
+    ?? Object.values(BIOMES)[0];
+  return {
+    biome: biome.id,
+    theme: STAGE_THEMES[stage % STAGE_THEMES.length],
+    // ★5 は終盤まで敵にも出さない。初見で「これは別格」と分かる位置に置く
+    rarityCap: stage < 3 ? 2 : stage < 6 ? 3 : stage < 10 ? 4 : 5,
+    formation: STAGE_FORMATIONS[stage % STAGE_FORMATIONS.length],
+    cleanBonus: Math.min(10, stage * 2),
+  };
+}
+
 export function buildEnemyTeam(stage: number, seed: number, anchor: TeamAnchor): TeamSetup {
   const rng = new Rng(seed ^ 0x9e3779b9);
   const level = Math.max(1, anchor.level);
-  const themes = ['flame', 'aqua', 'terra', 'gale', 'null'] as const;
-  const theme = themes[stage % themes.length];
+  const pv = stagePreview(stage);
+  const theme = pv.theme;
 
-  // ★5 は終盤まで敵にも出さない。初見で「これは別格」と分かる位置に置く。
   // イベント個体は通常戦には出さない——出会う場所を1か所に限る
-  const pool = REVOS.filter(
-    (r) => !r.eventOnly && r.rarity <= (stage < 3 ? 2 : stage < 6 ? 3 : stage < 10 ? 4 : 5),
-  );
+  const pool = REVOS.filter((r) => !r.eventOnly && r.rarity <= pv.rarityCap);
   const themed = pool.filter((r) => r.element === theme);
   const pick = (): string => {
     const list = rng.chance(0.55) && themed.length > 0 ? themed : pool;
@@ -102,12 +131,12 @@ export function buildEnemyTeam(stage: number, seed: number, anchor: TeamAnchor):
       defId,
       level,
       // クリーン度も同じ理由で味方基準。素の育成差で殴らない
-      clean: Math.max(45, Math.min(95, anchor.clean + Math.min(10, stage * 2))),
+      clean: Math.max(45, Math.min(95, anchor.clean + pv.cleanBonus)),
       skillLevel: 1,
     })),
     order: [0, 1, 2],
     // 進行度に応じて陣形も変える。同じ相手を延々見せない
-    formation: (['wedge', 'rush', 'ring', 'metro'] as FormationId[])[stage % 4],
+    formation: pv.formation,
   };
 }
 

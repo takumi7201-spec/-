@@ -41,7 +41,9 @@ export function screenHead(opts: {
 }): HTMLElement {
   const head = h('div', { class: 'scr-head' });
   if (opts.onBack) {
-    head.appendChild(button('‹', () => { audio.uiBack(); opts.onBack?.(); }, { class: 'btn--rail scr-back' }));
+    const back = button('‹', () => { audio.uiBack(); opts.onBack?.(); }, { class: 'btn--rail scr-back' });
+    back.setAttribute('aria-label', '戻る');
+    head.appendChild(back);
   }
   head.appendChild(h('div', { class: 'scr-head-main' },
     h('div', { class: 'scr-eyebrow', text: spaced(opts.eyebrow) }),

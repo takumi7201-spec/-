@@ -1675,3 +1675,89 @@ canvas.slot-icon, canvas.roster-icon, canvas.dex-icon {
 .det-equip { height: 48px; min-height: 48px; padding: 0 26px; border-radius: 14px; flex: none; }
 
 body[data-layout='wide'] .det-body { left: 16vw; right: 16vw; }
+
+/* =========================================================================
+   出撃の選択
+   通常戦とイベント戦を同じ画面に並べる。切り替えは上の2枚だけ
+   ========================================================================= */
+.screen--battleSelect::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--battleSelect > * { z-index: 1; }
+
+.sel-tabs {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px);
+  left: calc(var(--gutter) + var(--safe-l));
+  right: calc(var(--gutter) + var(--safe-r));
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+  pointer-events: auto;
+}
+.sel-tab {
+  position: relative;
+  min-height: 42px; border-radius: 12px;
+  font-size: 14px; font-weight: 900; letter-spacing: 0.1em;
+}
+.sel-badge {
+  position: absolute; right: 8px; top: 7px;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--hl-rose); color: #fff6f4;
+  font-size: 10px; font-weight: 700;
+  display: grid; place-items: center; line-height: 1;
+}
+
+.sel-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 56px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+.sel-body--stages { gap: 8px; }
+
+/* 段の札。左に番号、中に予告、右に状態と報酬 */
+.stage-card {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 78px; padding: 10px 13px;
+  border: 0; border-radius: 15px;
+  background: rgba(255, 253, 248, 0.84); color: var(--ink);
+  box-shadow: 0 5px 14px rgba(72, 58, 36, 0.14);
+  text-align: left;
+}
+/* 未踏の1段だけ色を持つ。踏破済みは戻れる場所であって、進む先ではない */
+.stage-card.is-next {
+  background: linear-gradient(100deg, rgba(255, 214, 120, 0.9), rgba(255, 246, 222, 0.94));
+  box-shadow: 0 7px 18px rgba(197, 138, 30, 0.28);
+}
+.stage-no {
+  flex: none; width: 54px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.stage-no-label { font-size: 8px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink-faint); }
+.stage-no-num { font-size: 26px; line-height: 1.05; color: var(--ink); }
+.stage-card.is-next .stage-no-num { color: var(--hl-amber-deep); }
+.stage-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.stage-biome { font-size: 14px; font-weight: 900; }
+.stage-traits { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.stage-trait {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; color: var(--ink-soft);
+}
+.stage-trait .dot { width: 8px; height: 8px; border-radius: 2px; }
+.stage-right { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.stage-tag {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.16em;
+  color: #fff6f4; background: var(--pencil);
+  padding: 2px 8px; border-radius: 5px;
+}
+.stage-card.is-next .stage-tag { background: var(--hl-amber-deep); }
+.stage-coin { font-size: 13px; color: var(--pen-brown); }
+
+body[data-layout='wide'] .sel-body,
+body[data-layout='wide'] .sel-tabs { left: 18vw; right: 18vw; }
