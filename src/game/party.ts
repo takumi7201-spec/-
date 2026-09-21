@@ -4,6 +4,7 @@ import { makeUid } from '../core/Save';
 import type { FormationId, TargetPref, TeamSetup } from './battle/types';
 import { Rng } from '../voxel/VoxelPainter';
 import { BIOMES, type BiomeId } from '../voxel/palette';
+import { cleanMultiplier } from './battle/simulate';
 
 /** 所持ユニットから編成を作る。足りなければ先頭から埋める */
 export function buildTeamSetup(
@@ -195,4 +196,47 @@ export function addFossil(data: SaveData, defId: string, clean: number): { isNew
 
 export function revosName(defId: string): string {
   return getRevos(defId).name;
+}
+
+/**
+ * 実際に出撃する3体。
+ *
+ * order が未設定でも buildTeamSetup は手持ちの先頭から埋めて出撃させる。
+ * 画面側が order をそのまま読むと「0 / 3」と出て、出撃できないように
+ * 見える——出撃時と同じ埋め方をここに1つ置き、表示も戦力もここから引く。
+ */
+export function effectiveParty(data: SaveData): OwnedRevos[] {
+  const byUid = new Map(data.roster.map((r) => [r.uid, r]));
+  const out: OwnedRevos[] = [];
+  for (const uid of data.party.order ?? []) {
+    const u = byUid.get(uid);
+    if (u && !out.includes(u)) out.push(u);
+  }
+  for (const r of data.roster) {
+    if (out.length >= 3) break;
+    if (!out.includes(r)) out.push(r);
+  }
+  return out.slice(0, 3);
+}
+
+/**
+ * 編成の戦力。
+ *
+ * 体力と攻撃・防御を1つの数にまとめた目安。攻撃と防御を4倍で数えるのは、
+ * 体力だけが桁違いに大きく、素で足すと壁役の並びが常に最強に見えるため。
+ *
+ * 画面ごとに違う式で出すと、どちらが本当の値か分からなくなる。
+ * 編成でもユニットの入口でも、数えるのはここ1か所にする。
+ */
+export function partyPower(data: SaveData): number {
+  let hp = 0, atk = 0, def = 0;
+  for (const u of effectiveParty(data)) {
+    const d = getRevos(u.defId);
+    const ls = 1 + 0.055 * (u.level - 1);
+    const mc = cleanMultiplier(u.clean);
+    hp += Math.round(d.hp * ls * mc);
+    atk += Math.round(d.atk * ls * mc);
+    def += Math.round(d.def * ls * mc);
+  }
+  return hp + atk * 4 + def * 4;
 }

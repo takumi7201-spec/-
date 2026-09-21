@@ -7,6 +7,7 @@ import { revosIcon } from '../revosIcon';
 import { BIOMES } from '../../voxel/palette';
 import { EVENTS } from '../../game/data/events';
 import { unclaimedCount } from '../../game/mail';
+import { effectiveParty } from '../../game/party';
 import { missionRatio, nearestMission, readyCount } from '../../game/missions';
 import { unreadNews } from '../../game/news';
 
@@ -45,12 +46,14 @@ export class HomeScreen extends Screen {
     { key: 'home', icon: '⌂', label: '拠点', onTap: () => { /* いまここ */ } },
     { key: 'dig', icon: '⛏', label: '発掘', onTap: () => this.onGo?.('dig') },
     { key: 'battle', icon: '⚔', label: 'バトル', onTap: () => this.onGo?.('battle') },
-    { key: 'party', icon: '◈', label: '編成', onTap: () => this.onGo?.('party') },
-    { key: 'dex', icon: '☰', label: '図鑑', onTap: () => this.onGo?.('dex') },
+    // 編成と図鑑は同じ対象（持っている化石）を別の角度から見ているだけで、
+    // 下タブを2枠使う理由が無かった。1枠に畳んで、空いたほうを設定に回す
+    { key: 'unit', icon: '◈', label: 'ユニット', onTap: () => this.onGo?.('unit') },
+    { key: 'settings', icon: '⚙', label: '設定', onTap: () => this.onGo?.('settings') },
   ]);
 
   onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'news' | 'shop' | 'mission'
-    | 'mail' | 'party' | 'dex' | 'profile' | 'title' | 'debug') => void;
+    | 'mail' | 'unit' | 'settings' | 'profile') => void;
 
   constructor() { super('home'); }
 
@@ -94,8 +97,6 @@ export class HomeScreen extends Screen {
     };
     addRail('profile', '◱', '記録', () => this.onGo?.('profile'));
     addRail('mail', '✉', 'メールボックス', () => this.onGo?.('mail'));
-    addRail('title', '⌂', 'タイトルへ', () => this.onGo?.('title'));
-    addRail('debug', '⚙', '検証', () => this.onGo?.('debug'));
 
     // ---- 右の色札 ----
     const cards = h('div', { class: 'card-col home-cards' });
@@ -184,8 +185,6 @@ export class HomeScreen extends Screen {
     // ---- 右の色札 ----
     this.cards.get('news')?.badge(unreadNews(this.data));
     this.cards.get('shop')?.badge(0);
-    // 未解放の導線は暗い札のまま置いておく。消すと「あとで増える」が伝わらない
-    this.rails.get('debug')!.el.hidden = this.data.settings.debug !== true;
     // 受信箱だけ数を出す。何通あるかで受け取りの手間が変わる
     this.rails.get('mail')?.badge(unclaimedCount(this.data));
 
@@ -229,8 +228,8 @@ export class HomeScreen extends Screen {
     this.misBadgeEl.hidden = ready === 0;
 
     // ---- タブの報せ ----
-    this.tabs.badge('party', this.data.roster.length === 0 ? 0 : 0);
-    this.tabs.badge('dex', 0);
+    // 3体そろっていないときだけ出す。出撃できない状態は先に知らせる
+    this.tabs.badge('unit', this.data.roster.length > 0 && effectiveParty(this.data).length < 3 ? 1 : 0);
   }
 }
 

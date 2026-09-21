@@ -5,6 +5,7 @@ import { getRevos, revosShortName } from '../../game/data/revos';
 import { FORMATIONS, TARGET_PREFS, type FormationId, type TargetPref } from '../../game/battle/types';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
+import { partyPower } from '../../game/party';
 import { revosIcon } from '../revosIcon';
 import { screenHead, plate, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
@@ -163,7 +164,11 @@ export class PartyScreen extends Screen {
       h('span', { class: 'total-row' }, cell('体力', hp), cell('攻撃', atk), cell('防御', def)),
       dots,
     );
-    this.powerPlate.set(String(hp + atk * 4 + def * 4));
+    // 戦力の式はユニットの入口と共有する。画面ごとに違う数を出さない
+    this.powerPlate.set(String(partyPower({
+      ...this.data,
+      party: { ...this.data.party, order: this.order as [string, string, string] },
+    })));
 
     // ---- 作戦 ----
     // 誰を狙うかはスロットごとに決める。編成とセットで意味が出る決定なので、

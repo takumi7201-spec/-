@@ -2225,3 +2225,273 @@ body[data-layout='wide'] .news-body { left: 18vw; right: 18vw; }
 .shop-got-note { font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
 
 body[data-layout='wide'] .shop-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   ユニット（手持ちの入口）
+   一覧・編成・図鑑・付け替え。4枚とも「いま何があるか」を数で出す
+   ========================================================================= */
+.screen--unit::before,
+.screen--roster::before,
+.screen--transfer::before,
+.screen--settings::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--unit > *,
+.screen--roster > *,
+.screen--transfer > *,
+.screen--settings > * { z-index: 1; }
+
+.unit-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 8px); bottom: 100px;
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  padding-bottom: 12px;
+  pointer-events: auto;
+}
+/* 編成中の3体。どの面へ行くにも、いま誰を出しているかが起点になる */
+.unit-faces {
+  flex: none; display: flex; gap: 8px; min-width: 0;
+  padding: 10px; border-radius: 15px;
+  background: rgba(255, 253, 248, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.1);
+}
+.unit-face {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+}
+.unit-face-img { width: 54px; height: 54px; }
+.unit-face-name {
+  font-size: 10px; font-weight: 900; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.unit-face-sub { font-size: 10px; color: var(--ink-soft); }
+.unit-faces-empty { flex: 1; font-size: 12px; color: var(--ink-soft); text-align: center; padding: 18px 0; }
+
+/* 高さは札の中身で決める。余白いっぱいに伸ばすと、
+   4枚とも中身が下に溜まった縦長の板になる */
+.unit-grid {
+  flex: none;
+  display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 138px; gap: 10px;
+}
+.unit-card {
+  position: relative; min-width: 0; min-height: 124px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 13px 13px 14px;
+  border: 0; border-radius: 17px;
+  color: var(--ink); text-align: left;
+  box-shadow: 0 7px 18px rgba(72, 58, 36, 0.16);
+}
+.unit-card--plain { background: rgba(255, 253, 248, 0.88); }
+.unit-card--amber { background: linear-gradient(104deg, rgba(255, 214, 120, 0.94), rgba(255, 247, 226, 0.96)); }
+.unit-card--mint { background: linear-gradient(104deg, rgba(168, 214, 226, 0.88), rgba(247, 252, 254, 0.96)); }
+.unit-card--rose { background: linear-gradient(104deg, rgba(246, 166, 156, 0.86), rgba(255, 245, 242, 0.96)); }
+.unit-card.is-off {
+  background: rgba(255, 253, 248, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.14);
+  color: var(--ink-faint);
+}
+.unit-card-mark {
+  width: 34px; height: 34px; border-radius: 11px; margin-bottom: 4px;
+  display: grid; place-items: center;
+  font-size: 17px; color: var(--on-plate); background: var(--plate);
+}
+.unit-card.is-off .unit-card-mark { background: rgba(42, 37, 30, 0.28); }
+.unit-card-title { font-size: 14px; font-weight: 900; letter-spacing: 0.04em; }
+.unit-card-value { font-size: 19px; line-height: 1.1; color: var(--pen-brown); }
+.unit-card.is-off .unit-card-value { color: var(--ink-faint); }
+.unit-card-note {
+  font-size: 10px; color: var(--ink-soft); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+body[data-layout='wide'] .unit-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   手持ちの一覧（個体）
+   図鑑は種を並べる面、ここは個体を並べる面
+   ========================================================================= */
+.ros-sorts {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 4px);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  pointer-events: auto;
+}
+.ros-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 46px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 8px;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+.ros-card {
+  display: flex; align-items: center; gap: 11px; min-width: 0;
+  min-height: 70px; padding: 9px 12px;
+  border: 0; border-radius: var(--r-lg);
+  background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-1);
+  text-align: left;
+}
+/* 出撃中の3体は縁で示す。並べ替えても、誰を出しているかが読める */
+.ros-card.is-in { box-shadow: inset 0 0 0 2px var(--hl-amber), var(--lift-1); }
+.ros-icon { width: 48px; height: 48px; flex: none; }
+.ros-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ros-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ros-head .chip { height: 18px; font-size: 10px; padding: 0 6px; flex: none; }
+.ros-name { font-size: 13px; font-weight: 900; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ros-flag {
+  flex: none; font-size: 9px; font-weight: 900; letter-spacing: 0.14em;
+  color: #fff6f4; background: var(--hl-amber-deep); padding: 2px 7px; border-radius: 5px;
+}
+.ros-sub {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  font-size: 10px; color: var(--ink-soft); white-space: nowrap;
+}
+.ros-rarity { color: var(--pen-brown); letter-spacing: 0.02em; }
+.ros-skill { color: #1c6f8c; }
+.ros-clean { display: flex; align-items: center; gap: 7px; }
+.ros-clean .bar { flex: 1; min-width: 0; }
+.ros-rank { flex: none; font-size: 11px; color: var(--pen-brown); }
+.ros-rank--S { color: var(--hl-amber-deep); }
+.ros-rank--D { color: var(--ink-faint); }
+
+body[data-layout='wide'] .ros-body,
+body[data-layout='wide'] .ros-sorts { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   カセキ付け替え
+   消えるほうを選ばせる操作。どちらがどちらかを取り違えさせない
+   ========================================================================= */
+.tr-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: 84px;
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 8px;
+  padding-bottom: 16px;
+  pointer-events: auto;
+}
+.tr-summary {
+  flex: none;
+  padding: 12px; border-radius: 16px;
+  background: var(--paper-card);
+  box-shadow: 0 7px 18px rgba(72, 58, 36, 0.16);
+}
+.tr-pair { display: flex; align-items: stretch; gap: 8px; }
+.tr-face {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 8px 6px 10px; border-radius: 13px;
+}
+/* 残るほうは琥珀、消えるほうは朱。色で役目を固定する */
+.tr-face--target { background: rgba(255, 214, 120, 0.3); box-shadow: inset 0 0 0 2px var(--hl-amber); }
+.tr-face--core { background: rgba(246, 166, 156, 0.26); box-shadow: inset 0 0 0 2px var(--hl-rose); }
+.tr-face.is-empty { background: rgba(42, 37, 30, 0.05); box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.16); }
+.tr-face-label { font-size: 9px; font-weight: 700; letter-spacing: 0.18em; color: var(--ink-soft); }
+.tr-face-img { width: 62px; height: 62px; }
+.tr-face-name { font-size: 12px; font-weight: 900; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr-face-sub { font-size: 10px; color: var(--ink-soft); }
+.tr-face-hole { font-size: 11px; color: var(--ink-faint); padding: 26px 0; }
+/* 矢印は核から先へ向ける。移動するのはクリーン度のほう */
+.tr-arrow { flex: none; align-self: center; font-size: 15px; color: var(--pen-brown); }
+.tr-result { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 4px; }
+.tr-result-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.tr-result-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-faint); width: 58px; flex: none; }
+.tr-from { font-size: 14px; color: var(--ink-soft); }
+.tr-to-mark { font-size: 11px; color: var(--ink-faint); }
+.tr-to { font-size: 18px; color: var(--hl-amber-deep); }
+.tr-gain { font-size: 12px; color: var(--pen-green); }
+.tr-cost { font-size: 15px; color: var(--pen-brown); }
+.tr-lose { margin-left: auto; font-size: 10px; color: var(--hl-rose); white-space: nowrap; }
+.tr-reason {
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--rule);
+  font-size: 12px; color: var(--ink-soft); text-align: center;
+}
+.tr-label {
+  flex: none; display: flex; align-items: baseline; gap: 8px; min-width: 0;
+  margin-top: 6px; padding: 0 2px;
+  font-size: 11px; font-weight: 900;
+}
+.tr-label--target { color: var(--hl-amber-deep); }
+.tr-label--core { color: var(--hl-rose); }
+.tr-label-note { font-size: 10px; font-weight: 700; color: var(--ink-faint); letter-spacing: 0; min-width: 0; }
+.tr-grid { flex: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 7px; }
+.tr-cell {
+  min-width: 0; padding: 7px 4px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  border: 0; border-radius: 13px;
+  background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-1);
+}
+/* 選んだ札は、その棚の色で塗る。残るほうは琥珀、消えるほうは朱——
+   縁だけ色を変えても、既定の選択色が下に残って signal が混ざる */
+.tr-cell--target.is-on {
+  background: linear-gradient(104deg, rgba(255, 214, 120, 0.96), rgba(255, 244, 218, 0.98));
+  box-shadow: inset 0 0 0 2px var(--hl-amber-deep), var(--lift-1);
+}
+.tr-cell--core.is-on {
+  background: linear-gradient(104deg, rgba(246, 166, 156, 0.94), rgba(255, 240, 237, 0.98));
+  box-shadow: inset 0 0 0 2px var(--hl-rose), var(--lift-1);
+}
+/* 押しても意味のない札は沈めるが、棚からは外さない——
+   なぜ選べないかは、並んでいないと分からない */
+.tr-cell.is-off { background: rgba(255, 253, 248, 0.45); box-shadow: inset 0 0 0 1px rgba(74, 65, 54, 0.12); opacity: 0.66; }
+.tr-cell-img { width: 42px; height: 42px; }
+.tr-cell-name { font-size: 10px; font-weight: 900; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr-cell-rank { font-size: 10px; color: var(--pen-brown); }
+.tr-rank--S { color: var(--hl-amber-deep); }
+.tr-rank--D { color: var(--ink-faint); }
+.tr-cell-lv { font-size: 9px; color: var(--ink-faint); }
+.tr-empty { grid-column: 1 / -1; font-size: 12px; color: var(--ink-soft); padding: 14px 4px; }
+
+body[data-layout='wide'] .tr-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   設定
+   つまみは札で並べる。スライダーは指では端が押せず、現在値も指で隠れる
+   ========================================================================= */
+.set-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: 100px;
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 7px;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+.set-group-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.2em;
+  color: var(--ink-faint); padding: 10px 2px 1px;
+}
+.set-group-label:first-child { padding-top: 2px; }
+.set-row {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 11px 13px 12px; border-radius: 14px;
+  background: var(--paper-card);
+  box-shadow: var(--lift-1);
+}
+.set-row-head { display: flex; flex-direction: column; gap: 1px; min-width: 0; text-align: left; }
+.set-label { font-size: 13px; font-weight: 900; }
+.set-note { font-size: 10px; color: var(--ink-soft); line-height: 1.5; }
+.set-opts { display: flex; gap: 5px; }
+.set-opt { flex: 1; min-width: 0; min-height: 38px; border-radius: 10px; font-size: 12px; font-weight: 900; }
+.set-link {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 56px; padding: 10px 13px;
+  border: 0; border-radius: 14px;
+  background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-1);
+}
+.set-link .set-row-head { flex: 1; }
+.set-link-go { flex: none; font-size: 18px; color: var(--ink-faint); }
+.set-link.is-danger .set-label { color: var(--hl-rose); }
+
+body[data-layout='wide'] .set-body { left: 18vw; right: 18vw; }

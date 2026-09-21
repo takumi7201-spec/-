@@ -26,6 +26,10 @@ import { DigSelectScreen } from './ui/screens/DigSelectScreen';
 import { MissionScreen } from './ui/screens/MissionScreen';
 import { NewsScreen } from './ui/screens/NewsScreen';
 import { ShopScreen } from './ui/screens/ShopScreen';
+import { UnitScreen } from './ui/screens/UnitScreen';
+import { RosterScreen } from './ui/screens/RosterScreen';
+import { TransferScreen } from './ui/screens/TransferScreen';
+import { SettingsScreen } from './ui/screens/SettingsScreen';
 import { grantLogin, grantStaffMail } from './game/mail';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
@@ -35,7 +39,7 @@ import { REVOS } from './game/data/revos';
 import { audio } from './core/Audio';
 import {
   load as loadSave, save as writeSave, defaultSave, dropDecay, addExp, addPlayerExp,
-  countToday, rollDaily,
+  countToday, rollDaily, clearSave,
   type SaveData,
 } from './core/Save';
 import type { BiomeId } from './voxel/palette';
@@ -71,6 +75,21 @@ async function main(): Promise<void> {
 
   await progress(0.2, 'セーブデータを読み込んでいます…');
   let data: SaveData = loadSave();
+
+  /**
+   * 画質。
+   *
+   * 保存には入っていたのに、どこからも読んでいなかった——保存されているのに
+   * 変えられない値は、無いのと同じ。おまかせなら端末の判定に任せ、
+   * 自分で選んだときだけその段に固定する。
+   *
+   * 場面を組む前に通す。粒子の上限は場面の構築時に焼き込まれるので、
+   * 後から変えたぶんは描画の経路にだけ効き、粒の量は次の起動から。
+   */
+  const applyQuality = (): void => {
+    if (data.settings.quality !== 'auto') renderer.setQuality(data.settings.quality);
+  };
+  applyQuality();
 
   await progress(0.34, '拠点を組み立てています…');
   const home = new HomeScene(renderer.quality);
@@ -116,12 +135,16 @@ async function main(): Promise<void> {
   const missionScreen = new MissionScreen();
   const newsScreen = new NewsScreen();
   const shopScreen = new ShopScreen();
+  const unitScreen = new UnitScreen();
+  const rosterScreen = new RosterScreen();
+  const transferScreen = new TransferScreen();
+  const settingsScreen = new SettingsScreen();
   const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
   const detailScreen = new DetailScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -254,15 +277,9 @@ async function main(): Promise<void> {
     goHome();
   };
   title.onBattle = () => { grantStarters(data); writeSave(data); void startBattle(); };
-  title.onSettings = () => {
-    data.settings.swapSides = !data.settings.swapSides;
-    applyHand();
-    writeSave(data);
-    ui.toast(
-      data.settings.swapSides ? '操作：右で移動 / 左で視点' : '操作：左で移動 / 右で視点',
-      'info', 2200,
-    );
-  };
+  // タイトルからも同じ設定の面へ。押すたびに左右が入れ替わるだけの
+  // ボタンだったので、何が変わったかはトーストでしか分からなかった
+  title.onSettings = () => goSettings();
   title.setHasSave(data.stats.runs > 0 || data.roster.length > 0);
 
   homeScreen.onGo = (where) => {
@@ -283,13 +300,95 @@ async function main(): Promise<void> {
         ui.show('battleSelect', { mode: 'event' });
         break;
       case 'mail': mailScreen.setData(data); ui.show('mail'); break;
-      case 'debug': openDebug(); break;
-      case 'party': partyScreen.setData(data); ui.show('party'); break;
-      case 'dex': dexScreen.setData(data); ui.show('dex'); break;
-      case 'profile': profileScreen.setData(data); ui.show('profile'); break;
-      case 'title': ui.show('title'); break;
+      case 'unit': goUnit(); break;
+      case 'settings': goSettings(); break;
+      case 'profile': profileBack = goHome; profileScreen.setData(data); ui.show('profile'); break;
     }
   };
+
+  /** ユニットの入口。手持ちに関わる面はすべてここから枝分かれする */
+  function goUnit(): void { unitScreen.setData(data); ui.show('unit'); }
+  function goSettings(): void { settingsScreen.setData(data); ui.show('settings'); }
+
+  /** 下タブはどの根の画面からも同じ場所へ飛ぶ。画面ごとに行き先を変えない */
+  const tabGo = (where: 'home' | 'dig' | 'battle' | 'unit' | 'settings'): void => {
+    if (where === 'home') { goHome(); return; }
+    if (where === 'dig') { digSelectScreen.setData(data); ui.show('digSelect'); return; }
+    if (where === 'battle') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'normal' }); return; }
+    if (where === 'unit') { goUnit(); return; }
+    goSettings();
+  };
+  unitScreen.onTab = tabGo;
+  settingsScreen.onTab = tabGo;
+
+  unitScreen.onGo = (where) => {
+    switch (where) {
+      case 'roster': rosterScreen.setData(data); ui.show('roster'); break;
+      case 'party': partyScreen.setData(data); ui.show('party'); break;
+      case 'dex': dexScreen.setData(data); ui.show('dex'); break;
+      case 'transfer': transferScreen.setData(data); ui.show('transfer'); break;
+    }
+  };
+
+  rosterScreen.onBack = () => goUnit();
+  rosterScreen.onDetail = (defId, unit) => {
+    ui.show('detail', {
+      defId,
+      unit,
+      owned: data.roster.filter((u) => u.defId === defId),
+      back: () => { rosterScreen.setData(data); ui.show('roster'); },
+    });
+  };
+
+  transferScreen.onBack = () => goUnit();
+  transferScreen.onDone = () => {
+    writeSave(data);
+    homeScreen.setData(data);
+    unitScreen.setData(data);
+    partyScreen.setData(data);
+  };
+
+  settingsScreen.onChange = (key) => {
+    const s = data.settings;
+    if (key === 'hand') applyHand();
+    else if (key === 'audio') audio.setVolumes(s.sfx, s.bgm);
+    else if (key === 'quality') applyQuality();
+    else if (key === 'shake') battle.reducedShake = s.reducedShake;
+    else if (key === 'battle' && player) player.speed = s.battleSpeed;
+    writeSave(data);
+  };
+  settingsScreen.onGo = (where) => {
+    if (where === 'profile') { profileBack = goSettings; profileScreen.setData(data); ui.show('profile'); return; }
+    if (where === 'title') { ui.show('title'); return; }
+    if (where === 'debug') { openDebug(); return; }
+    void wipeSave();
+  };
+
+  /**
+   * セーブの消去。
+   *
+   * 取り返しがつかないので、確認は一度だけ、文面で何が消えるかを書く。
+   * 消したあとはタイトルへ戻す——消えた手持ちを拠点で見せても仕方がない。
+   */
+  async function wipeSave(): Promise<void> {
+    const ok = await ui.confirm(
+      'セーブを消す',
+      '手持ち・図鑑・記録・コインがすべて消える。元には戻せない。',
+      '消す', true,
+    );
+    if (!ok) return;
+    clearSave();
+    data = defaultSave();
+    writeSave(data);
+    // 起動時に1度だけ渡している画面は、差し替えた保存を自分では知らない
+    digScreen.setSave(data);
+    applyHand();
+    applyQuality();
+    battle.reducedShake = data.settings.reducedShake;
+    title.setHasSave(false);
+    ui.toast('セーブを消した', 'warn', 2600);
+    ui.show('title');
+  }
 
   // 詳細は1枚の画面。どこから開いたかを覚えて、閉じたらそこへ戻す
   dexScreen.onDetail = (defId) => {
@@ -483,7 +582,9 @@ async function main(): Promise<void> {
     });
   };
 
-  profileScreen.onBack = () => goHome();
+  // 記録は拠点の丸列と設定の両方から開く。閉じたら開いた場所へ返す
+  let profileBack: () => void = goHome;
+  profileScreen.onBack = () => profileBack();
   // 精錬の一覧から戻る先は発掘の面。拠点まで戻すと、
   // もう1つ削りに行くのに毎回タブを踏み直すことになる
   stockScreen.onBack = () => { digSelectScreen.setData(data); ui.show('digSelect'); };
@@ -538,17 +639,17 @@ async function main(): Promise<void> {
   // 触った結果は即保存する。検証中にリロードして消えるのがいちばん困る
   debugScreen.onChanged = () => writeSave(data);
 
-  partyScreen.onBack = () => goHome();
+  partyScreen.onBack = () => goUnit();
   partyScreen.onApply = (order, formation, prefs) => {
     data.party.order = order;
     data.party.formation = formation;
     data.party.targetPrefs = prefs;
     writeSave(data);
     ui.toast('編成を保存した', 'info', 1600);
-    goHome();
+    goUnit();
   };
 
-  dexScreen.onBack = () => goHome();
+  dexScreen.onBack = () => goUnit();
 
   resultScreen.onNext = () => goHome();
   resultScreen.onAgain = () => {
@@ -592,6 +693,10 @@ async function main(): Promise<void> {
     else if (jump === 'mission') { missionScreen.setData(data); ui.show('mission'); }
     else if (jump === 'news') { newsScreen.setData(data); ui.show('news'); }
     else if (jump === 'shop') { shopScreen.setData(data); ui.show('shop'); }
+    else if (jump === 'unit') goUnit();
+    else if (jump === 'settings') goSettings();
+    else if (jump === 'roster') { rosterScreen.setData(data); ui.show('roster'); }
+    else if (jump === 'transfer') { transferScreen.setData(data); ui.show('transfer'); }
     else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
     else if (jump === 'profile') { profileScreen.setData(data); ui.show('profile'); }
     else if (jump === 'debug') openDebug();
