@@ -73,9 +73,14 @@ export interface Mod {
 }
 
 export interface StatusEffect {
-  kind: 'burn' | 'regen';
+  kind: 'burn' | 'regen' | 'poison';
   turns: number;
-  /** burn: 最大HP比 / regen: 1回あたりの回復量（実数） */
+  /**
+   * burn / poison: 1行動あたりに削る最大体力の割合 / regen: 1回あたりの回復量（実数）
+   *
+   * 毒は火傷と違って重なる。重ねた数はここに足し込んで持つ——
+   * スタック数を別に持つと、同じ意味の値が2つになって片方だけ腐る。
+   */
   value: number;
   /**
    * regen の残り回復量。これを撃ち切ると、期限前でも消える。
@@ -162,8 +167,8 @@ export type BattleEvent =
   | { t: 'heal'; uid: string; from: string; amount: number; hp: number }
   | { t: 'shield'; uid: string; amount: number }
   | { t: 'mod'; uid: string; kind: ModKind; value: number; turns: number; label: string }
-  | { t: 'status'; uid: string; kind: 'burn'; applied: boolean }
-  | { t: 'statusTick'; uid: string; kind: 'burn' | 'regen'; amount: number; hp: number }
+  | { t: 'status'; uid: string; kind: 'burn' | 'poison'; applied: boolean }
+  | { t: 'statusTick'; uid: string; kind: 'burn' | 'regen' | 'poison'; amount: number; hp: number }
   | { t: 'od'; uid: string; value: number }
   | { t: 'odReady'; uid: string }
   | { t: 'ko'; uid: string; by: string }

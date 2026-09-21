@@ -1207,7 +1207,7 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
 /* 足もと。案内を1行だけ置く */
 .dex-foot {
   position: absolute; left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
-  bottom: calc(var(--safe-b) + 18px);
+  bottom: calc(var(--safe-b) + 18px + var(--tabbar-h));
   display: flex; align-items: center; gap: 10px;
   pointer-events: none;
 }
@@ -1216,7 +1216,7 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
 .dex-foot-rule { flex: 1; height: 1px; background: rgba(74, 65, 54, 0.18); }
 .dex-body {
   position: absolute;
-  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: calc(var(--safe-b) + 44px);
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: calc(var(--safe-b) + 44px + var(--tabbar-h));
   left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
   overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
   display: flex; flex-direction: column; gap: 8px;

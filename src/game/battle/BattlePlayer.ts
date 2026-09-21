@@ -317,7 +317,9 @@ export class BattlePlayer {
 
       case 'statusTick': {
         const at = this.scene.worldOf(e.uid, this.tmpVec);
-        if (at) this.scene.numbers.spawn(at.clone(), `${e.amount}`, { color: '#ff9c3c', scale: 0.8 });
+        // 火傷は橙、毒は紫。同じ色で出すと、どちらが切れたのか読めない
+        const color = e.kind === 'poison' ? '#9d6bd8' : '#ff9c3c';
+        if (at) this.scene.numbers.spawn(at.clone(), `${e.amount}`, { color, scale: 0.8 });
         return 0.10 * beat;
       }
 

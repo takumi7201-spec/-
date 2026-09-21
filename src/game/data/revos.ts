@@ -21,7 +21,8 @@ export type PassiveId =
   | 'traction' | 'overheat' | 'pursuit' | 'deepreign'
   | 'oldtyrant' | 'archivesail'
   | 'skygrasp' | 'platescreen' | 'greatbeak'
-  | 'islandapex' | 'earthbreath' | 'warlord';
+  | 'islandapex' | 'earthbreath' | 'warlord'
+  | 'firstbite' | 'greateye' | 'twinhorn' | 'runningcharge' | 'scytheclaw' | 'venomgland';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
@@ -29,7 +30,8 @@ export type OdId =
   | 'faulthaul' | 'greateruption' | 'crushbite' | 'abyssalmaw'
   | 'galemaw' | 'stratarecord'
   | 'skyreign' | 'spikebore' | 'leapstrike'
-  | 'hatzegwing' | 'grindfeed' | 'tyrantrequiem';
+  | 'hatzegwing' | 'grindfeed' | 'tyrantrequiem'
+  | 'forkjaw' | 'gazepierce' | 'hornrout' | 'crimsoncharge' | 'harvest' | 'serpentvenom';
 
 export interface RevosDef {
   id: string;
@@ -179,7 +181,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'pachycephalosaurus', name: 'パキケファロサウルス', short: 'パキケファロ', en: 'Pachycephalosaurus', element: 'null', role: 'Buffer',
-    hp: 1160, atk: 118, def: 110, spd: 116, basicPower: 86,
+    hp: 1210, atk: 124, def: 112, spd: 116, basicPower: 88,
     passive: { id: 'resonance', name: '共鳴', desc: '自分の行動時、味方全体の 必殺 +10。' },
     od: { id: 'resonantlight', name: '共鳴光', desc: '味方全体の 攻撃 +18%（4行動）＋ 全体の 必殺 +15。', power: 0 },
     defaultPref: 'support',
@@ -293,6 +295,114 @@ export const REVOS: RevosDef[] = [
     flavor: '島には大型の獣脚類がいなかった。翼を畳んで四足で歩き、地上の獲物を狩る翼竜が、そこでは頂点に立っていた。',
   },
   {
+    id: 'dimorphodon', name: 'ディモルフォドン', short: 'ディモルフォ',
+    en: 'Dimorphodon', element: 'gale', role: 'Striker',
+    hp: 1190, atk: 128, def: 92, spd: 134, basicPower: 91,
+    passive: {
+      id: 'firstbite', name: '初手の牙',
+      desc: 'まだ一度も攻撃していない相手への与ダメージ +28%。先に噛みついた者が場を決める。',
+    },
+    od: {
+      id: 'forkjaw', name: '二叉ノ顎',
+      desc: '単体に大ダメージ ＋ 別の敵1体にも同じ一撃が届く。', power: 126,
+    },
+    defaultPref: 'front',
+    sprite: 'dimorphodon',
+    build: { archetype: 'pterosaur', seed: 21212, bulk: 0.88, scale: 0.92, crest: true },
+    habitat: ['canyon'], rarity: 1,
+    flavor: '前に大きな牙、奥に細かい歯——一つの顎に二種類の歯が並ぶ。名前もそこから来ている。翼開長1.4m、掘り出される数だけは多い。',
+  },
+  {
+    id: 'ophthalmosaurus', name: 'オフタルモサウルス', short: 'オフタルモ',
+    en: 'Ophthalmosaurus', element: 'aqua', role: 'Technical',
+    hp: 1370, atk: 138, def: 106, spd: 114, basicPower: 92,
+    passive: {
+      id: 'greateye', name: '巨眼',
+      desc: '会心率 +18%。会心が出るたび味方全体の 必殺 +8。',
+    },
+    od: {
+      id: 'gazepierce', name: '暗所ノ一瞥',
+      desc: '単体に大ダメージ。必ず会心になる。', power: 118,
+    },
+    defaultPref: 'lowhp',
+    sprite: 'ophthalmosaurus',
+    build: { archetype: 'aquatic', seed: 22222, bulk: 1.0, scale: 1.0 },
+    habitat: ['tidehollow', 'frostpeak'], rarity: 2,
+    flavor: '直径 23cm、体に対して史上最大の眼。光の届かない深さまで潜って狩るために、目だけが先に巨大化した。',
+  },
+  {
+    id: 'albertaceratops', name: 'アルベルタケラトプス', short: 'アルベルタ',
+    en: 'Albertaceratops', element: 'terra', role: 'Debuffer',
+    hp: 1560, atk: 128, def: 134, spd: 94, basicPower: 90,
+    passive: {
+      id: 'twinhorn', name: '双角の圧',
+      desc: '攻撃が通った相手の 攻撃 −12%（3行動）。角を向けられた側は前に出られない。',
+    },
+    od: {
+      id: 'hornrout', name: '角衾',
+      desc: '敵全体に中ダメージ ＋ 全体の 必殺 −28 ＋ 味方全体の 防御 +18%（4行動）。', power: 78,
+    },
+    defaultPref: 'front',
+    sprite: 'albertaceratops',
+    build: { archetype: 'ceratopsian', seed: 23232, bulk: 1.18, scale: 1.06, horns: 2 },
+    habitat: ['canyon', 'frostpeak'], rarity: 3,
+    flavor: '角竜のなかでも古い型で、眉の上の角が長い。フリルの縁には鉤状の骨が並ぶ——正面から見たときの大きさだけを、ひたすら盛った顔。',
+  },
+  {
+    id: 'carnotaurus', name: 'カルノタウルス', short: 'カルノ',
+    en: 'Carnotaurus', element: 'flame', role: 'Finisher',
+    hp: 1220, atk: 146, def: 88, spd: 124, basicPower: 94,
+    passive: {
+      id: 'runningcharge', name: '駆ける角',
+      desc: '自分のほうが 速度 が高いとき、差 1 につき与ダメージ +0.35%（最大 +26%）。',
+    },
+    od: {
+      id: 'crimsoncharge', name: '赤角突撃',
+      desc: '単体に大ダメージ。倒しきれたら、そのまま次の1体へ突っ込む。', power: 148,
+    },
+    defaultPref: 'lowhp',
+    sprite: 'carnotaurus',
+    build: { archetype: 'theropod', seed: 24242, bulk: 0.96, scale: 1.0, horns: 2 },
+    habitat: ['emberfield', 'canyon'], rarity: 3,
+    flavor: '目の上に雄牛のような角を持つ獣脚類。前肢は退化して指先が飛び出しているだけ。代わりに尾の筋肉が異常に太く、走る速さだけに全部を寄せた体。',
+  },
+  {
+    id: 'therizinosaurus', name: 'テリジノサウルス', short: 'テリジノ',
+    en: 'Therizinosaurus', element: 'terra', role: 'Breaker',
+    hp: 1430, atk: 144, def: 112, spd: 96, basicPower: 97,
+    passive: {
+      id: 'scytheclaw', name: '鎌爪',
+      desc: 'シールドを無視して斬る。相手の 防御 が高いほど与ダメージ上昇（最大 +36%）。',
+    },
+    od: {
+      id: 'harvest', name: '収穫',
+      desc: '単体に特大ダメージ ＋ 与えたダメージの 28% を自分の体力に還す。', power: 172,
+    },
+    defaultPref: 'defense',
+    sprite: 'therizinosaurus',
+    build: { archetype: 'theropod', seed: 25252, bulk: 1.14, scale: 1.12, spikes: true },
+    habitat: ['frostpeak', 'canyon'], rarity: 4,
+    flavor: '長さ 1m に届く爪を三本ずつ。獣脚類でありながら草を食んでいたと見られている——この爪が何のためのものだったかは、まだ誰も知らない。',
+  },
+  {
+    id: 'elasmosaurus', name: 'エラスモサウルス', short: 'エラスモ',
+    en: 'Elasmosaurus', element: 'aqua', role: 'Sprinter',
+    hp: 1230, atk: 138, def: 92, spd: 138, basicPower: 89,
+    passive: {
+      id: 'venomgland', name: '毒腺',
+      desc: '通常攻撃の命中時 55% で毒を1つ重ねる（毒は1つにつき毎行動 最大体力の 4%、4つまで）。',
+    },
+    od: {
+      id: 'serpentvenom', name: '蛇頸毒牙',
+      desc: '単体に2回攻撃し、当たるたび毒を1つ重ねる ＋ 自分の次の行動を早める。', power: 62,
+    },
+    defaultPref: 'back',
+    sprite: 'elasmosaurus',
+    build: { archetype: 'aquatic', seed: 26262, bulk: 0.94, scale: 1.16 },
+    habitat: ['tidehollow', 'canyon'], rarity: 4,
+    flavor: '首の骨が 72 個。全長 10m のうち半分以上が首で、胴と鰭は小さい。水の中を進むというより、首だけを伸ばして獲物の群れに差し入れる。',
+  },
+  {
     id: 'tyrannosaurus-sue', name: 'ティラノサウルス スー', short: 'スー',
     en: 'Tyrannosaurus "Sue"', element: 'null', role: 'Apex',
     hp: 1900, atk: 140, def: 138, spd: 94, basicPower: 94,
@@ -313,7 +423,7 @@ export const REVOS: RevosDef[] = [
   {
     id: 'brachiosaurus', name: 'ブラキオサウルス', short: 'ブラキオ',
     en: 'Brachiosaurus', element: 'terra', role: 'Healer',
-    hp: 2140, atk: 100, def: 150, spd: 80, basicPower: 80,
+    hp: 2060, atk: 100, def: 144, spd: 80, basicPower: 80,
     passive: {
       id: 'earthbreath', name: '大地の伊吹',
       desc: '味方が受ける回復量 +15%（自分の回復も含む）。',

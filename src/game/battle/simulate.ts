@@ -91,6 +91,11 @@ export function cleanRank(clean: number): 'S' | 'A' | 'B' | 'C' | 'D' {
   return 'D';
 }
 
+/** 毒1つぶんの 1行動あたりの削り（最大体力比）と、重ねられる上限・持続 */
+const POISON_PER_STACK = 0.04;
+const POISON_MAX_STACK = 4;
+const POISON_TURNS = 5;
+
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
 const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };
 
@@ -423,6 +428,7 @@ export class BattleSim {
       const p = passiveOf(actor);
       this.tickIslandApex(actor, ev);
       if (p === 'embers' && this.rng.chance(0.32)) this.applyBurn(target, ev, actor.uid);
+      if (p === 'venomgland' && this.rng.chance(0.55)) this.applyPoison(target, ev, actor.uid);
       if (p === 'shearwind') {
         const st = actor.stacks.shear ?? 0;
         if (st < 3) {
@@ -531,6 +537,67 @@ export class BattleSim {
           t.draggedTurns = 2;
           ev.push({ t: 'promote', uid: t.uid, from: 'back', to: 'front' });
         }
+        break;
+      }
+      case 'forkjaw': {
+        const t = single(); if (!t) break;
+        // 2体目は別の個体。居なければ1体で終わる——同じ相手に2回当てると
+        // ただの連撃になり、「二叉」の絵と合わない
+        const other2 = enemies.filter((e) => e !== t);
+        const second = other2.length > 0 ? other2[Math.floor(this.rng.next() * other2.length)] : null;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: second ? [t.uid, second.uid] : [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        if (second) this.dealDamage(actor, second, power, ev);
+        break;
+      }
+      case 'gazepierce': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev, false, 'crit');
+        break;
+      }
+      case 'hornrout': {
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: enemies.map((e) => e.uid) });
+        for (const e of enemies) this.dealDamage(actor, e, power, ev);
+        for (const e of enemies) {
+          e.od = Math.max(0, e.od - 28);
+          ev.push({ t: 'od', uid: e.uid, value: e.od });
+        }
+        for (const a of allies) {
+          this.addMod(a, { kind: 'def', value: 0.18, turns: 4, source: 'hornrout' }, ev, 'DEF上昇');
+        }
+        break;
+      }
+      case 'crimsoncharge': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        // 倒しきれたら、そのまま次へ。連鎖は1回まで——3体まとめて薙げると
+        // 単体技のつもりが全体技になる
+        if (!t.alive) {
+          const next = this.alive(other(actor.side))[0];
+          if (next) {
+            ev.push({ t: 'passive', uid: actor.uid, label: '赤角突撃' });
+            this.dealDamage(actor, next, power, ev);
+          }
+        }
+        break;
+      }
+      case 'harvest': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        const dealt = this.dealDamage(actor, t, power, ev);
+        if (dealt > 0 && actor.alive) this.heal(actor, actor, Math.round(dealt * 0.28), ev);
+        break;
+      }
+      case 'serpentvenom': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        for (let i = 0; i < 2 && t.alive; i++) {
+          this.dealDamage(actor, t, power, ev);
+          if (t.alive) this.applyPoison(t, ev, actor.uid);
+        }
+        actor.av += 3000;
         break;
       }
       case 'tyrantrequiem': {
@@ -671,7 +738,7 @@ export class BattleSim {
   }
 
   private computeDamage(
-    atk: Fighter, def: Fighter, power: number, roll: boolean,
+    atk: Fighter, def: Fighter, power: number, roll: boolean, force?: 'crit',
   ): { amount: number; crit: boolean; eff: 1.5 | 1 | 0.7 } {
     const atkStat = atk.atk * clamp(1 + this.modSum(atk, 'atk'), 0.3, 3);
     let defStat = def.def * clamp(1 + this.modSum(def, 'def'), 0.3, 3);
@@ -715,6 +782,14 @@ export class BattleSim {
 
     const pa = passiveOf(atk);
     if (pa === 'deeppressure' && def.spd >= atk.spd + 20) buff *= 1.14;
+    // 「初手の牙」: まだ一度も噛んでいない相手に強い。先に当てた者が場を決める
+    if (pa === 'firstbite' && !atk.stacks[`bit${def.uid}`]) buff *= 1.28;
+    // 「駆ける角」: 速度差そのものが威力になる。深圧の裏返しで、追う側の理屈
+    if (pa === 'runningcharge' && atk.spd > def.spd) {
+      buff *= 1 + Math.min(0.26, (atk.spd - def.spd) * 0.0035);
+    }
+    // 「鎌爪」: 硬い相手ほど深く入る。柔らかい相手には何の足しにもならない
+    if (pa === 'scytheclaw') buff *= 1 + Math.min(0.36, Math.max(0, defStat - 90) * 0.0030);
     if (pa === 'traction' && def.row === 'back') buff *= 1.34;
     if (pa === 'overheat') buff *= 1 + 0.25 * (1 - atk.hp / atk.maxHp);
     // 「旧き暴君」: まだ削れていない相手を先に潰す
@@ -724,8 +799,10 @@ export class BattleSim {
 
     buff = clamp(buff, 0.4, 2.5);
 
-    const critRate = clamp(0.05 + (atk.spd - def.spd) * 0.0015, 0.02, 0.35);
-    const crit = roll ? this.rng.chance(critRate) : false;
+    let critRate = clamp(0.05 + (atk.spd - def.spd) * 0.0015, 0.02, 0.35);
+    // 「巨眼」: 見えている相手の継ぎ目を突く
+    if (pa === 'greateye') critRate = clamp(critRate + 0.18, 0.02, 0.55);
+    const crit = force === 'crit' ? true : roll ? this.rng.chance(critRate) : false;
     const rnd = roll ? this.rng.range(0.92, 1.08) : 1;
 
     base *= eff * posAtk * posDef * buff * (crit ? 1.8 : 1) * rnd;
@@ -733,10 +810,15 @@ export class BattleSim {
   }
 
   private dealDamage(
-    atk: Fighter, target: Fighter, power: number, ev: BattleEvent[], pierceShield = false,
+    atk: Fighter, target: Fighter, power: number, ev: BattleEvent[],
+    pierceShield = false, force?: 'crit',
   ): number {
     if (!target.alive || !atk.alive) return 0;
-    const { amount, crit, eff } = this.computeDamage(atk, target, power, true);
+    const pAtk = passiveOf(atk);
+    // 「鎌爪」は常にシールドを無視する。硬さを割るのが役目の爪なので、
+    // 吸収の板だけ素通りできない、では筋が通らない
+    if (pAtk === 'scytheclaw') pierceShield = true;
+    const { amount, crit, eff } = this.computeDamage(atk, target, power, true, force);
 
     let remaining = amount;
     let shielded = 0;
@@ -758,6 +840,20 @@ export class BattleSim {
     // 被弾で OD が溜まる（負けている側が巻き返せる仕組み）
     if (remaining > 0) this.gainOd(target, 24 * (remaining / target.maxHp), ev);
     if (eff === 1.5) this.gainOd(atk, 4, ev);
+
+    if (remaining > 0 || amount > 0) {
+      // 「初手の牙」: 一度噛んだ相手は覚えておく
+      if (pAtk === 'firstbite') atk.stacks[`bit${target.uid}`] = 1;
+      // 「巨眼」: 継ぎ目を突いた瞬間、味方全員がそこを見る
+      if (pAtk === 'greateye' && crit) {
+        ev.push({ t: 'passive', uid: atk.uid, label: '巨眼' });
+        for (const a of this.alive(atk.side)) this.gainOd(a, 8, ev);
+      }
+      // 「双角の圧」: 角を向けられた側は前に出られない
+      if (pAtk === 'twinhorn' && target.alive && !target.mods.some((m) => m.source === 'twinhorn')) {
+        this.addMod(target, { kind: 'atk', value: -0.12, turns: 3, source: 'twinhorn' }, ev, 'ATK低下');
+      }
+    }
 
     // 「熱反射」
     if (passiveOf(target) === 'heatreflect' && remaining > 0 && atk.alive && atk !== target) {
@@ -899,6 +995,26 @@ export class BattleSim {
     }
   }
 
+  /**
+   * 毒。
+   *
+   * 火傷と違って重なる。1つで 1行動あたり 最大体力の 2.5%、3つまで。
+   * 持続は長いが立ち上がりが遅いので、何度も動ける個体でないと積めない——
+   * 速さがそのまま毒の厚みになる、という役割の形にしてある。
+   *
+   * 攻撃力に一切依存しないのも火傷と同じ。硬い相手ほど、殴るより効く。
+   */
+  private applyPoison(target: Fighter, ev: BattleEvent[], source: string): void {
+    const existing = target.statuses.find((s) => s.kind === 'poison');
+    if (existing) {
+      existing.value = Math.min(POISON_MAX_STACK * POISON_PER_STACK, existing.value + POISON_PER_STACK);
+      existing.turns = POISON_TURNS;
+    } else {
+      target.statuses.push({ kind: 'poison', turns: POISON_TURNS, value: POISON_PER_STACK, source });
+    }
+    ev.push({ t: 'status', uid: target.uid, kind: 'poison', applied: true });
+  }
+
   private applyBurn(target: Fighter, ev: BattleEvent[], source: string): void {
     const existing = target.statuses.find((s) => s.kind === 'burn');
     if (existing) existing.turns = Math.max(existing.turns, 3);
@@ -918,10 +1034,10 @@ export class BattleSim {
         if ((s.pool ?? 0) <= 0) s.turns = 0;
         continue;
       }
-      if (s.kind === 'burn') {
+      if (s.kind === 'burn' || s.kind === 'poison') {
         const dmg = Math.max(1, Math.round(f.maxHp * s.value));
         f.hp = Math.max(0, f.hp - dmg);
-        ev.push({ t: 'statusTick', uid: f.uid, kind: 'burn', amount: dmg, hp: f.hp });
+        ev.push({ t: 'statusTick', uid: f.uid, kind: s.kind, amount: dmg, hp: f.hp });
         if (f.hp === 0) {
           const src = this.fighters.find((x) => x.uid === s.source) ?? f;
           this.kill(f, src, ev);
