@@ -3,7 +3,9 @@ import { h, button, clear, fmtNum } from '../dom';
 import type { OwnedRevos, SaveData } from '../../core/Save';
 import { getRevos, revosShortName } from '../../game/data/revos';
 import { cleanRank } from '../../game/battle/simulate';
-import { TRANSFER_MIN_CLEAN, applyTransfer, canBeCore, quoteTransfer } from '../../game/transfer';
+import {
+  TRANSFER_MIN_CLEAN, applyTransfer, canBeTarget, coresFor, quoteTransfer,
+} from '../../game/transfer';
 import { revosIcon } from '../revosIcon';
 import { screenHead, plate, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
@@ -15,6 +17,10 @@ import { audio } from '../../core/Audio';
  * 消えるほうを選ばせる操作なので、どちらがどちらかを画面の上で
  * 取り違えられないようにする。上段に結果を先に出し、下の2つの棚は
  * 見出しと色で役目を分ける。
+ *
+ * 移せるのは同じ種のあいだだけなので、順番は移す先が先。核の棚は
+ * 選んだ種で絞る——全部並べてから「その種には移せない」と断るのは、
+ * 選ばせてから取り消すのと同じで、二度手間になる。
  *
  * 選んだ時点では何も起きない。実行の前に必ず一度確かめる——
  * 押し間違いで消える対象が、削り上げるのに1分かかったものだから。
@@ -64,7 +70,7 @@ export class TransferScreen extends Screen {
       this.targetEl,
       h('div', { class: 'tr-label tr-label--core' },
         h('span', { text: spaced('核') }),
-        h('span', { class: 'tr-label-note', text: `クリーン度 ${TRANSFER_MIN_CLEAN} から。こちらは失われる` }),
+        h('span', { class: 'tr-label-note', text: `同じ種・クリーン度 ${TRANSFER_MIN_CLEAN} から。こちらは失われる` }),
       ),
       this.coreEl,
     );
@@ -109,28 +115,43 @@ export class TransferScreen extends Screen {
     );
     this.goBtn.disabled = !q.ok;
 
-    // ---- 棚 ----
+    // ---- 移す先の棚。核を1体も持たない個体は沈めて理由を出す ----
     clear(this.targetEl);
+    const anyTarget = this.data.roster.some((u) => canBeTarget(this.data, u));
+    if (!anyTarget) {
+      this.targetEl.appendChild(h('div', { class: 'tr-empty' },
+        `同じ種を2体以上持っていて、片方のクリーン度が ${TRANSFER_MIN_CLEAN}`
+        + `（${cleanRank(TRANSFER_MIN_CLEAN)}ランク）以上のときに移せる。`,
+      ));
+    }
     for (const u of this.sorted()) {
-      // 核に選んだ個体は移す先にならない。同じ札を2つの役目で押させない
       if (u.uid === this.coreUid) continue;
-      this.targetEl.appendChild(this.cell(u, 'target', u.uid === this.targetUid, false, () => {
+      const dead = !canBeTarget(this.data, u);
+      this.targetEl.appendChild(this.cell(u, 'target', u.uid === this.targetUid, dead, () => {
+        if (dead) { audio.uiError(); this.ui.toast('この個体へ移せる核がない', 'warn'); return; }
         this.targetUid = this.targetUid === u.uid ? null : u.uid;
+        // 種が変われば核は持ち越せない。選び直させる前に外す
+        this.coreUid = null;
         this.render();
       }));
     }
 
+    // ---- 核の棚。移す先の種だけを並べる ----
     clear(this.coreEl);
-    const cores = this.sorted().filter(canBeCore);
+    if (!target) {
+      this.coreEl.appendChild(h('div', { class: 'tr-empty', text: '先に移す先を選ぶ。核は同じ種からしか選べない。' }));
+      return;
+    }
+    const cores = coresFor(this.data, target).sort((a, b) => b.clean - a.clean);
     if (cores.length === 0) {
-      this.coreEl.appendChild(h('div', { class: 'tr-empty', text: `クリーン度 ${TRANSFER_MIN_CLEAN}（${cleanRank(TRANSFER_MIN_CLEAN)}ランク）以上の化石がまだない。` }));
+      this.coreEl.appendChild(h('div', { class: 'tr-empty' },
+        `${revosShortName(target.defId)} の核がない。`
+        + `同じ種を、いまより高いクリーン度で削り上げると並ぶ。`,
+      ));
+      return;
     }
     for (const u of cores) {
-      if (u.uid === this.targetUid) continue;
-      // 移す先より低い核は押しても意味がない。並べたまま沈めて理由を示す
-      const useless = !!target && u.clean <= target.clean;
-      this.coreEl.appendChild(this.cell(u, 'core', u.uid === this.coreUid, useless, () => {
-        if (useless) { audio.uiError(); this.ui.toast('移す先のほうが高い', 'warn'); return; }
+      this.coreEl.appendChild(this.cell(u, 'core', u.uid === this.coreUid, false, () => {
         this.coreUid = this.coreUid === u.uid ? null : u.uid;
         this.render();
       }));

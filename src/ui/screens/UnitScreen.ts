@@ -4,7 +4,7 @@ import type { SaveData } from '../../core/Save';
 import { REVOS, getRevos } from '../../game/data/revos';
 import { cleanRank } from '../../game/battle/simulate';
 import { effectiveParty, partyPower } from '../../game/party';
-import { canBeCore, TRANSFER_MIN_CLEAN } from '../../game/transfer';
+import { TRANSFER_MIN_CLEAN, transferPairs } from '../../game/transfer';
 import { revosIcon } from '../revosIcon';
 import { screenHead, plate, tabBar } from '../chrome';
 
@@ -72,7 +72,9 @@ export class UnitScreen extends Screen {
     }
 
     // ---- 4枚の札 ----
-    const cores = roster.filter(canBeCore).length;
+    // 数えるのは「クリーン度 70 以上の個体」ではなく、実際に成立する組。
+    // 別々の種で 70 以上が2体あっても、同種でなければ1組も成立しない
+    const pairs = transferPairs(this.data);
     const best = roster.reduce((m, u) => Math.max(m, u.clean), 0);
     const specs: {
       key: UnitWhere; icon: string; title: string; note: string; value: string; tone: string;
@@ -94,16 +96,24 @@ export class UnitScreen extends Screen {
       },
       {
         key: 'transfer', icon: '✦', title: 'カセキ付け替え', tone: 'rose',
-        note: `クリーン度 ${TRANSFER_MIN_CLEAN} から核にできる`,
-        value: `核 ${cores} 体`,
+        note: `同じ種のあいだだけ。核はクリーン度 ${TRANSFER_MIN_CLEAN} から`,
+        value: `${pairs} 組`,
       },
     ];
 
     clear(this.gridEl);
     for (const s of specs) {
-      const disabled = (s.key === 'transfer' && cores === 0) || (s.key === 'roster' && roster.length === 0);
+      const disabled = (s.key === 'transfer' && pairs === 0) || (s.key === 'roster' && roster.length === 0);
       const card = button('', () => {
-        if (disabled) { this.ui.toast(s.key === 'transfer' ? `クリーン度 ${TRANSFER_MIN_CLEAN} 以上の化石がまだない` : 'まだ手持ちがない', 'warn'); return; }
+        if (disabled) {
+          this.ui.toast(
+            s.key === 'transfer'
+              ? `同じ種を2体以上、片方はクリーン度 ${TRANSFER_MIN_CLEAN} 以上で持つと使える`
+              : 'まだ手持ちがない',
+            'warn',
+          );
+          return;
+        }
         this.onGo?.(s.key);
       }, { class: `unit-card unit-card--${s.tone} ${disabled ? 'is-off' : ''}` });
       card.append(

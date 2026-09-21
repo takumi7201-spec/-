@@ -17,8 +17,11 @@ import { cleanRank } from './battle/simulate';
  * 核にした個体は失われる——2体ぶんの手間で1体を仕上げる取引にしないと、
  * 削る回数だけが増えて、1回ごとの丁寧さが要らなくなる。
  *
- * 動くのはクリーン度だけ。レベルも経験値も種も移さない。
- * 育てた個体を別の種に化けさせる道具にすると、発掘そのものが要らなくなる。
+ * 移せるのは同じ種のあいだだけ。別の種の結晶を継げるなら、掘るのは
+ * いちばん出やすい1種だけでよくなり、地層ごとに棲み分けている意味が消える。
+ * 同種に限れば、その種を掘り直して削り直した回数がそのまま厚みになる。
+ *
+ * 動くのはクリーン度だけ。レベルも経験値も移さない。
  */
 
 /** 核にできる下限。cleanRank の B と同じ値にする——2か所で境目をずらさない */
@@ -54,6 +57,7 @@ export function quoteTransfer(d: SaveData, targetUid: string | null, coreUid: st
   if (!target) return NG('移す先を選ぶ');
   if (!core) return NG('核を選ぶ');
   if (target.uid === core.uid) return NG('同じ個体は選べない');
+  if (target.defId !== core.defId) return NG('同じ種のあいだでしか移せない');
   if (core.clean < TRANSFER_MIN_CLEAN) {
     return NG(`核はクリーン度 ${TRANSFER_MIN_CLEAN}（${cleanRank(TRANSFER_MIN_CLEAN)}ランク）から`);
   }
@@ -63,9 +67,32 @@ export function quoteTransfer(d: SaveData, targetUid: string | null, coreUid: st
   return { ok: true, cost, gain: core.clean - target.clean, from: target.clean, to: core.clean };
 }
 
-/** 核にできる個体か。一覧を絞るのに使う */
+/** 核の資格。クリーン度だけの条件で、相手が決まる前の絞り込みに使う */
 export function canBeCore(u: OwnedRevos): boolean {
   return u.clean >= TRANSFER_MIN_CLEAN;
+}
+
+/** この個体へ移せる核。同じ種で、いまより高いものだけ */
+export function coresFor(d: SaveData, target: OwnedRevos): OwnedRevos[] {
+  return d.roster.filter(
+    (u) => u.uid !== target.uid && u.defId === target.defId
+      && canBeCore(u) && u.clean > target.clean,
+  );
+}
+
+/** 移す先になれる個体か。核が1体も無い個体を選ばせても、そこで行き止まる */
+export function canBeTarget(d: SaveData, u: OwnedRevos): boolean {
+  return coresFor(d, u).length > 0;
+}
+
+/**
+ * いま成立する組の数。
+ *
+ * 核の資格を持つ個体の数ではない。同じ種の相方が居なければ核にはならないので、
+ * 「クリーン度 70 以上が2体」と「別々の種で70以上が2体」を同じ数で出すと嘘になる。
+ */
+export function transferPairs(d: SaveData): number {
+  return d.roster.filter((u) => canBeTarget(d, u)).length;
 }
 
 /**
