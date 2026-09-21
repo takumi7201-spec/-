@@ -89,6 +89,11 @@ export class BattlePlayer {
   private released: string | null = null;
   /** 直前の行動を終えた時点の AV。リングの 0 をここに置く */
   private floor = new Map<string, number>();
+  /**
+   * 見せてよい時刻の上限。次に誰かが動く時刻で、1フレームに1度だけ引く。
+   * 個体ごとに引くと、6体ぶん毎フレーム生存者の配列を作り直すことになる。
+   */
+  private shownAt = 0;
 
   constructor(
     seed: number,
@@ -97,6 +102,7 @@ export class BattlePlayer {
     private scene: BattleScene,
   ) {
     this.sim = new BattleSim(seed, teamA, teamB);
+    this.shownAt = this.sim.clock;
     for (const f of this.sim.fighters) {
       this.maxHp.set(f.uid, f.maxHp);
       this.sideOf.set(f.uid, f.side);
@@ -137,6 +143,7 @@ export class BattlePlayer {
     if (this.intro > 0) { this.intro -= dt; return; }
 
     this.clock += dt * this.avPerSec();
+    this.shownAt = Math.min(this.clock, this.sim.nextActorAt());
 
     // 出せるイベントは、この1フレームのうちに全部出す。
     // 「1フレーム1イベント」だと、近い時刻に重なった行動が引き伸ばされる
@@ -149,6 +156,7 @@ export class BattlePlayer {
         this.queue = this.sim.step();
         if (this.queue.length === 0) { this.finish(); return; }
         this.snapshotAv(this.actorOf(this.queue));
+        this.shownAt = Math.min(this.clock, this.sim.nextActorAt());
         this.cursor = Math.max(this.cursor, this.sim.clock);
       }
       if (this.cursor > this.clock) break;
@@ -194,13 +202,24 @@ export class BattlePlayer {
     this.baseAv.set(uid, f.av - this.sim.speedOf(f) * (this.clock - this.baseClock));
   }
 
-  /** 表示用の AV。時計の位置から素直に引く */
+  /**
+   * 表示用の AV。
+   *
+   * 起点はシミュレータの時計、伸ばすのは再生の時計——この2つは同じ速さでは
+   * 進まない。1手ぶんの演出（構え・踏み込み・当たり・のけぞり）は、その手と
+   * 次の手のあいだの AV 差より長いことが多く、再生は少しずつ後ろへ溜まる。
+   * 素の差で伸ばすと、溜まったぶんだけ余計に進んで上限に張り付き、
+   * 誰のリングも行動直後に満ちて見えた。
+   *
+   * 伸ばす先は「次に誰かが動く時刻」まで。そこから先はまだ起きていない
+   * 出来事なので、見せる時計をそこで止める。
+   */
   displayAv(uid: string): number {
     const f = this.sim.fighters.find((x) => x.uid === uid);
     if (!f) return 0;
     const base = this.baseAv.get(uid);
     if (base === undefined) return f.av;
-    const v = base + this.sim.speedOf(f) * (this.clock - this.baseClock);
+    const v = base + this.sim.speedOf(f) * Math.max(0, this.shownAt - this.baseClock);
     return Math.min(AV_THRESHOLD, v);
   }
 
