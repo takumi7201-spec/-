@@ -21,7 +21,7 @@ export type PassiveId =
   | 'traction' | 'overheat' | 'pursuit' | 'deepreign'
   | 'oldtyrant' | 'archivesail'
   | 'skygrasp' | 'platescreen' | 'greatbeak'
-  | 'islandapex' | 'earthbreath';
+  | 'islandapex' | 'earthbreath' | 'warlord';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
@@ -29,7 +29,7 @@ export type OdId =
   | 'faulthaul' | 'greateruption' | 'crushbite' | 'abyssalmaw'
   | 'galemaw' | 'stratarecord'
   | 'skyreign' | 'spikebore' | 'leapstrike'
-  | 'hatzegwing' | 'grindfeed';
+  | 'hatzegwing' | 'grindfeed' | 'tyrantrequiem';
 
 export interface RevosDef {
   id: string;
@@ -291,6 +291,24 @@ export const REVOS: RevosDef[] = [
     build: { archetype: 'pterosaur', seed: 19191, bulk: 1.14, scale: 1.12, crest: true },
     habitat: ['emberfield', 'canyon'], rarity: 5,
     flavor: '島には大型の獣脚類がいなかった。翼を畳んで四足で歩き、地上の獲物を狩る翼竜が、そこでは頂点に立っていた。',
+  },
+  {
+    id: 'tyrannosaurus-sue', name: 'ティラノサウルス スー', short: 'スー',
+    en: 'Tyrannosaurus "Sue"', element: 'null', role: 'Apex',
+    hp: 1900, atk: 140, def: 138, spd: 94, basicPower: 94,
+    passive: {
+      id: 'warlord', name: '歴戦の暴君',
+      desc: '属性相性を使わない。自分が与えるダメージも受けるダメージも、相手の属性に関わらず ×1.5。',
+    },
+    od: {
+      id: 'tyrantrequiem', name: '覇王鎮魂・六千万年ノ咬',
+      desc: '単体に特大ダメージ ＋ 対象の被ダメージ +20%（2行動）。', power: 186,
+    },
+    defaultPref: 'defense',
+    sprite: 'tyrannosaurus-sue',
+    build: { archetype: 'theropod', seed: 20202, bulk: 1.12, scale: 1.1 },
+    habitat: ['canyon', 'emberfield'], rarity: 5,
+    flavor: '1990年、サウスダコタの丘で見つかった最も完全な一体。折れて癒えた肋骨、噛まれた跡の残る顎——三十年ぶんの傷を抱えたまま、六千万年を越えて掘り出された。',
   },
   {
     id: 'brachiosaurus', name: 'ブラキオサウルス', short: 'ブラキオ',

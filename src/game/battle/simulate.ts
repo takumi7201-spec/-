@@ -533,6 +533,16 @@ export class BattleSim {
         }
         break;
       }
+      case 'tyrantrequiem': {
+        const t = single(); if (!t) break;
+        ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
+        this.dealDamage(actor, t, power, ev);
+        // 噛み跡は残る。倒しきれなくても、次の2行動は味方全員の攻撃が通る
+        if (t.alive) {
+          this.addMod(t, { kind: 'taken', value: 0.2, turns: 2, source: 'tyrantrequiem' }, ev, '被ダメ上昇');
+        }
+        break;
+      }
       case 'crushbite': {
         const t = single(); if (!t) break;
         ev.push({ t: 'action', uid: actor.uid, kind: 'od', name: def.od.name, targets: [t.uid] });
@@ -673,6 +683,17 @@ export class BattleSim {
     let base = 4.15 * (power / 100) * atkStat * dr;
 
     let eff: 1.5 | 1 | 0.7 = elementFactor(atk.element, def.element);
+    /*
+     * 相性表を書き換える2つの特性。
+     *
+     * 「歴戦の暴君」は相性を使わず、与も被も常に 1.5 に固定する。
+     * 有利も不利も無い代わりに、殴る側も殴られる側も倍率が乗ったままになる。
+     *
+     * 「不変」と噛み合ったときは不変が勝つ。「相性を受けない」ほうが
+     * 「常に相性ぶん乗る」より強い宣言で、こう置くと不変の側が
+     * 暴君に対する唯一の受け札になる——★5 に素で刺さる札を1つ残す。
+     */
+    if (passiveOf(atk) === 'warlord' || passiveOf(def) === 'warlord') eff = 1.5;
     if (passiveOf(atk) === 'immutable' || passiveOf(def) === 'immutable') eff = 1;
 
     const posAtk = atk.row === 'front' ? 1.15 : 0.9;
