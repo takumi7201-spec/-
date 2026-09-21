@@ -121,6 +121,15 @@
 /* 利き手を替えたら、移動と主アクションごと入れ替える */
 body[data-hand='left'] .deck--dig { flex-direction: row-reverse; }
 body[data-hand='left'] .rail--r { right: auto; left: calc(var(--gutter) + var(--safe-l)); }
+/*
+ * 持ち物はツール列と反対の端に置く。
+ *
+ * 同じ側に出すと、開いた板が「持ち物」のボタンごと覆ってしまい、
+ * 同じボタンで閉じられなくなる——開いたら閉じられない面になっていた。
+ */
+body[data-hand='left'] .inv { left: auto; right: calc(var(--gutter) + var(--safe-r)); }
+body[data-hand='left'] .inv.is-open { animation-name: inv-in-r; }
+body[data-hand='left'] .inv.is-closing { animation-name: inv-out-r; }
 .deck-right { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .dig-tools { margin-top: 10px; }
 .rail--r { align-items: flex-end; }
@@ -369,8 +378,12 @@ body[data-layout='wide'] .tabbar { left: 50%; right: auto; width: min(560px, 94v
 }
 
 /* ---- WIDE レイアウト（スマホ横 / PC）---- */
-body[data-layout='wide'] .rail--r { top: 84px; }
-body[data-layout='wide'] .deck--dig { padding-left: 5vw; padding-right: 5vw; }
+/* 横長でも棚の高さは同じ式で出す。84px 決め打ちだと体力の帯に乗る */
+body[data-layout='wide'] .deck--dig {
+  padding-left: 5vw; padding-right: 5vw;
+  /* 下段は既定で中央寄せになるが、発掘だけは両の親指へ振り分ける */
+  justify-content: space-between;
+}
 body[data-layout='wide'] .title-actions { width: min(520px, 100%); }
 
 /* =========================================================================
@@ -1335,6 +1348,20 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
 .dex-owned, .dex-habitat { font-size: 12px; color: var(--ink-soft); display: flex; gap: 8px; align-items: center; }
 
 /* ---- リザルト ---- */
+/*
+ * 地を敷く。
+ *
+ * ここだけ背景を持っておらず、裏で回っている 3D の場面がそのまま透けていた。
+ * 戦闘が終わると場面は拠点のジオラマに戻るので、報告の行の後ろで
+ * ボクセルの角が動くことになる——読む面の後ろに動くものを置かない。
+ */
+.screen--result::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--result > * { z-index: 1; }
+
 /* 斜めに差す光。勝敗の後ろにだけ置く */
 .result-rays {
   position: absolute; left: -90px; right: -90px; top: -70px; height: 460px;
@@ -1439,10 +1466,13 @@ body[data-layout='wide'] .party-field { grid-template-columns: repeat(3, 180px);
    ========================================================================= */
 .inv {
   position: absolute;
-  top: calc(var(--safe-t) + 62px);
+  /* 棚はツール列と同じ高さから。62px 決め打ちだと、頭と体力の帯に乗る */
+  top: calc(var(--safe-t) + var(--head-h) + 74px);
   left: calc(var(--gutter) + var(--safe-l));
-  width: min(272px, 72%);
-  max-height: calc(100dvh - var(--safe-t) - 62px - 208px);
+  /* ツール列（丸ボタン＋略図）ぶんを必ず空ける。72% だと端末幅によっては
+     列の上に乗り、ボタンの右肩だけが隠れて押せなくなる */
+  width: min(272px, calc(100% - var(--gutter) * 2 - var(--safe-l) - var(--safe-r) - 124px));
+  max-height: calc(100dvh - var(--safe-t) - var(--head-h) - 74px - 208px);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1461,6 +1491,14 @@ body[data-layout='wide'] .party-field { grid-template-columns: repeat(3, 180px);
 }
 @keyframes inv-out {
   to { opacity: 0; transform: translateX(-10px); }
+}
+/* 右端から出すときは、滑る向きも反対にする */
+@keyframes inv-in-r {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes inv-out-r {
+  to { opacity: 0; transform: translateX(10px); }
 }
 
 /* 持ち物の1枚。白い板を左に積む */
@@ -1554,7 +1592,9 @@ body[data-layout='wide'] .party-field { grid-template-columns: repeat(3, 180px);
 .dot--null { background: var(--el-null); }
 
 /* 持ち物を開いている間はミニマップを畳む。左右で情報が競合する */
-.screen--dig.inv-open .rail--r { opacity: 0; pointer-events: none; }
+/* 持ち物を開いてもツール列は消さない。開いた板と反対側に置いてあるので
+   隠す理由がなく、隠すと「持ち物」のボタンごと消えて閉じられなくなる */
+.screen--dig.inv-open .rail--r { opacity: 0.55; }
 body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); }
 
 /* =========================================================================

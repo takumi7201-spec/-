@@ -265,7 +265,9 @@ export class DigScreen extends Screen {
     audio.uiTap();
     this.inv.open(ctx);
     this.el.classList.add('inv-open');
-    this.scene.setViewShift(1);
+    // 板は利き手と反対の端に出る。被写体はその反対へ逃がす——
+    // 板と同じ側へ寄せたら、開けた場所を自分で塞ぐことになる
+    this.scene.setViewShift(document.body.dataset.hand === 'left' ? -1 : 1);
   }
 
   private leave(): void {
