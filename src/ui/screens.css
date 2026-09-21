@@ -1608,11 +1608,16 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
   display: block;
   object-fit: contain;
 }
-/* ★5 は img ではなくキャンバスで返る。キャンバスには object-fit が効かず、
-   横長の枠に入れると絵が伸びる。高さ基準にして正方形を保つ */
-canvas.revos-sprite {
-  width: auto; aspect-ratio: 1; margin-left: auto; margin-right: auto;
-}
+/*
+ * ★5 は img ではなくキャンバスで返る。
+ *
+ * かつて「キャンバスには object-fit が効かない」と見て width: auto と
+ * aspect-ratio で逃がしていたが、canvas は置換要素なので object-fit は効く。
+ * そのうえ canvas.revos-sprite は呼び出し側の .○○-icon より詳細度が高く、
+ * width を指定している置き場所すべてを上書きしていた——リザルトの
+ * 3体は枠 78px に対して 256px で描かれ、画面いっぱいに溢れていた。
+ * 上の .revos-sprite 1つで img と同じように収まる。
+ */
 .slot-icon { width: 100%; height: 46px; margin-bottom: 2px; }
 .roster-icon { width: 100%; height: 36px; }
 .dex-icon { width: 100%; height: 52px; }
