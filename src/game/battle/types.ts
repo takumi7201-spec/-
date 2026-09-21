@@ -1,4 +1,5 @@
 import type { ElementId } from '../../voxel/palette';
+import type { Engraving } from '../engraving';
 
 export type Row = 'front' | 'back';
 export type Side = 0 | 1;
@@ -102,6 +103,8 @@ export interface RevosInstance {
   clean: number;
   /** スキルレベル（重複強化）1-5 */
   skillLevel: number;
+  /** 刻印。クリーン度の倍率とは別枠で、最後に足す加算 */
+  engraving?: Engraving;
 }
 
 export interface TeamSetup {

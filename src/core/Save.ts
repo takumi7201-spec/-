@@ -1,6 +1,7 @@
 import type { FormationId, Stance, TargetPref } from '../game/battle/types';
 import type { QualityTier } from './Quality';
 import type { BiomeId } from '../voxel/palette';
+import type { Engraving } from '../game/engraving';
 
 /**
  * セーブデータ。
@@ -21,6 +22,11 @@ export interface OwnedRevos {
   /** クリーン度 C（0-100）。再研磨では高いほうだけを採用する */
   clean: number;
   skillLevel: number;
+  /**
+   * 刻印。削り上げたときに稀に出る、倍率とは別枠の加算。
+   * 個体に付くので、付け替えれば別の個体へ移る
+   */
+  engraving?: Engraving;
   obtainedAt: number;
   /**
    * デバッグモードで配った個体。
@@ -171,6 +177,10 @@ export interface SaveData {
     /** 図鑑の並び。開くたびに選び直させない */
     dexSort?: 'index' | 'rarity' | 'element' | 'role' | 'owned';
     dexDesc?: boolean;
+    /** 手持ち一覧の見せ方。札を敷き詰めるか、1行ずつ読ませるか */
+    rosterView?: 'list' | 'grid';
+    rosterSort?: 'got' | 'level' | 'clean' | 'rarity' | 'element';
+    rosterDesc?: boolean;
   };
 }
 

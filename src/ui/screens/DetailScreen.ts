@@ -6,6 +6,7 @@ import { ELEMENT_NAMES, BIOMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
 import { revosIcon } from '../revosIcon';
 import { spaced } from '../chrome';
+import { engraveChip } from './CleanChoiceScreen';
 import { audio } from '../../core/Audio';
 
 /** 帯の満ち具合を決める基準値。種ごとの差が読める幅に取る */
@@ -38,6 +39,7 @@ export class DetailScreen extends Screen {
   private nameEl!: HTMLElement;
   private latinEl!: HTMLElement;
   private statsEl!: HTMLElement;
+  private engraveEl!: HTMLElement;
   private passiveEl!: HTMLElement;
   private odEl!: HTMLElement;
   private habitatEl!: HTMLElement;
@@ -53,6 +55,7 @@ export class DetailScreen extends Screen {
     this.nameEl = h('div', { class: 'det-name' });
     this.latinEl = h('div', { class: 'det-latin' });
     this.statsEl = h('div', { class: 'det-stats' });
+    this.engraveEl = h('div', { class: 'det-engrave' });
     this.passiveEl = h('div', { class: 'det-skill det-skill--passive' });
     this.odEl = h('div', { class: 'det-skill det-skill--od' });
     this.habitatEl = h('div', { class: 'det-habitat' });
@@ -69,6 +72,7 @@ export class DetailScreen extends Screen {
       h('div', { class: 'det-body' },
         h('div', { class: 'det-title' }, this.headEl, this.nameEl, this.latinEl),
         this.statsEl,
+        this.engraveEl,
         this.passiveEl,
         this.odEl,
         h('div', { class: 'det-foot' },
@@ -139,6 +143,17 @@ export class DetailScreen extends Screen {
           h('i', { style: `width:${Math.min(100, (v / ceil) * 100)}%;background:${c}` }),
         ),
       ));
+    }
+
+    // 刻印はこの個体だけのもの。種の性能表とは別の段に置く——
+    // 同じ行に混ぜると、図鑑に並ぶ数値が個体ごとに違って見える
+    clear(this.engraveEl);
+    this.engraveEl.hidden = !u?.engraving;
+    if (u?.engraving) {
+      this.engraveEl.append(
+        h('span', { class: 'det-engrave-tag', text: spaced('刻印') }),
+        engraveChip(u.engraving, 'is-cur'),
+      );
     }
 
     clear(this.passiveEl);

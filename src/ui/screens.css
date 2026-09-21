@@ -2314,12 +2314,6 @@ body[data-layout='wide'] .unit-body { left: 18vw; right: 18vw; }
    手持ちの一覧（個体）
    図鑑は種を並べる面、ここは個体を並べる面
    ========================================================================= */
-.ros-sorts {
-  position: absolute;
-  top: calc(var(--safe-t) + var(--head-h) + 4px);
-  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
-  pointer-events: auto;
-}
 .ros-body {
   position: absolute;
   top: calc(var(--safe-t) + var(--head-h) + 46px); bottom: var(--deck-bottom);
@@ -2361,8 +2355,7 @@ body[data-layout='wide'] .unit-body { left: 18vw; right: 18vw; }
 .ros-rank--S { color: var(--hl-amber-deep); }
 .ros-rank--D { color: var(--ink-faint); }
 
-body[data-layout='wide'] .ros-body,
-body[data-layout='wide'] .ros-sorts { left: 18vw; right: 18vw; }
+body[data-layout='wide'] .ros-body { left: 18vw; right: 18vw; }
 
 /* =========================================================================
    カセキ付け替え
@@ -2495,3 +2488,188 @@ body[data-layout='wide'] .tr-body { left: 18vw; right: 18vw; }
 .set-link.is-danger .set-label { color: var(--hl-rose); }
 
 body[data-layout='wide'] .set-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   刻印
+   クリーン度の倍率とは別枠の加算。等級で色が変わる1つの塊として出す
+   ========================================================================= */
+.eng-chip {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 7px;
+  padding: 4px 9px 5px; border-radius: 9px;
+  background: rgba(42, 37, 30, 0.06);
+  font-size: 11px; font-weight: 700;
+}
+.eng-chip.is-new { background: rgba(255, 214, 120, 0.4); box-shadow: inset 0 0 0 1px var(--hl-amber); }
+.eng-chip.is-cur { background: rgba(42, 37, 30, 0.07); }
+.eng-mark {
+  width: 20px; height: 20px; border-radius: 6px;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 900; color: #fff6f4;
+  background: var(--pencil);
+}
+/* 等級は色で出す。☆の数だけでは、並んだときの上下がひと目で読めない */
+.eng-mark--g1 { background: #8a8073; }
+.eng-mark--g2 { background: #1f7b78; }
+.eng-mark--g3 { background: #2f6fae; }
+.eng-mark--g4 { background: #8a4fa8; }
+.eng-mark--g5 { background: var(--hl-amber-deep); }
+/* 等級は「☆4」と数で出す。☆を並べると小さい字では数えられない */
+.eng-grade { font-size: 10px; font-weight: 900; color: var(--pen-brown); }
+.eng-stat { display: inline-flex; align-items: baseline; gap: 3px; color: var(--ink-soft); }
+.eng-val { font-size: 12px; color: var(--pen-green); }
+
+/* 一覧に置く小さい印。銘と等級だけ——加算まで出すと行が読めない */
+.eng-tag {
+  flex: none;
+  padding: 1px 6px 2px; border-radius: 5px;
+  font-size: 9px; font-weight: 900; letter-spacing: 0.04em;
+  color: #fff6f4; background: var(--pencil);
+}
+.eng-tag--g1 { background: #8a8073; }
+.eng-tag--g2 { background: #1f7b78; }
+.eng-tag--g3 { background: #2f6fae; }
+.eng-tag--g4 { background: #8a4fa8; }
+.eng-tag--g5 { background: var(--hl-amber-deep); }
+.eng-tag.is-compact {
+  position: absolute; left: 2px; top: 2px;
+  width: 17px; height: 17px; padding: 0; border-radius: 6px;
+  display: grid; place-items: center; font-size: 10px;
+}
+
+.det-engrave {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  margin-top: 10px; padding: 9px 11px; border-radius: 12px;
+  background: rgba(42, 37, 30, 0.05);
+}
+.det-engrave-tag { font-size: 9px; font-weight: 900; letter-spacing: 0.2em; color: var(--ink-faint); }
+
+/* =========================================================================
+   精錬の後始末
+   重ねるか、別個体として迎えるか。どちらも選ばない道は無い
+   ========================================================================= */
+.screen--cleanChoice::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--cleanChoice > * { z-index: 1; }
+
+.cc-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: 130px;
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 8px;
+  padding-bottom: 14px;
+  pointer-events: auto;
+}
+.cc-fossil {
+  flex: none; display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 16px;
+  background: linear-gradient(104deg, rgba(255, 214, 120, 0.9), rgba(255, 248, 230, 0.96));
+  box-shadow: 0 7px 18px rgba(197, 138, 30, 0.22);
+}
+.cc-fossil-img { width: 72px; height: 72px; flex: none; }
+.cc-fossil-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.cc-fossil-name { font-size: 17px; font-weight: 900; }
+.cc-fossil-sub { font-size: 12px; color: var(--pen-brown); }
+.cc-noeng { font-size: 10px; color: var(--ink-soft); }
+
+.cc-label {
+  flex: none; display: flex; align-items: baseline; gap: 8px; min-width: 0;
+  margin-top: 6px; padding: 0 2px;
+  font-size: 11px; font-weight: 900; color: var(--pen-brown);
+}
+.cc-label-note { font-size: 10px; font-weight: 700; color: var(--ink-faint); letter-spacing: 0; min-width: 0; }
+
+.cc-list { flex: none; display: flex; flex-direction: column; gap: 7px; }
+.cc-row {
+  display: flex; align-items: center; gap: 11px; min-width: 0;
+  padding: 10px 12px;
+  border: 0; border-radius: 14px;
+  background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-1);
+  text-align: left;
+}
+.cc-row.is-on { box-shadow: inset 0 0 0 2px var(--hl-amber-deep), var(--lift-1); }
+.cc-row-img { width: 46px; height: 46px; flex: none; }
+.cc-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cc-row-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.cc-row-name { font-size: 13px; font-weight: 900; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-row-lv { margin-left: auto; flex: none; font-size: 10px; color: var(--ink-soft); }
+.cc-row-line { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.cc-row-label { flex: none; font-size: 9px; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-faint); width: 52px; }
+.cc-row-from { font-size: 12px; color: var(--ink-soft); }
+.cc-row-mark { font-size: 10px; color: var(--ink-faint); }
+.cc-row-to { font-size: 15px; color: var(--hl-amber-deep); }
+.cc-row-gain { font-size: 11px; color: var(--pen-green); }
+.cc-row-hold, .cc-row-none { font-size: 10px; color: var(--ink-faint); }
+
+.cc-swap { flex: none; display: flex; flex-direction: column; gap: 7px; }
+.cc-swap-opts { display: flex; flex-direction: column; gap: 7px; }
+.cc-swap-opt {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 10px 12px;
+  border: 0; border-radius: 14px;
+  background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-1);
+  text-align: left;
+}
+.cc-swap-opt.is-on { box-shadow: inset 0 0 0 2px var(--hl-amber-deep), var(--lift-1); }
+.cc-swap-label { flex: none; width: 92px; font-size: 12px; font-weight: 900; }
+.cc-swap-note { font-size: 11px; color: var(--ink-soft); padding: 4px 2px; }
+
+/* 下段は2つ。片方だけ琥珀にすると、そちらが既定の答えに見える——
+   ここは「どちらも正しい」選択なので、白と琥珀で並べて重みを分ける */
+.deck--cc { flex-direction: column; gap: 8px; }
+.deck--cc .btn { width: 100%; height: 50px; min-height: 50px; border-radius: 14px; }
+.cc-keep {
+  background: var(--paper-card); color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--rule), 0 4px 12px rgba(72, 58, 36, 0.14);
+}
+
+body[data-layout='wide'] .cc-body { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   一覧の見せ方
+   数が少ないうちは1行ずつ、増えたら敷き詰めて位置で探す
+   ========================================================================= */
+.ros-tools {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 4px);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  pointer-events: auto;
+}
+.ros-tools .ros-sorts { flex: 1; min-width: 0; overflow-x: auto; }
+.ros-views { flex: none; display: flex; gap: 4px; }
+.ros-view { min-width: 34px; padding: 0 8px; min-height: 32px; border-radius: 9px; font-size: 14px; }
+
+.ros-body--grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px; align-content: start;
+}
+.ros-cell {
+  min-width: 0; padding: 8px 6px 9px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 0; border-radius: 14px;
+  background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-1);
+}
+.ros-cell.is-in { box-shadow: inset 0 0 0 2px var(--hl-amber), var(--lift-1); }
+.ros-cell[data-rarity='5'] { background: linear-gradient(150deg, rgba(255, 244, 214, 0.96), rgba(255, 253, 248, 0.96)); }
+.ros-cell-art { position: relative; display: block; }
+.ros-cell-img { width: 62px; height: 62px; }
+.ros-cell-flag {
+  position: absolute; right: 0; top: 2px;
+  width: 17px; height: 17px; border-radius: 6px;
+  display: grid; place-items: center;
+  font-size: 9px; font-weight: 900; color: #fff6f4; background: var(--hl-amber-deep);
+}
+.ros-cell-row { display: flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; }
+.ros-cell-row .dot { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.ros-cell-name { font-size: 10px; font-weight: 900; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ros-cell-sub { display: flex; align-items: baseline; gap: 6px; font-size: 10px; color: var(--ink-soft); }
+
+body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }

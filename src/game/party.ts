@@ -5,6 +5,7 @@ import type { FormationId, TargetPref, TeamSetup } from './battle/types';
 import { Rng } from '../voxel/VoxelPainter';
 import { BIOMES, type BiomeId } from '../voxel/palette';
 import { cleanMultiplier } from './battle/simulate';
+import { ENGRAVE_PATTERNS, buildEngraving, type Engraving } from './engraving';
 
 /** 所持ユニットから編成を作る。足りなければ先頭から埋める */
 export function buildTeamSetup(
@@ -36,6 +37,7 @@ export function buildTeamSetup(
       level: r.level,
       clean: r.clean,
       skillLevel: r.skillLevel,
+      engraving: r.engraving,
     })),
     order: [0, 1, 2],
     formation,
@@ -134,6 +136,19 @@ export function buildEnemyTeam(stage: number, seed: number, anchor: TeamAnchor):
       // クリーン度も同じ理由で味方基準。素の育成差で殴らない
       clean: Math.max(45, Math.min(95, anchor.clean + pv.cleanBonus)),
       skillLevel: 1,
+      /*
+       * 刻印は敵にも乗せる。
+       *
+       * 味方だけが別枠の加算を積めると、段が進むほど差が開く一方になる——
+       * 刻印は「掘って削る」の報酬であって、難度を素通りさせる道具ではない。
+       * 等級は段から決め、銘は席ごとに固定する（同じ段は同じ相手になる）。
+       */
+      engraving: stage >= 4
+        ? buildEngraving(
+          ENGRAVE_PATTERNS[(stage * 3 + i) % ENGRAVE_PATTERNS.length],
+          Math.max(1, Math.min(4, Math.floor(stage / 4))),
+        )
+        : undefined,
     })),
     order: [0, 1, 2],
     // 進行度に応じて陣形も変える。同じ相手を延々見せない
@@ -171,15 +186,20 @@ export function joinLevel(data: SaveData): number {
   return Math.max(1, lv[Math.floor(lv.length / 2)] - 1);
 }
 
-/** 化石を所持ユニットに変換する。同種を持っていればスキルレベルに還元 */
-export function addFossil(data: SaveData, defId: string, clean: number): { isNew: boolean; unit: OwnedRevos } {
-  const existing = data.roster.find((r) => r.defId === defId);
-  if (existing) {
-    existing.skillLevel = Math.min(5, existing.skillLevel + 1);
-    // 再研磨と同じ扱いで、高いほうのクリーン度だけを採る
-    existing.clean = Math.max(existing.clean, clean);
-    return { isNew: false, unit: existing };
-  }
+/**
+ * 化石を所持ユニットに変換する。
+ *
+ * 同じ種でも別の個体として迎える。以前は問答無用で先に持っている個体へ
+ * 吸わせていたので、クリーン度 96 の2体目を削り上げても、手元に残るのは
+ * 数字が1つ動いた1体だけだった——削った時間の行き先が見えない。
+ *
+ * どちらにするかは精錬の後に選ばせる。ここは「別個体として迎える」側で、
+ * 重ねる側は mergeFossil が受け持つ。
+ */
+export function addFossil(
+  data: SaveData, defId: string, clean: number, engraving?: Engraving,
+): { isNew: boolean; unit: OwnedRevos } {
+  const isNew = !data.dex.includes(defId);
   const unit: OwnedRevos = {
     uid: makeUid(),
     defId,
@@ -187,11 +207,34 @@ export function addFossil(data: SaveData, defId: string, clean: number): { isNew
     exp: 0,
     clean,
     skillLevel: 1,
+    engraving,
     obtainedAt: Date.now(),
   };
   data.roster.push(unit);
-  if (!data.dex.includes(defId)) data.dex.push(defId);
-  return { isNew: true, unit };
+  if (isNew) data.dex.push(defId);
+  return { isNew, unit };
+}
+
+/**
+ * 削り上げた化石を、すでに持っている個体へ重ねる。
+ *
+ * クリーン度は高いほうだけを採る。刻印を付け替えるかは呼び出し側が決める——
+ * 速度 +5 と体力 +160 のどちらが要るかは、編成を見ないと決まらない。
+ */
+export function mergeFossil(
+  data: SaveData,
+  targetUid: string,
+  clean: number,
+  engraving: Engraving | undefined,
+  takeEngraving: boolean,
+): OwnedRevos | null {
+  const u = data.roster.find((r) => r.uid === targetUid);
+  if (!u) return null;
+  u.clean = Math.max(u.clean, clean);
+  u.skillLevel = Math.min(5, u.skillLevel + 1);
+  if (takeEngraving && engraving) u.engraving = engraving;
+  if (!data.dex.includes(u.defId)) data.dex.push(u.defId);
+  return u;
 }
 
 export function revosName(defId: string): string {

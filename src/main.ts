@@ -17,7 +17,9 @@ import { CleanScene } from './scenes/CleanScene';
 import { BattleScene } from './scenes/BattleScene';
 import { HomeScene } from './scenes/HomeScene';
 import { BattlePlayer } from './game/battle/BattlePlayer';
-import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, teamAnchor, stagePreview } from './game/party';
+import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, mergeFossil, teamAnchor, stagePreview } from './game/party';
+import { rollEngraving, engraveName, engraveText } from './game/engraving';
+import { Rng } from './voxel/VoxelPainter';
 import { advanceHoloTime } from './fx/SpriteUnit';
 import { buildEventTeam, type EventDef } from './game/data/events';
 import { BattleSelectScreen, stageCoins } from './ui/screens/BattleSelectScreen';
@@ -30,6 +32,7 @@ import { UnitScreen } from './ui/screens/UnitScreen';
 import { RosterScreen } from './ui/screens/RosterScreen';
 import { TransferScreen } from './ui/screens/TransferScreen';
 import { SettingsScreen } from './ui/screens/SettingsScreen';
+import { CleanChoiceScreen } from './ui/screens/CleanChoiceScreen';
 import { grantLogin, grantStaffMail } from './game/mail';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
@@ -139,12 +142,13 @@ async function main(): Promise<void> {
   const rosterScreen = new RosterScreen();
   const transferScreen = new TransferScreen();
   const settingsScreen = new SettingsScreen();
+  const cleanChoiceScreen = new CleanChoiceScreen();
   const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
   const detailScreen = new DetailScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, cleanChoiceScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -331,6 +335,7 @@ async function main(): Promise<void> {
   };
 
   rosterScreen.onBack = () => goUnit();
+  rosterScreen.onPrefChange = () => writeSave(data);
   rosterScreen.onDetail = (defId, unit) => {
     ui.show('detail', {
       defId,
@@ -449,32 +454,74 @@ async function main(): Promise<void> {
     ui.show('stock');
   };
 
+  /**
+   * 精錬の後始末。
+   *
+   * 同じ種をすでに持っているなら、重ねるか別個体として迎えるかを選ばせる。
+   * 黙って吸わせると、クリーン度 96 の2体目を削り上げても手元に残るのは
+   * 数字が1つ動いた1体だけで、削った時間の行き先が見えない。
+   */
   cleanScreen.onFinish = (score, defId) => {
-    const { isNew, unit } = addFossil(data, defId, score.clean);
     data.stats.fossils++;
     data.stats.bestClean = Math.max(data.stats.bestClean, score.clean);
     if (score.rank === 'S') data.stats.sRanks++;
     countToday(data, 'clean');
     addPlayerExp(data, 60 + Math.round(score.clean * 0.6));
-    writeSave(data);
-    showResult({
-      title: '精錬完了',
-      subtitle: `${label(defId)} の化石`,
-      good: score.rank !== 'D',
-      rows: [
-        { label: 'ランク', value: score.rank, kind: 'rank' },
-        { label: 'クリーン度', value: `${score.clean}`, kind: 'exp' },
-        { label: '岩の除去', value: `${Math.round(score.rockRatio * 100)}%` },
-        // 損傷は点を引かず上限を下げる。引かれた点ではなく、届かなくなった天井を出す
-        { label: '骨の損傷', value: score.boneDamage > 0 ? `上限 ${score.cap}` : 'なし' },
-        ...(score.rank === 'S' ? [{ label: '解放', value: 'スキルスロット3枠目', kind: 'new' as const }] : []),
-        isNew
-          ? { label: '新種を入手', value: label(defId), kind: 'new' as const }
-          : { label: `${label(defId)}（所持済み）`, value: `スキルLv ${unit.skillLevel}`, kind: 'new' as const },
-        ...(data.stock.length > 0
-          ? [{ label: '未精錬のストック', value: `${data.stock.length} 個` }]
-          : []),
-      ],
+
+    // 刻印は削り上げたこの瞬間に決まる。出るかどうかも等級もクリーン度次第
+    const engraving = rollEngraving(score.clean, new Rng((Date.now() ^ (score.clean * 2654435761)) >>> 0));
+    const owned = data.roster.filter((r) => r.defId === defId);
+
+    const finish = (isNew: boolean, note: { label: string; value: string }): void => {
+      writeSave(data);
+      showResult({
+        title: '精錬完了',
+        subtitle: `${label(defId)} の化石`,
+        good: score.rank !== 'D',
+        rows: [
+          { label: 'ランク', value: score.rank, kind: 'rank' },
+          { label: 'クリーン度', value: `${score.clean}`, kind: 'exp' },
+          { label: '岩の除去', value: `${Math.round(score.rockRatio * 100)}%` },
+          // 損傷は点を引かず上限を下げる。引かれた点ではなく、届かなくなった天井を出す
+          { label: '骨の損傷', value: score.boneDamage > 0 ? `上限 ${score.cap}` : 'なし' },
+          ...(engraving
+            ? [{ label: engraveName(engraving), value: engraveText(engraving), kind: 'new' as const }]
+            : []),
+          isNew
+            ? { label: '新種を入手', value: label(defId), kind: 'new' as const }
+            : { ...note, kind: 'new' as const },
+          ...(data.stock.length > 0
+            ? [{ label: '未精錬のストック', value: `${data.stock.length} 個` }]
+            : []),
+        ],
+      });
+    };
+
+    if (owned.length === 0) {
+      const { isNew } = addFossil(data, defId, score.clean, engraving ?? undefined);
+      finish(isNew, { label: label(defId), value: '加入' });
+      return;
+    }
+
+    ui.show('cleanChoice', {
+      defId,
+      clean: score.clean,
+      engraving: engraving ?? undefined,
+      owned,
+      onMerge: (targetUid: string, takeEngraving: boolean) => {
+        const u = mergeFossil(data, targetUid, score.clean, engraving ?? undefined, takeEngraving);
+        finish(false, {
+          label: `${label(defId)} に重ねた`,
+          value: `技Lv ${u?.skillLevel ?? 1} · クリーン度 ${u?.clean ?? score.clean}`,
+        });
+      },
+      onKeep: () => {
+        addFossil(data, defId, score.clean, engraving ?? undefined);
+        finish(false, {
+          label: `${label(defId)} を迎えた`,
+          value: `${data.roster.filter((r) => r.defId === defId).length} 体目`,
+        });
+      },
     });
   };
 
@@ -697,6 +744,13 @@ async function main(): Promise<void> {
     else if (jump === 'settings') goSettings();
     else if (jump === 'roster') { rosterScreen.setData(data); ui.show('roster'); }
     else if (jump === 'transfer') { transferScreen.setData(data); ui.show('transfer'); }
+    else if (jump === 'cleanChoice') {
+      // 削り上げた直後の状態を、精錬を回さずに作る。刻印は本番と同じ抽選を通す
+      cleanScreen.onFinish?.(
+        { clean: 88, rank: 'A', rockRatio: 0.94, timeRatio: 0.42, boneDamage: 1, cap: 97 },
+        'yutyrannus',
+      );
+    }
     else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
     else if (jump === 'profile') { profileScreen.setData(data); ui.show('profile'); }
     else if (jump === 'debug') openDebug();

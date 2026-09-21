@@ -91,6 +91,9 @@ export function cleanRank(clean: number): 'S' | 'A' | 'B' | 'C' | 'D' {
   return 'D';
 }
 
+/** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
+const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };
+
 function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
   const out: Fighter[] = [];
   const form = FORMATIONS[setup.formation];
@@ -99,6 +102,7 @@ function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
     const def = getRevos(inst.defId);
     const ls = levelScale(inst.level);
     const mc = cleanMultiplier(inst.clean);
+    const eg = inst.engraving ?? NO_ENGRAVING;
     const row: Row = slot === 0 ? 'front' : 'back';
     out.push({
       uid: inst.uid,
@@ -111,11 +115,13 @@ function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
       level: inst.level,
       clean: inst.clean,
       skillLevel: inst.skillLevel,
-      maxHp: Math.round(def.hp * ls * mc),
-      hp: Math.round(def.hp * ls * mc),
-      atk: Math.round(def.atk * ls * mc),
-      def: Math.round(def.def * ls * mc * form.defMul),
-      spd: Math.round(def.spd * ls * form.spdMul),
+      // 刻印はレベルもクリーン度も掛からない純粋な加算。最後に足す——
+      // 倍率の中に入れると、育てるほど刻印の差まで広がって二重に効く
+      maxHp: Math.round(def.hp * ls * mc) + eg.hp,
+      hp: Math.round(def.hp * ls * mc) + eg.hp,
+      atk: Math.round(def.atk * ls * mc) + eg.atk,
+      def: Math.round(def.def * ls * mc * form.defMul) + eg.def,
+      spd: Math.round(def.spd * ls * form.spdMul) + eg.spd,
       basicPower: def.basicPower,
       av: 0,
       od: 30 + form.startOd,
