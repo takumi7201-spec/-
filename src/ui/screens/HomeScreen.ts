@@ -1,13 +1,12 @@
 import { Screen } from '../UIRoot';
 import { h, bar, button, clear, fmtNum } from '../dom';
-import { banner, cardButton, identity, plate, railButton, spaced, tabBar } from '../chrome';
+import { banner, cardButton, identity, plate, railButton, spaced } from '../chrome';
 import type { SaveData } from '../../core/Save';
 import { expToNext, dropDecay } from '../../core/Save';
 import { revosIcon } from '../revosIcon';
 import { BIOMES } from '../../voxel/palette';
 import { EVENTS } from '../../game/data/events';
 import { unclaimedCount } from '../../game/mail';
-import { effectiveParty } from '../../game/party';
 import { missionRatio, nearestMission, readyCount } from '../../game/missions';
 import { unreadNews } from '../../game/news';
 
@@ -42,20 +41,11 @@ export class HomeScreen extends Screen {
   private misBadgeEl!: HTMLElement;
   private cards = new Map<string, ReturnType<typeof cardButton>>();
   private rails = new Map<string, ReturnType<typeof railButton>>();
-  private tabs = tabBar([
-    { key: 'home', icon: '⌂', label: '拠点', onTap: () => { /* いまここ */ } },
-    { key: 'dig', icon: '⛏', label: '発掘', onTap: () => this.onGo?.('dig') },
-    { key: 'battle', icon: '⚔', label: 'バトル', onTap: () => this.onGo?.('battle') },
-    // 編成と図鑑は同じ対象（持っている化石）を別の角度から見ているだけで、
-    // 下タブを2枠使う理由が無かった。1枠に畳んで、空いたほうを設定に回す
-    { key: 'unit', icon: '◈', label: 'ユニット', onTap: () => this.onGo?.('unit') },
-    { key: 'settings', icon: '⚙', label: '設定', onTap: () => this.onGo?.('settings') },
-  ]);
 
   onGo?: (where: 'dig' | 'clean' | 'battle' | 'event' | 'news' | 'shop' | 'mission'
     | 'mail' | 'unit' | 'settings' | 'profile') => void;
 
-  constructor() { super('home'); }
+  constructor() { super('home', 'home'); }
 
   setData(d: SaveData): void {
     this.data = d;
@@ -139,8 +129,7 @@ export class HomeScreen extends Screen {
     this.misMoreEl.appendChild(this.misBadgeEl);
     const mission = h('div', { class: 'home-mission' }, strip, this.misMoreEl);
 
-    this.tabs.select('home');
-    this.el.append(head, bannerWrap, rail, cards, mission, foot, this.tabs.el);
+    this.el.append(head, bannerWrap, rail, cards, mission, foot);
   }
 
   enter(): void { this.refresh(); }
@@ -227,9 +216,6 @@ export class HomeScreen extends Screen {
     this.misBadgeEl.textContent = String(ready);
     this.misBadgeEl.hidden = ready === 0;
 
-    // ---- タブの報せ ----
-    // 3体そろっていないときだけ出す。出撃できない状態は先に知らせる
-    this.tabs.badge('unit', this.data.roster.length > 0 && effectiveParty(this.data).length < 3 ? 1 : 0);
   }
 }
 

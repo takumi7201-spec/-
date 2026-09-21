@@ -23,7 +23,7 @@ export class MailScreen extends Screen {
   /** 受け取りで所持品が変わるので、保存はゲーム側に任せる */
   onClaim?: () => void;
 
-  constructor() { super('mail'); }
+  constructor() { super('mail', 'home'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

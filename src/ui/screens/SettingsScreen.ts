@@ -2,7 +2,7 @@ import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
 import type { SaveData } from '../../core/Save';
 import type { QualityTier } from '../../core/Quality';
-import { screenHead, plate, spaced, tabBar } from '../chrome';
+import { screenHead, plate, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
 export type SettingKey = 'hand' | 'audio' | 'quality' | 'battle' | 'shake';
@@ -22,27 +22,17 @@ export class SettingsScreen extends Screen {
   private data!: SaveData;
   private bodyEl!: HTMLElement;
   private verPlate = plate('版', { tone: 'plain' });
-  private tabs = tabBar([
-    { key: 'home', icon: '⌂', label: '拠点', onTap: () => this.onTab?.('home') },
-    { key: 'dig', icon: '⛏', label: '発掘', onTap: () => this.onTab?.('dig') },
-    { key: 'battle', icon: '⚔', label: 'バトル', onTap: () => this.onTab?.('battle') },
-    { key: 'unit', icon: '◈', label: 'ユニット', onTap: () => this.onTab?.('unit') },
-    { key: 'settings', icon: '⚙', label: '設定', onTap: () => { /* いまここ */ } },
-  ]);
-
   onChange?: (key: SettingKey) => void;
   onGo?: (where: SettingsWhere) => void;
-  onTab?: (where: 'home' | 'dig' | 'battle' | 'unit') => void;
 
-  constructor() { super('settings'); }
+  constructor() { super('settings', 'settings'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 
   build(): void {
     const head = screenHead({ eyebrow: '環境', title: '設定', right: this.verPlate.el });
     this.bodyEl = h('div', { class: 'set-body' });
-    this.tabs.select('settings');
-    this.el.append(head, this.bodyEl, this.tabs.el);
+    this.el.append(head, this.bodyEl);
   }
 
   enter(): void { this.render(); }

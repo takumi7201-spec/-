@@ -40,7 +40,7 @@ export class TransferScreen extends Screen {
   /** クリーン度と手持ちが動くので、保存はゲーム側に任せる */
   onDone?: () => void;
 
-  constructor() { super('transfer'); }
+  constructor() { super('transfer', 'unit'); }
 
   setData(d: SaveData): void {
     this.data = d;

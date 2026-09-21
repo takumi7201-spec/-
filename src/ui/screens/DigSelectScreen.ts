@@ -30,7 +30,7 @@ export class DigSelectScreen extends Screen {
   onGo?: (biome: BiomeId) => void;
   onClean?: () => void;
 
-  constructor() { super('digSelect'); }
+  constructor() { super('digSelect', 'dig'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

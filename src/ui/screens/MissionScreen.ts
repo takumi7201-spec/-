@@ -29,7 +29,7 @@ export class MissionScreen extends Screen {
   /** 受け取りでコインと経験値が動くので、保存はゲーム側に任せる */
   onClaim?: () => void;
 
-  constructor() { super('mission'); }
+  constructor() { super('mission', 'home'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

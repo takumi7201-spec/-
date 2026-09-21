@@ -58,7 +58,7 @@ export class ProfileScreen extends Screen {
 
   onBack?: () => void;
 
-  constructor() { super('profile'); }
+  constructor() { super('profile', 'home'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

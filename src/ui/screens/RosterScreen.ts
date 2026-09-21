@@ -45,7 +45,7 @@ export class RosterScreen extends Screen {
   /** 並びと見せ方は設定に残す。保存はゲーム側に任せる */
   onPrefChange?: () => void;
 
-  constructor() { super('roster'); }
+  constructor() { super('roster', 'unit'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

@@ -25,7 +25,7 @@ export class ShopScreen extends Screen {
   /** コインと在庫が動くので、保存はゲーム側に任せる */
   onBuy?: () => void;
 
-  constructor() { super('shop'); }
+  constructor() { super('shop', 'home'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

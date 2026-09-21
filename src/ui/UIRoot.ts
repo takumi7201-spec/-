@@ -7,10 +7,28 @@ export interface ScreenContext {
   ui: UIRoot;
 }
 
+/** chrome.ts の tabBar() が返すもの。UIレイヤはこの形だけ知っていればいい */
+export interface TabBarHandle {
+  el: HTMLElement;
+  select(key: string): void;
+  badge(key: string, n: number): void;
+}
+
 export abstract class Screen {
   readonly el: HTMLElement;
   protected ui!: UIRoot;
-  constructor(readonly name: string) {
+  /**
+   * 下タブのどの枠に属するか。
+   *
+   * 下タブは画面ごとに置かず、UIレイヤに1つだけ置いて出し入れする。
+   * 各画面はどの枠の下に居るかだけを宣言する——たとえば図鑑も編成も
+   * 一覧も「ユニット」の下なので、そこへ潜っても札は点いたままになる。
+   *
+   * 未設定の画面ではタブそのものを出さない。潜行中・精錬中・戦闘中と、
+   * 選び終えるまで先へ進めない面（削り上げの選択・リザルト）がそれ——
+   * ここで別の面へ飛べると、進行中の周回が宙に浮く。
+   */
+  constructor(readonly name: string, readonly tab?: string) {
     this.el = h('div', { class: `screen screen--${name}`, 'data-screen': name });
   }
   attach(ui: UIRoot): void { this.ui = ui; }
@@ -37,6 +55,9 @@ export class UIRoot {
   layout: LayoutKind = 'tower';
 
   private screens = new Map<string, Screen>();
+  private tabs: TabBarHandle | null = null;
+  /** 画面が切り替わったあとに呼ぶ。報せの数を貼り直すのに使う */
+  onShow?: (name: string) => void;
   private built = new Set<string>();
   private current: Screen | null = null;
   private toasts: HTMLElement[] = [];
@@ -63,6 +84,29 @@ export class UIRoot {
     this.el.insertBefore(screen.el, this.toastArea);
   }
 
+  /**
+   * 下タブを預かる。
+   *
+   * 画面の一部ではなく、画面の上に常駐する層として持つ。各画面が自前で
+   * 持つと、同じ札が15枚できて選択状態も報せもそれぞれ別に腐る。
+   */
+  mountTabs(tabs: TabBarHandle): void {
+    this.tabs = tabs;
+    this.el.insertBefore(tabs.el, this.toastArea);
+    this.syncTabs();
+  }
+
+  tabBadge(key: string, n: number): void { this.tabs?.badge(key, n); }
+
+  private syncTabs(): void {
+    if (!this.tabs) return;
+    const key = this.current?.tab;
+    this.tabs.el.hidden = !key;
+    // 画面側の余白はこの印で決める。札のぶんだけ底を持ち上げる
+    document.body.dataset.tabbar = key ? 'on' : 'off';
+    if (key) this.tabs.select(key);
+  }
+
   get(name: string): Screen | undefined { return this.screens.get(name); }
   get currentName(): string | null { return this.current?.name ?? null; }
 
@@ -84,7 +128,11 @@ export class UIRoot {
     this.current = next;
     next.el.classList.add('is-active');
     next.el.style.pointerEvents = '';
+    // 札の出し入れは中身を組む前に済ませる。画面側が自分の高さを
+    // 測るとき、底がまだ動いていないと1フレーム分ずれる
+    this.syncTabs();
     next.enter(params);
+    this.onShow?.(name);
   }
 
   update(dt: number): void {

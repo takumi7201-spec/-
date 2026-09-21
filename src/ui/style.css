@@ -142,7 +142,14 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
-  --deck-bottom: calc(var(--safe-b) + 12px);
+  /*
+   * 下タブの高さ。札を出している画面だけ 0 でなくなる。
+   *
+   * 各画面が自分で「タブのぶん」を引くと、出す画面と出さない画面で
+   * 二重に引いたり引き忘れたりする。底からの距離はこの1つを通す。
+   */
+  --tabbar-h: 0px;
+  --deck-bottom: calc(var(--safe-b) + 12px + var(--tabbar-h));
 
   --gutter: 14px;
   --ui-scale: 1;
@@ -813,6 +820,19 @@ body[data-layout='tower'] .side-only { display: none; }
 }
 
 /* ---- 下タブ ---- */
+/*
+ * 札を出している画面だけ、底をそのぶん持ち上げる。
+ *
+ * --deck-bottom をここでも書き直すのは、カスタムプロパティの var() が
+ * 「宣言した要素」で解決されるため。:root の --deck-bottom は :root の
+ * --tabbar-h（0）を読んだきり、body 側の上書きを見に来ない。
+ */
+body[data-tabbar='on'] {
+  /* 選択中の札が 70px、下の余白が 14px。実測で帯は 84px ある */
+  --tabbar-h: 84px;
+  --deck-bottom: calc(var(--safe-b) + 12px + 84px);
+}
+
 .tabbar {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 0 calc(8px + var(--safe-l)) calc(var(--safe-b) + 14px) calc(8px + var(--safe-r));

@@ -6,7 +6,7 @@ import { cleanRank } from '../../game/battle/simulate';
 import { effectiveParty, partyPower } from '../../game/party';
 import { TRANSFER_MIN_CLEAN, transferPairs } from '../../game/transfer';
 import { revosIcon } from '../revosIcon';
-import { screenHead, plate, tabBar } from '../chrome';
+import { screenHead, plate } from '../chrome';
 
 export type UnitWhere = 'roster' | 'party' | 'dex' | 'transfer';
 
@@ -25,18 +25,9 @@ export class UnitScreen extends Screen {
   private gridEl!: HTMLElement;
   private facesEl!: HTMLElement;
   private countPlate = plate('手持ち', { tone: 'amber' });
-  private tabs = tabBar([
-    { key: 'home', icon: '⌂', label: '拠点', onTap: () => this.onTab?.('home') },
-    { key: 'dig', icon: '⛏', label: '発掘', onTap: () => this.onTab?.('dig') },
-    { key: 'battle', icon: '⚔', label: 'バトル', onTap: () => this.onTab?.('battle') },
-    { key: 'unit', icon: '◈', label: 'ユニット', onTap: () => { /* いまここ */ } },
-    { key: 'settings', icon: '⚙', label: '設定', onTap: () => this.onTab?.('settings') },
-  ]);
-
   onGo?: (where: UnitWhere) => void;
-  onTab?: (where: 'home' | 'dig' | 'battle' | 'settings') => void;
 
-  constructor() { super('unit'); }
+  constructor() { super('unit', 'unit'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 
@@ -44,8 +35,7 @@ export class UnitScreen extends Screen {
     const head = screenHead({ eyebrow: '手持ち', title: 'ユニット', right: this.countPlate.el });
     this.facesEl = h('div', { class: 'unit-faces' });
     this.gridEl = h('div', { class: 'unit-grid' });
-    this.tabs.select('unit');
-    this.el.append(head, h('div', { class: 'unit-body' }, this.facesEl, this.gridEl), this.tabs.el);
+    this.el.append(head, h('div', { class: 'unit-body' }, this.facesEl, this.gridEl));
   }
 
   enter(): void { this.render(); }

@@ -41,7 +41,7 @@ export class BattleSelectScreen extends Screen {
   onNormal?: (stage: number) => void;
   onEvent?: (ev: EventDef) => void;
 
-  constructor() { super('battleSelect'); }
+  constructor() { super('battleSelect', 'battle'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

@@ -288,7 +288,7 @@ body[data-hand='left'] .rail--r { right: auto; left: calc(var(--gutter) + var(--
 /* 足もと。左に計器、右に次の目標 */
 .home-foot {
   position: absolute;
-  bottom: 118px;
+  bottom: calc(var(--tabbar-h) + var(--safe-b) + 34px);
   left: calc(var(--gutter) + var(--safe-l));
   right: calc(var(--gutter) + var(--safe-r));
   display: flex; align-items: flex-end; gap: 10px;
@@ -1659,7 +1659,7 @@ canvas.revos-sprite {
 
 .det-body {
   position: absolute; left: 0; right: 0; top: 344px; bottom: 0;
-  padding: 0 calc(var(--gutter) + var(--safe-r)) calc(var(--safe-b) + 18px)
+  padding: 0 calc(var(--gutter) + var(--safe-r)) calc(var(--safe-b) + 32px + var(--tabbar-h))
     calc(var(--gutter) + var(--safe-l));
   display: flex; flex-direction: column; gap: 11px;
   overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
@@ -1722,7 +1722,22 @@ canvas.revos-sprite {
 .det-skill--passive .det-skill-desc { color: #3e4a49; }
 .det-skill--od .det-skill-desc { color: #4a3e28; }
 
-.det-foot { margin-top: auto; padding-top: 4px; display: flex; gap: 10px; align-items: flex-end; }
+/*
+ * 産出と「編成する」は貼り付ける。
+ *
+ * 中身が枠より高い画面なので、流れに任せると下タブの縁に重なったまま
+ * 止まる。一番押したいボタンを、スクロール位置に関係なく同じ場所に置く。
+ */
+.det-foot {
+  /* 内側の余白がすでに下タブのぶんを取ってあるので、貼り付け先は 0 でよい
+     （sticky の基準は枠の内容box の底で、padding の内側になる） */
+  position: sticky; bottom: 0;
+  margin-top: auto; padding: 18px 0 8px;
+  display: flex; gap: 10px; align-items: flex-end;
+  /* 下は塗り切る。半端に透けると、裏を流れる本文が読めるまま切れて見える */
+  background: linear-gradient(0deg,
+    rgb(223, 209, 178) 0%, rgb(223, 209, 178) 72%, rgba(223, 209, 178, 0) 100%);
+}
 .det-habitat-main { flex: 1; min-width: 0; }
 .det-habitat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; color: var(--ink-faint); }
 .det-habitat { font-size: 12px; color: var(--ink-line); margin-top: 1px; display: flex; align-items: center; gap: 6px; }
@@ -1836,7 +1851,7 @@ body[data-layout='wide'] .sel-tabs { left: 18vw; right: 18vw; }
 
 .mail-body {
   position: absolute;
-  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: 84px;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: calc(84px + var(--tabbar-h));
   left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
   overflow-y: auto; overflow-x: hidden;
   overscroll-behavior: contain; touch-action: pan-y;
@@ -1910,7 +1925,7 @@ body[data-layout='wide'] .mail-body { left: 18vw; right: 18vw; }
    ========================================================================= */
 .home-mission {
   position: absolute;
-  bottom: 188px;
+  bottom: calc(var(--tabbar-h) + var(--safe-b) + 104px);
   left: calc(var(--gutter) + var(--safe-l));
   right: calc(var(--gutter) + var(--safe-r));
   display: flex; align-items: stretch; gap: 8px;
@@ -2053,7 +2068,7 @@ body[data-layout='wide'] .digsel-body { left: 18vw; right: 18vw; }
 
 .mis-body {
   position: absolute;
-  top: calc(var(--safe-t) + var(--head-h) + 56px); bottom: 84px;
+  top: calc(var(--safe-t) + var(--head-h) + 56px); bottom: calc(84px + var(--tabbar-h));
   left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
   overflow-y: auto; overflow-x: hidden;
   overscroll-behavior: contain; touch-action: pan-y;
@@ -2245,7 +2260,7 @@ body[data-layout='wide'] .shop-body { left: 18vw; right: 18vw; }
 
 .unit-body {
   position: absolute;
-  top: calc(var(--safe-t) + var(--head-h) + 8px); bottom: 100px;
+  top: calc(var(--safe-t) + var(--head-h) + 8px); bottom: var(--deck-bottom);
   left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
   display: flex; flex-direction: column; gap: 12px;
   overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
@@ -2363,7 +2378,7 @@ body[data-layout='wide'] .ros-body { left: 18vw; right: 18vw; }
    ========================================================================= */
 .tr-body {
   position: absolute;
-  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: 84px;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: calc(84px + var(--tabbar-h));
   left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
   overflow-y: auto; overflow-x: hidden;
   overscroll-behavior: contain; touch-action: pan-y;
@@ -2452,7 +2467,7 @@ body[data-layout='wide'] .tr-body { left: 18vw; right: 18vw; }
    ========================================================================= */
 .set-body {
   position: absolute;
-  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: 100px;
+  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: var(--deck-bottom);
   left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
   overflow-y: auto; overflow-x: hidden;
   overscroll-behavior: contain; touch-action: pan-y;

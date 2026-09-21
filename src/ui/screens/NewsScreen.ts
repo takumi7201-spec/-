@@ -23,7 +23,7 @@ export class NewsScreen extends Screen {
   /** 既読が動くので、保存はゲーム側に任せる */
   onRead?: () => void;
 
-  constructor() { super('news'); }
+  constructor() { super('news', 'home'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

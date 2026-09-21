@@ -17,7 +17,13 @@ import { CleanScene } from './scenes/CleanScene';
 import { BattleScene } from './scenes/BattleScene';
 import { HomeScene } from './scenes/HomeScene';
 import { BattlePlayer } from './game/battle/BattlePlayer';
-import { buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, mergeFossil, teamAnchor, stagePreview } from './game/party';
+import {
+  buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, mergeFossil,
+  teamAnchor, stagePreview, effectiveParty,
+} from './game/party';
+import { tabBar } from './ui/chrome';
+import { unclaimedCount } from './game/mail';
+import { readyCount } from './game/missions';
 import { rollEngraving, engraveName, engraveText } from './game/engraving';
 import { Rng } from './voxel/VoxelPainter';
 import { advanceHoloTime } from './fx/SpriteUnit';
@@ -314,7 +320,13 @@ async function main(): Promise<void> {
   function goUnit(): void { unitScreen.setData(data); ui.show('unit'); }
   function goSettings(): void { settingsScreen.setData(data); ui.show('settings'); }
 
-  /** 下タブはどの根の画面からも同じ場所へ飛ぶ。画面ごとに行き先を変えない */
+  /**
+   * 下タブ。
+   *
+   * 画面ごとに置かず、UIレイヤに1枚だけ置いて出し入れする。図鑑も編成も
+   * 付け替えも「ユニット」の下に居るので、そこへ潜っても札は点いたまま、
+   * 別の枠へ一手で移れる。行き先はここ1か所で決める。
+   */
   const tabGo = (where: 'home' | 'dig' | 'battle' | 'unit' | 'settings'): void => {
     if (where === 'home') { goHome(); return; }
     if (where === 'dig') { digSelectScreen.setData(data); ui.show('digSelect'); return; }
@@ -322,8 +334,28 @@ async function main(): Promise<void> {
     if (where === 'unit') { goUnit(); return; }
     goSettings();
   };
-  unitScreen.onTab = tabGo;
-  settingsScreen.onTab = tabGo;
+  const tabs = tabBar([
+    { key: 'home', icon: '⌂', label: '拠点', onTap: () => tabGo('home') },
+    { key: 'dig', icon: '⛏', label: '発掘', onTap: () => tabGo('dig') },
+    { key: 'battle', icon: '⚔', label: 'バトル', onTap: () => tabGo('battle') },
+    { key: 'unit', icon: '◈', label: 'ユニット', onTap: () => tabGo('unit') },
+    { key: 'settings', icon: '⚙', label: '設定', onTap: () => tabGo('settings') },
+  ]);
+  ui.mountTabs(tabs);
+
+  /**
+   * 札に貼る報せ。
+   *
+   * 画面が変わるたびに貼り直す。画面側から書かせると、更新した画面に
+   * 居るあいだしか正しくならない——札は常駐しているので、数も常駐させる。
+   */
+  const refreshTabs = (): void => {
+    ui.tabBadge('unit', data.roster.length > 0 && effectiveParty(data).length < 3 ? 1 : 0);
+    ui.tabBadge('home', unclaimedCount(data) + readyCount(data));
+    ui.tabBadge('dig', data.stock.length);
+  };
+  ui.onShow = () => refreshTabs();
+  refreshTabs();
 
   unitScreen.onGo = (where) => {
     switch (where) {

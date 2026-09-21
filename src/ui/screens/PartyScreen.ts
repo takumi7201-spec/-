@@ -35,7 +35,7 @@ export class PartyScreen extends Screen {
   onDetail?: (defId: string, unit: OwnedRevos) => void;
   onApply?: (order: [string, string, string], formation: FormationId, prefs: TargetPref[]) => void;
 
-  constructor() { super('party'); }
+  constructor() { super('party', 'unit'); }
 
   setData(d: SaveData): void {
     this.data = d;

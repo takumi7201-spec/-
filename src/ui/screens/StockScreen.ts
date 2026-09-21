@@ -41,7 +41,7 @@ export class StockScreen extends Screen {
   onBack?: () => void;
   onClean?: (entry: StockEntry) => void;
 
-  constructor() { super('stock'); }
+  constructor() { super('stock', 'dig'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

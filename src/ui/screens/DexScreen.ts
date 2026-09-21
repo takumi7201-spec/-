@@ -42,7 +42,7 @@ export class DexScreen extends Screen {
   /** 並びは設定に残す。保存はゲーム側に任せる */
   onPrefChange?: () => void;
 
-  constructor() { super('dex'); }
+  constructor() { super('dex', 'unit'); }
 
   setData(d: SaveData): void { this.data = d; this.render(); }
 

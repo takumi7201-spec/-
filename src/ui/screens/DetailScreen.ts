@@ -46,7 +46,7 @@ export class DetailScreen extends Screen {
   private habitatLabel!: HTMLElement;
   private equipBtn!: HTMLButtonElement;
 
-  constructor() { super('detail'); }
+  constructor() { super('detail', 'unit'); }
 
   build(): void {
     this.artEl = h('div', { class: 'det-art' });
