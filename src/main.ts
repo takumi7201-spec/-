@@ -261,6 +261,9 @@ async function main(): Promise<void> {
     player = new BattlePlayer(seed, mine, foes, battle);
     battleScreen.setPlayer(player);
     player.speed = data.settings.battleSpeed;
+    // 設定に入っていたのに、どこからも読んでいなかった。
+    // 自動なら満ちた時点で撃ち、手動ならタップまで溜める
+    player.sim.autoOd = data.settings.autoOd;
     await progress(0.9, 'リヴォスを復元しています…');
     battle.resize(renderer.aspect);
     renderer.setScene(battle.scene, battle.camera);
@@ -391,7 +394,10 @@ async function main(): Promise<void> {
     else if (key === 'audio') audio.setVolumes(s.sfx, s.bgm);
     else if (key === 'quality') applyQuality();
     else if (key === 'shake') battle.reducedShake = s.reducedShake;
-    else if (key === 'battle' && player) player.speed = s.battleSpeed;
+    else if (key === 'battle' && player) {
+      player.speed = s.battleSpeed;
+      player.sim.autoOd = s.autoOd;
+    }
     writeSave(data);
   };
   settingsScreen.onGo = (where) => {

@@ -126,7 +126,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'triceratops', name: 'トリケラトプス', en: 'Triceratops', element: 'terra', role: 'Guardian',
-    hp: 1340, atk: 108, def: 122, spd: 84, basicPower: 90,
+    hp: 1410, atk: 117, def: 126, spd: 86, basicPower: 93,
     passive: { id: 'sediment', name: '堆積', desc: '行動するたび自身の 防御 +9%（最大 +45%、戦闘中持続）。' },
     od: { id: 'rockaegis', name: '岩盾展開', desc: '味方全体に 防御 基準の厚い吸収シールド（4行動）。', power: 0 },
     defaultPref: 'front',
@@ -214,7 +214,7 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'pliosaurus', name: 'プリオサウルス', en: 'Pliosaurus', element: 'aqua', role: 'Striker',
-    hp: 1210, atk: 134, def: 96, spd: 106, basicPower: 90,
+    hp: 1250, atk: 141, def: 98, spd: 106, basicPower: 92,
     passive: { id: 'pursuit', name: '追い波', desc: '自分が敵を撃破すると AV +3800。倒した勢いのまま次へ入る。' },
     od: { id: 'crushbite', name: '圧砕顎', desc: '単体に大ダメージ。シールドを貫通する。', power: 168 },
     defaultPref: 'lowhp',
@@ -249,7 +249,7 @@ export const REVOS: RevosDef[] = [
   {
     id: 'spinosaurus-1915', name: 'スピノサウルス 1915', short: 'スピノ1915',
     en: 'Spinosaurus (1915)', element: 'terra', role: 'Buffer',
-    hp: 1380, atk: 120, def: 128, spd: 94, basicPower: 88,
+    hp: 1420, atk: 130, def: 134, spd: 94, basicPower: 91,
     passive: { id: 'archivesail', name: '記録の帆', desc: '味方が特殊攻撃を撃つたび、その味方の 攻撃 +12%（1体につき3回まで、戦闘中持続）。' },
     od: { id: 'stratarecord', name: '古層の記録', desc: '味方全体の 必殺 +25 ＋ 全体の与ダメージ +20%（4行動）。', power: 0 },
     defaultPref: 'support',
@@ -261,7 +261,7 @@ export const REVOS: RevosDef[] = [
   {
     id: 'quetzalcoatlus', name: 'ケツァルコアトルス', short: 'ケツァル',
     en: 'Quetzalcoatlus', element: 'gale', role: 'Buffer',
-    hp: 1160, atk: 104, def: 98, spd: 126, basicPower: 79,
+    hp: 1150, atk: 100, def: 96, spd: 124, basicPower: 78,
     passive: {
       id: 'skygrasp', name: '掌握する空',
       desc: '味方の攻撃が奇数回目になるたび、味方全体の 攻撃 +5%（最大 +15%）。+15% の間は味方全体の 必殺 獲得 +20%。自分が倒れると効果は消える。',
@@ -297,10 +297,10 @@ export const REVOS: RevosDef[] = [
   {
     id: 'dimorphodon', name: 'ディモルフォドン', short: 'ディモルフォ',
     en: 'Dimorphodon', element: 'gale', role: 'Striker',
-    hp: 1190, atk: 128, def: 92, spd: 134, basicPower: 91,
+    hp: 1100, atk: 106, def: 88, spd: 134, basicPower: 82,
     passive: {
       id: 'firstbite', name: '初手の牙',
-      desc: 'まだ一度も攻撃していない相手への与ダメージ +28%。先に噛みついた者が場を決める。',
+      desc: 'まだ一度も攻撃していない相手への与ダメージ +20%。先に噛みついた者が場を決める。',
     },
     od: {
       id: 'forkjaw', name: '二叉ノ顎',
@@ -315,10 +315,10 @@ export const REVOS: RevosDef[] = [
   {
     id: 'ophthalmosaurus', name: 'オフタルモサウルス', short: 'オフタルモ',
     en: 'Ophthalmosaurus', element: 'aqua', role: 'Technical',
-    hp: 1370, atk: 138, def: 106, spd: 114, basicPower: 92,
+    hp: 1300, atk: 116, def: 102, spd: 112, basicPower: 84,
     passive: {
       id: 'greateye', name: '巨眼',
-      desc: '会心率 +18%。会心が出るたび味方全体の 必殺 +8。',
+      desc: '会心率 +12%。会心が出るたび味方全体の 必殺 +8。',
     },
     od: {
       id: 'gazepierce', name: '暗所ノ一瞥',
@@ -333,14 +333,14 @@ export const REVOS: RevosDef[] = [
   {
     id: 'albertaceratops', name: 'アルベルタケラトプス', short: 'アルベルタ',
     en: 'Albertaceratops', element: 'terra', role: 'Debuffer',
-    hp: 1560, atk: 128, def: 134, spd: 94, basicPower: 90,
+    hp: 1520, atk: 108, def: 130, spd: 92, basicPower: 82,
     passive: {
       id: 'twinhorn', name: '双角の圧',
       desc: '攻撃が通った相手の 攻撃 −12%（3行動）。角を向けられた側は前に出られない。',
     },
     od: {
       id: 'hornrout', name: '角衾',
-      desc: '敵全体に中ダメージ ＋ 全体の 必殺 −28 ＋ 味方全体の 防御 +18%（4行動）。', power: 78,
+      desc: '敵全体に中ダメージ ＋ 全体の 必殺 −28 ＋ 味方全体の 防御 +18%（4行動）。', power: 52,
     },
     defaultPref: 'front',
     sprite: 'albertaceratops',
@@ -351,7 +351,7 @@ export const REVOS: RevosDef[] = [
   {
     id: 'carnotaurus', name: 'カルノタウルス', short: 'カルノ',
     en: 'Carnotaurus', element: 'flame', role: 'Finisher',
-    hp: 1220, atk: 146, def: 88, spd: 124, basicPower: 94,
+    hp: 1140, atk: 124, def: 84, spd: 122, basicPower: 85,
     passive: {
       id: 'runningcharge', name: '駆ける角',
       desc: '自分のほうが 速度 が高いとき、差 1 につき与ダメージ +0.35%（最大 +26%）。',
@@ -369,10 +369,10 @@ export const REVOS: RevosDef[] = [
   {
     id: 'therizinosaurus', name: 'テリジノサウルス', short: 'テリジノ',
     en: 'Therizinosaurus', element: 'terra', role: 'Breaker',
-    hp: 1430, atk: 144, def: 112, spd: 96, basicPower: 97,
+    hp: 1360, atk: 124, def: 108, spd: 92, basicPower: 86,
     passive: {
       id: 'scytheclaw', name: '鎌爪',
-      desc: 'シールドを無視して斬る。相手の 防御 が高いほど与ダメージ上昇（最大 +36%）。',
+      desc: 'シールドを無視して斬る。相手の 防御 が高いほど与ダメージ上昇（最大 +24%）。',
     },
     od: {
       id: 'harvest', name: '収穫',
@@ -387,10 +387,10 @@ export const REVOS: RevosDef[] = [
   {
     id: 'elasmosaurus', name: 'エラスモサウルス', short: 'エラスモ',
     en: 'Elasmosaurus', element: 'aqua', role: 'Sprinter',
-    hp: 1230, atk: 138, def: 92, spd: 138, basicPower: 89,
+    hp: 1120, atk: 106, def: 84, spd: 136, basicPower: 79,
     passive: {
       id: 'venomgland', name: '毒腺',
-      desc: '通常攻撃の命中時 55% で毒を1つ重ねる（毒は1つにつき毎行動 最大体力の 4%、4つまで）。',
+      desc: '通常攻撃の命中時 45% で毒を1つ重ねる（毒は1つにつき毎行動 最大体力の 3%、3つまで）。',
     },
     od: {
       id: 'serpentvenom', name: '蛇頸毒牙',
@@ -405,7 +405,7 @@ export const REVOS: RevosDef[] = [
   {
     id: 'tyrannosaurus-sue', name: 'ティラノサウルス スー', short: 'スー',
     en: 'Tyrannosaurus "Sue"', element: 'null', role: 'Apex',
-    hp: 1900, atk: 140, def: 138, spd: 94, basicPower: 94,
+    hp: 1640, atk: 116, def: 122, spd: 92, basicPower: 85,
     passive: {
       id: 'warlord', name: '歴戦の暴君',
       desc: '属性相性を使わない。自分が与えるダメージも受けるダメージも、相手の属性に関わらず ×1.5。',

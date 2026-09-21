@@ -42,9 +42,21 @@ const OD_RECOVERY: Record<string, number> = {
   spikebore: 0.5, leapstrike: 0.5,
   skyreign: 0.28,
   hatzegwing: 0.85,
+  tyrantrequiem: 0.55, forkjaw: 0.6, gazepierce: 0.5,
+  crimsoncharge: 0.55, harvest: 0.55, serpentvenom: 0.5,
+  hornrout: 0.8,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28, grindfeed: 0.28,
 };
+
+/**
+ * 表に無い技ぶんの隙。
+ *
+ * 技を足したときにここへ書き忘れると undefined が返り、AV が NaN になって
+ * その個体は二度と行動順に入らない——撃った側だけが止まり、相手が
+ * 何倍も動いているように見える。落ちるのではなく、無難な値で続かせる。
+ */
+const OD_RECOVERY_DEFAULT = 0.5;
 const MAX_TURNS = 200;
 
 /**
@@ -92,8 +104,8 @@ export function cleanRank(clean: number): 'S' | 'A' | 'B' | 'C' | 'D' {
 }
 
 /** 毒1つぶんの 1行動あたりの削り（最大体力比）と、重ねられる上限・持続 */
-const POISON_PER_STACK = 0.04;
-const POISON_MAX_STACK = 4;
+const POISON_PER_STACK = 0.03;
+const POISON_MAX_STACK = 3;
 const POISON_TURNS = 5;
 
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
@@ -217,6 +229,12 @@ export class BattleSim {
   startEvents(): BattleEvent[] {
     return [{ t: 'start', fighters: this.fighters.map(snapshot) }];
   }
+
+  /**
+   * 必殺を自動で撃つか。false なら満ちても溜め続け、タップで撃つまで待つ
+   * （150 に達したぶんは捨てずに放出する）。
+   */
+  autoOd = true;
 
   /**
    * OD を自動発動させず溜める指示。プレイヤーがタップした瞬間に呼ぶ。
@@ -382,16 +400,22 @@ export class BattleSim {
 
   // ------------------------------------------------------------ 行動
 
+  /**
+   * 必殺を撃つか。
+   *
+   * 満ちたら撃つ。以前は「敵が2体以上いる」「一撃で倒せる」「強気の構え」の
+   * いずれかを満たしたときだけ撃っていたので、残り1体の詰めでゲージが
+   * 満タンのまま通常攻撃を繰り返すことがあった——溜まった札を使わずに
+   * 殴り続ける絵は、見ていて理由が分からない。
+   *
+   * 手動に切り替えているときだけ溜める。その場合も 150 で自動的に放出する
+   * （上限を超えたぶんは捨てるだけなので、溜め得にはしない）。
+   */
   private shouldFireOd(actor: Fighter): boolean {
     if (actor.od < 100) return false;
     if (this.odFire.has(actor.uid)) return true;
-    if (this.odHold.has(actor.uid)) return actor.od >= 150; // 上限で自動放出
-    // AI: 敵が2体以上いるか、または一撃で仕留められるなら撃つ
-    const enemies = this.alive(other(actor.side));
-    if (enemies.length >= 2) return true;
-    const target = this.pickTarget(actor);
-    if (target && this.estimateDamage(actor, target, odPower(actor)) >= target.hp) return true;
-    return actor.stance === 'aggressive';
+    if (this.odHold.has(actor.uid) || !this.autoOd) return actor.od >= 150;
+    return true;
   }
 
   /**
@@ -428,7 +452,7 @@ export class BattleSim {
       const p = passiveOf(actor);
       this.tickIslandApex(actor, ev);
       if (p === 'embers' && this.rng.chance(0.32)) this.applyBurn(target, ev, actor.uid);
-      if (p === 'venomgland' && this.rng.chance(0.55)) this.applyPoison(target, ev, actor.uid);
+      if (p === 'venomgland' && this.rng.chance(0.45)) this.applyPoison(target, ev, actor.uid);
       if (p === 'shearwind') {
         const st = actor.stacks.shear ?? 0;
         if (st < 3) {
@@ -718,7 +742,7 @@ export class BattleSim {
     ev.push({ t: 'od', uid: actor.uid, value: 0 });
     // 特殊攻撃のあとは隙ができる。隙の大きさは技の重さに比例させる。
     // 一律にすると、全体攻撃と支援技が同じ代償になってしまう
-    actor.av -= AV_THRESHOLD * OD_RECOVERY[id];
+    actor.av -= AV_THRESHOLD * (OD_RECOVERY[id] ?? OD_RECOVERY_DEFAULT);
   }
 
   // ------------------------------------------------------------ 計算
@@ -783,13 +807,13 @@ export class BattleSim {
     const pa = passiveOf(atk);
     if (pa === 'deeppressure' && def.spd >= atk.spd + 20) buff *= 1.14;
     // 「初手の牙」: まだ一度も噛んでいない相手に強い。先に当てた者が場を決める
-    if (pa === 'firstbite' && !atk.stacks[`bit${def.uid}`]) buff *= 1.28;
+    if (pa === 'firstbite' && !atk.stacks[`bit${def.uid}`]) buff *= 1.20;
     // 「駆ける角」: 速度差そのものが威力になる。深圧の裏返しで、追う側の理屈
     if (pa === 'runningcharge' && atk.spd > def.spd) {
       buff *= 1 + Math.min(0.26, (atk.spd - def.spd) * 0.0035);
     }
     // 「鎌爪」: 硬い相手ほど深く入る。柔らかい相手には何の足しにもならない
-    if (pa === 'scytheclaw') buff *= 1 + Math.min(0.36, Math.max(0, defStat - 90) * 0.0030);
+    if (pa === 'scytheclaw') buff *= 1 + Math.min(0.24, Math.max(0, defStat - 90) * 0.0020);
     if (pa === 'traction' && def.row === 'back') buff *= 1.34;
     if (pa === 'overheat') buff *= 1 + 0.25 * (1 - atk.hp / atk.maxHp);
     // 「旧き暴君」: まだ削れていない相手を先に潰す
@@ -801,7 +825,7 @@ export class BattleSim {
 
     let critRate = clamp(0.05 + (atk.spd - def.spd) * 0.0015, 0.02, 0.35);
     // 「巨眼」: 見えている相手の継ぎ目を突く
-    if (pa === 'greateye') critRate = clamp(critRate + 0.18, 0.02, 0.55);
+    if (pa === 'greateye') critRate = clamp(critRate + 0.12, 0.02, 0.4);
     const crit = force === 'crit' ? true : roll ? this.rng.chance(critRate) : false;
     const rnd = roll ? this.rng.range(0.92, 1.08) : 1;
 

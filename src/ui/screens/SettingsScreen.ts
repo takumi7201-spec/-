@@ -99,7 +99,7 @@ export class SettingsScreen extends Screen {
         { value: 2, label: '×2' },
         { value: 3, label: '×3' },
       ], s.battleSpeed, (v) => { s.battleSpeed = v; this.onChange?.('battle'); }),
-      this.row('必殺技', '溜まったら自動で撃つか、自分で押すか', [
+      this.row('必殺技', '満ちたら自動で撃つか、押すまで溜めるか', [
         { value: true, label: '自動' },
         { value: false, label: '手動' },
       ], s.autoOd, (v) => { s.autoOd = v; this.onChange?.('battle'); }),
