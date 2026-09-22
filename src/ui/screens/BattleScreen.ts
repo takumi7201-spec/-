@@ -1,11 +1,12 @@
 import { Screen, type LayoutKind } from '../UIRoot';
 import { h, button, bar, clear } from '../dom';
 import type { BattlePlayer, Speed } from '../../game/battle/BattlePlayer';
-import type { BattleEvent, Side } from '../../game/battle/types';
+import type { BattleEvent, Fighter, Side } from '../../game/battle/types';
 import { getRevos, revosShortName } from '../../game/data/revos';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
+import { spriteUrl } from '../../fx/SpriteUnit';
 
 interface UnitCard {
   uid: string;
@@ -23,6 +24,28 @@ interface UnitCard {
   /** 表示中の充填率。シミュレータの離散更新を補間してなめらかに見せる */
   cd: number;
   cdReady: boolean;
+  /** 属性の隣に出す状態異常の枠 */
+  status: HTMLElement;
+  /** いま出している状態。毎フレーム作り直さないための控え */
+  statusKey: string;
+}
+
+/**
+ * 状態異常の札。
+ *
+ * 属性チップの隣に置く。名前ではなく絵で出すのは、カードが視野の端でしか
+ * 読まれないから——端で読めるのは色と形だけで、2文字の熟語は読めない。
+ */
+function statusIcon(kind: 'burn' | 'poison'): HTMLElement {
+  // 画像は CSS の url() ではなく img で置く。public/ の絶対パスは
+  // サイトの根から解決されるので、下の階層に載せたときに全部落ちる——
+  // スプライトの在処は spriteUrl() 1か所に寄せる
+  const img = document.createElement('img');
+  img.className = 'card-status-img';
+  img.src = spriteUrl(kind === 'burn' ? 'fx-burn' : 'fx-poison');
+  img.alt = kind === 'burn' ? '火傷' : '毒';
+  img.decoding = 'async';
+  return h('span', { class: `card-status-icon card-status-icon--${kind}` }, img);
 }
 
 /**
@@ -146,28 +169,32 @@ export class BattleScreen extends Screen {
         // 自軍カードは OD ボタンを兼ねる。介入点をここ1箇所に集約する
         const btn = button('', () => this.tryOd(f.uid), { class: 'ally-card' });
         // 名前は1行まるごと使う。アイコンの横に置くと3列では必ず省略が出る
+        const status = h('span', { class: 'card-status' });
         btn.append(
           h('div', { class: 'card-top' },
             icon,
             h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
+            status,
           ),
           h('span', { class: 'card-name', text: revosShortName(def.id) }),
           hp.el,
           h('div', { class: 'card-row' }, hpText, h('span', { class: 'card-od-label', text: '必殺' }), od.el),
         );
         this.allyRow.appendChild(btn);
-        this.allyCards.push({ uid: f.uid, el: btn, hp, od, hpText, odBtn: btn, alive: true, maxHp: f.maxHp, odValue: f.od, icon, cd: 0, cdReady: false });
+        this.allyCards.push({ uid: f.uid, el: btn, hp, od, hpText, odBtn: btn, alive: true, maxHp: f.maxHp, odValue: f.od, icon, cd: 0, cdReady: false, status, statusKey: '' });
       } else {
+        const status = h('span', { class: 'card-status' });
         const el = h('div', { class: 'enemy-card' },
           h('div', { class: 'card-top' },
             icon,
             h('span', { class: `chip chip--${def.element}`, text: ELEMENT_NAMES[def.element] }),
+            status,
           ),
           h('span', { class: 'card-name', text: revosShortName(def.id) }),
           hp.el,
         );
         this.enemyRow.appendChild(el);
-        this.enemyCards.push({ uid: f.uid, el, hp, od, hpText, alive: true, maxHp: f.maxHp, odValue: f.od, icon, cd: 0, cdReady: false });
+        this.enemyCards.push({ uid: f.uid, el, hp, od, hpText, alive: true, maxHp: f.maxHp, odValue: f.od, icon, cd: 0, cdReady: false, status, statusKey: '' });
       }
     }
   }
@@ -358,6 +385,34 @@ export class BattleScreen extends Screen {
         c.icon.classList.toggle('is-charged', ready);
       }
       c.icon.classList.toggle('is-full', f.alive && c.cd > 0.97);
+      this.updateStatus(c, f);
+    }
+  }
+
+  /**
+   * 属性の隣に出す状態異常。
+   *
+   * イベントで足し引きせず、毎フレームその個体の状態をそのまま映す——
+   * 付与は status イベントで飛ぶが、切れるときは何も飛ばないので、
+   * 足し算だけでは消し忘れる。
+   *
+   * 毒は重なる。重なった数だけ削る量が変わるので、2つ以上なら数も出す。
+   */
+  private updateStatus(c: UnitCard, f: Fighter): void {
+    const on = f.alive ? f.statuses : [];
+    const burn = on.some((s) => s.kind === 'burn');
+    const poison = on.find((s) => s.kind === 'poison');
+    const stack = poison ? Math.max(1, Math.round(poison.value / 0.03)) : 0;
+    const key = `${burn ? 'b' : ''}${stack ? `p${stack}` : ''}`;
+    if (key === c.statusKey) return;
+    c.statusKey = key;
+
+    clear(c.status);
+    if (burn) c.status.appendChild(statusIcon('burn'));
+    if (stack > 0) {
+      const el = statusIcon('poison');
+      if (stack > 1) el.appendChild(h('i', { class: 'card-status-n num', text: String(stack) }));
+      c.status.appendChild(el);
     }
   }
 

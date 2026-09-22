@@ -2733,3 +2733,25 @@ body[data-layout='wide'] .cc-body { left: 18vw; right: 18vw; }
 .ros-cell-sub { display: flex; align-items: baseline; gap: 6px; font-size: 10px; color: var(--ink-soft); }
 
 body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
+
+/* =========================================================================
+   状態異常の札
+   属性チップの隣に置く。絵だけで出す——カードは視野の端でしか読まれない
+   ========================================================================= */
+.card-status { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.card-status-icon { position: relative; display: block; width: 18px; height: 18px; }
+.card-status-img {
+  width: 100%; height: 100%; display: block;
+  object-fit: contain; image-rendering: pixelated;
+}
+/* 毒は重なる。重なった数だけ削る量が変わるので、2つ以上なら数も出す */
+.card-status-n {
+  position: absolute; right: -3px; bottom: -3px;
+  min-width: 11px; height: 11px; padding: 0 1px;
+  border-radius: 4px;
+  background: #4a3b6e; color: #f3ecff;
+  font-size: 8px; font-weight: 900; font-style: normal;
+  display: grid; place-items: center; line-height: 1;
+}
+/* 敵のカードは詰まっているので一回り小さく */
+.enemy-card .card-status-icon { width: 16px; height: 16px; }
