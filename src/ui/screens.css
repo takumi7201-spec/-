@@ -1727,7 +1727,31 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
   letter-spacing: 0.1em; color: var(--ink-faint); margin-top: 1px;
 }
 
-.det-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+/*
+ * 能力の4枚。枠ごとタップで「合計」と「素の値」を入れ替えるので、
+ * 見た目は紙のままでボタンにする——押せることは右肩の ⇄ で示す。
+ */
+.det-statbox {
+  display: block; width: 100%; padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; text-align: left; -webkit-tap-highlight-color: transparent;
+}
+.det-statbox:not(:disabled) { cursor: pointer; }
+.det-statbox:not(:disabled):active .det-stats { transform: scale(0.985); }
+.det-statbox-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; padding: 0 2px 5px;
+}
+.det-statbox-tag { font-size: 10px; font-weight: 900; letter-spacing: 0.22em; color: var(--ink-faint); }
+.det-statbox-mode {
+  font-size: 10px; font-weight: 900; letter-spacing: 0.08em; color: var(--ink-faint);
+  background: rgba(42, 37, 30, 0.07); border-radius: 5px; padding: 2px 7px;
+}
+.det-statbox-mode[hidden] { display: none; }
+
+.det-stats {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
+  transition: transform 0.12s ease;
+}
 .det-stat {
   background: var(--paper-card); border-radius: 12px; padding: 9px 9px 10px;
   box-shadow: 0 5px 14px rgba(72, 58, 36, 0.14);
@@ -1735,13 +1759,25 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
 .det-stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-faint); }
 .det-stat { position: relative; }
 .det-stat-num { font-size: 19px; line-height: 1.15; }
-/* 精錬でどれだけ乗ったか。素の値とは別の色で、数字の右肩に出す */
-.det-stat-delta {
-  position: absolute; right: 9px; top: 9px;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+/* 素の値を出している面では、数字のほうを一段沈めて加算を読ませる */
+.det-stat.is-base .det-stat-num { color: var(--ink-faint); }
+/* 加算分。精錬は緑／赤、刻印は紫。高さは常に取って、面を変えても行がずれないようにする */
+.det-stat-adds {
+  display: flex; align-items: baseline; gap: 4px; min-height: 13px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em; margin-top: 1px;
 }
-.det-stat-delta.is-up { color: var(--pen-green); }
-.det-stat-delta.is-down { color: var(--pen-red); }
+.det-stat-add { flex: none; }
+.det-stat-add.is-up { color: var(--pen-green); }
+.det-stat-add.is-down { color: var(--pen-red); }
+.det-stat-add.is-eg { color: #8a4fa8; }
+/* 色の凡例。緑が「レベル＋精錬」であることを、ここでだけ言い切る */
+.det-statbox-legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 6px 2px 0; }
+.det-statbox-legend[hidden] { display: none; }
+.det-legend-key {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink-faint);
+}
+.det-legend-key > i { width: 8px; height: 4px; border-radius: 2px; display: block; }
 .det-clean-sum {
   flex: none; font-size: 10px; font-weight: 900; letter-spacing: 0.06em;
   padding: 2px 8px; border-radius: 5px;
@@ -1753,6 +1789,7 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
   background: rgba(42, 37, 30, 0.1); margin-top: 5px; overflow: hidden;
 }
 .det-stat-bar > i { position: absolute; left: 0; top: 0; bottom: 0; display: block; }
+.det-stat-bar { margin-top: 3px; }
 
 /* 特性は水、必殺は火。2枚の色で役割の違いを出す */
 .det-skill { border-radius: 14px; padding: 12px 14px 13px; }

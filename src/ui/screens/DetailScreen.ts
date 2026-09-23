@@ -12,6 +12,21 @@ import { audio } from '../../core/Audio';
 /** 帯の満ち具合を決める基準値。種ごとの差が読める幅に取る */
 const STAT_CEIL = { hp: 1900, atk: 180, def: 170, spd: 148 } as const;
 
+/** 刻印ぶんの色。毒の紫と同系で、精錬の緑／赤とは混ざらない */
+const ENGRAVE_INK = '#8a4fa8';
+
+interface StatRow {
+  key: string;
+  /** 種の基準値。レベル1・クリーン度50のときの数字 */
+  base: number;
+  /** レベルとクリーン度まで乗せた値 */
+  scaled: number;
+  /** 刻印の加算。倍率の外で足される */
+  eg: number;
+  ceil: number;
+  color: string;
+}
+
 export interface DetailParams {
   defId: string;
   /** この個体を開いているなら、種の基準値ではなく手元の値を出す */
@@ -32,6 +47,9 @@ export interface DetailParams {
  */
 export class DetailScreen extends Screen {
   private p: DetailParams | null = null;
+  /** 数字を「合計」で読むか「素＋加算」で読むか。タップで入れ替える */
+  private mode: 'total' | 'base' = 'total';
+  private rows: StatRow[] = [];
 
   private artEl!: HTMLElement;
   private tagEl!: HTMLElement;
@@ -39,6 +57,9 @@ export class DetailScreen extends Screen {
   private nameEl!: HTMLElement;
   private latinEl!: HTMLElement;
   private statsEl!: HTMLElement;
+  private statsBtn!: HTMLButtonElement;
+  private statsMode!: HTMLElement;
+  private statsLegend!: HTMLElement;
   private engraveEl!: HTMLElement;
   private passiveEl!: HTMLElement;
   private odEl!: HTMLElement;
@@ -55,6 +76,25 @@ export class DetailScreen extends Screen {
     this.nameEl = h('div', { class: 'det-name' });
     this.latinEl = h('div', { class: 'det-latin' });
     this.statsEl = h('div', { class: 'det-stats' });
+    this.statsMode = h('span', { class: 'det-statbox-mode' });
+    this.statsLegend = h('div', { class: 'det-statbox-legend' });
+    this.statsBtn = h('button', {
+      class: 'det-statbox',
+      type: 'button',
+      onclick: () => {
+        if (this.statsBtn.disabled) return;
+        audio.uiTap();
+        this.mode = this.mode === 'total' ? 'base' : 'total';
+        this.renderStats();
+      },
+    },
+      h('div', { class: 'det-statbox-head' },
+        h('span', { class: 'det-statbox-tag', text: spaced('能力') }),
+        this.statsMode,
+      ),
+      this.statsEl,
+      this.statsLegend,
+    );
     this.engraveEl = h('div', { class: 'det-engrave' });
     this.passiveEl = h('div', { class: 'det-skill det-skill--passive' });
     this.odEl = h('div', { class: 'det-skill det-skill--od' });
@@ -71,7 +111,7 @@ export class DetailScreen extends Screen {
       this.tagEl,
       h('div', { class: 'det-body' },
         h('div', { class: 'det-title' }, this.headEl, this.nameEl, this.latinEl),
-        this.statsEl,
+        this.statsBtn,
         this.engraveEl,
         this.passiveEl,
         this.odEl,
@@ -96,7 +136,6 @@ export class DetailScreen extends Screen {
     // 種の基準値を見せても「この子がどれだけ強いか」は分からない
     const ls = u ? 1 + 0.055 * (u.level - 1) : 1;
     const mc = u ? cleanMultiplier(u.clean) : 1;
-    const val = (base: number): number => Math.round(base * ls * mc);
     // 精錬でどれだけ足された（削られた）か。クリーン度50を素の状態として、
     // そこからの差を別の色で出す——倍率のままでは、削った手間が数字に見えない
     const cleanDelta = (base: number, scaled: boolean): number =>
@@ -121,29 +160,19 @@ export class DetailScreen extends Screen {
     this.nameEl.textContent = r.name;
     this.latinEl.textContent = r.en;
 
-    clear(this.statsEl);
-    // クリーン度が掛かるのは体力・攻撃・防御だけ。速度には乗らない
-    const rows: [string, number, number, string, number][] = [
-      ['体力', val(r.hp), STAT_CEIL.hp, '#3fa772', cleanDelta(r.hp, true)],
-      ['攻撃', val(r.atk), STAT_CEIL.atk, '#de523c', cleanDelta(r.atk, true)],
-      ['防御', val(r.def), STAT_CEIL.def, '#3f97d6', cleanDelta(r.def, true)],
-      ['速度', Math.round(r.spd * ls), STAT_CEIL.spd, 'var(--hl-amber)', 0],
+    // クリーン度が掛かるのは体力・攻撃・防御だけ。速度には乗らない。
+    // 刻印は倍率の外——掛けたあとに足す（simulate.ts の buildFighters と同じ順）
+    const eg = u?.engraving;
+    this.rows = [
+      { key: '体力', base: r.hp, scaled: Math.round(r.hp * ls * mc), eg: eg?.hp ?? 0, ceil: STAT_CEIL.hp, color: '#3fa772' },
+      { key: '攻撃', base: r.atk, scaled: Math.round(r.atk * ls * mc), eg: eg?.atk ?? 0, ceil: STAT_CEIL.atk, color: '#de523c' },
+      { key: '防御', base: r.def, scaled: Math.round(r.def * ls * mc), eg: eg?.def ?? 0, ceil: STAT_CEIL.def, color: '#3f97d6' },
+      { key: '速度', base: r.spd, scaled: Math.round(r.spd * ls), eg: eg?.spd ?? 0, ceil: STAT_CEIL.spd, color: 'var(--hl-amber)' },
     ];
-    for (const [k, v, ceil, c, delta] of rows) {
-      this.statsEl.appendChild(h('div', { class: 'det-stat' },
-        h('div', { class: 'det-stat-label', text: k }),
-        h('div', { class: 'det-stat-num num', text: v.toLocaleString('ja-JP') }),
-        delta !== 0
-          ? h('div', {
-            class: `det-stat-delta num ${delta > 0 ? 'is-up' : 'is-down'}`,
-            text: `${delta > 0 ? '+' : '−'}${Math.abs(delta)}`,
-          })
-          : null,
-        h('div', { class: 'det-stat-bar' },
-          h('i', { style: `width:${Math.min(100, (v / ceil) * 100)}%;background:${c}` }),
-        ),
-      ));
-    }
+    // 種の基準値しか無い図鑑では切り替える先が無いので、合計で固定する
+    this.statsBtn.disabled = !u;
+    if (!u) this.mode = 'total';
+    this.renderStats();
 
     // 刻印はこの個体だけのもの。種の性能表とは別の段に置く——
     // 同じ行に混ぜると、図鑑に並ぶ数値が個体ごとに違って見える
@@ -204,5 +233,80 @@ export class DetailScreen extends Screen {
     }
 
     this.equipBtn.hidden = !p.onEquip;
+  }
+
+  /**
+   * 能力の4枚を引き直す。
+   *
+   * 数字は「合計」と「素」を行き来させる。素の値だけ見せると手元の個体が
+   * どれだけ強いか分からず、合計だけ見せると何がどれだけ効いたか分からない。
+   * 帯はどちらの面でも同じ——素・精錬ぶん・刻印ぶんの3本に割って、
+   * 数字が入れ替わっても伸びた長さは動かないようにする。
+   */
+  private renderStats(): void {
+    const on = !this.statsBtn.disabled;
+    const base = this.mode === 'base';
+    this.statsMode.hidden = !on;
+    this.statsMode.textContent = base ? '素の値 ⇄' : '合計 ⇄';
+
+    // 加算が2色あるので、何の色かを1行で言っておく。下段の「精錬 +NN」は
+    // クリーン度ぶんだけの数字で、札の緑（レベル込み）とは別物になる
+    clear(this.statsLegend);
+    this.statsLegend.hidden = !on;
+    if (on) {
+      // 素の帯は項目ごとに色が違う。凡例では4色を並べて「その項目の色」を指す
+      const keys: [string, string][] = [
+        ['素', 'linear-gradient(90deg,#3fa772,#de523c,#3f97d6,var(--hl-amber))'],
+        ['育成・精錬', 'var(--pen-green)'],
+      ];
+      if (this.rows.some((x) => x.eg > 0)) keys.push(['刻印', ENGRAVE_INK]);
+      for (const [label, c] of keys) {
+        this.statsLegend.appendChild(h('span', { class: 'det-legend-key' },
+          h('i', { style: `background:${c}` }), label));
+      }
+    }
+
+    clear(this.statsEl);
+    for (const row of this.rows) {
+      const total = row.scaled + row.eg;
+      const grow = row.scaled - row.base;
+      const shown = base ? row.base : total;
+      const adds: HTMLElement[] = [];
+      if (on && grow !== 0) {
+        adds.push(h('span', {
+          class: `det-stat-add num ${grow > 0 ? 'is-up' : 'is-down'}`,
+          text: `${grow > 0 ? '+' : '−'}${Math.abs(grow)}`,
+        }));
+      }
+      if (row.eg > 0) {
+        adds.push(h('span', { class: 'det-stat-add num is-eg', text: `+${row.eg}` }));
+      }
+
+      // 帯。左から 素 / 精錬ぶん / 刻印ぶん。減っているときは
+      // 削れた側を薄い赤で残し、どこまであったはずかを見せる
+      // 育て切った個体は基準値を越える。越えたぶんで割り直さないと、
+      // 帯が右端で潰れて刻印ぶんが枠の外に出る
+      const ceil = Math.max(row.ceil, total, row.base);
+      const w = (n: number): number => Math.max(0, Math.min(100, (n / ceil) * 100));
+      const solid = grow >= 0 ? row.base : row.scaled;
+      const segs: [number, number, string][] = [
+        [0, w(solid), row.color],
+        grow > 0 ? [w(solid), w(grow), 'rgba(46,122,80,.55)'] : [0, 0, ''],
+        [w(row.scaled), w(row.eg), ENGRAVE_INK],
+        // 減っているぶんは合計の先に薄い赤で置く。満ちていない理由が見える
+        grow < 0 ? [w(total), w(-grow), 'rgba(194,58,40,.32)'] : [0, 0, ''],
+      ];
+
+      this.statsEl.appendChild(h('div', { class: `det-stat ${base ? 'is-base' : ''}` },
+        h('div', { class: 'det-stat-label', text: row.key }),
+        h('div', { class: 'det-stat-num num', text: shown.toLocaleString('ja-JP') }),
+        h('div', { class: 'det-stat-adds' }, ...adds),
+        h('div', { class: 'det-stat-bar' },
+          ...segs.map(([left, width, c]) => (width > 0
+            ? h('i', { style: `left:${left}%;width:${width}%;background:${c}` })
+            : null)),
+        ),
+      ));
+    }
   }
 }
