@@ -4,7 +4,7 @@ import type { CleanScene, ToolId } from '../../scenes/CleanScene';
 import { TOOLS } from '../../scenes/CleanScene';
 import type { CleanScore } from '../../game/FossilBlock';
 import { getRevos } from '../../game/data/revos';
-import { cleanCap } from '../../game/FossilBlock';
+import { cleanCap, scoreClean } from '../../game/FossilBlock';
 import { screenHead, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
@@ -34,6 +34,10 @@ export class CleanScreen extends Screen {
 
   private remain = 60;
   private limit = 60;
+  /** 生のクリーン度を出すための、直近の除去量 */
+  private removed = 0;
+  private rockTotal = 0;
+  private shownClean = -1;
   private running = false;
   private defId = '';
   private dragging = false;
@@ -52,25 +56,27 @@ export class CleanScreen extends Screen {
     // ---- 頭。題は化石の名前、右端に残り時間 ----
     this.timeEl = h('div', { class: 'plate-value num', text: '1:00' });
     this.nameEl = h('div', { class: 'scr-title' });
-    // 戻るは置かない。この画面を途中で抜けると化石をどう扱うかの規則が要る。
-    // 抜け道は「ここで終える」の1つに絞り、そこで必ず採点する
+    // 抜けても化石は残らない——途中で捨てる規則を作るより、
+    // ここまでの出来で採点して閉じる。やめる道は必ず採点を通る
     const head = screenHead({
       eyebrow: '下ごしらえ', title: '',
+      onBack: () => void this.abort(),
       right: h('div', { class: 'plate clean-time-plate' },
         h('div', { class: 'plate-inner' }, this.timeEl),
       ),
     });
     head.querySelector('.scr-title')?.replaceWith(this.nameEl);
+    head.querySelector('.scr-back')?.setAttribute('aria-label', 'やめる');
 
     // ---- 計器。左に除去率、右に損傷。1枚の板に並べる ----
-    this.progressText = h('span', { class: 'num clean-num', text: '0%' });
+    this.progressText = h('span', { class: 'num clean-num', text: '0' });
     this.boneEl = h('i', { class: 'clean-dmg-fill' });
     this.boneNumEl = h('div', { class: 'num clean-dmg-num', text: '0.0' });
 
     const strip = h('div', { class: 'clean-strip' },
       h('div', { class: 'clean-col grow' },
         h('div', { class: 'clean-prog-head' },
-          h('span', { class: 'clean-label', text: spaced('除去率') }),
+          h('span', { class: 'clean-label', text: spaced('クリーン度') }),
           this.progressText,
         ),
         // 目盛りは評価の境目。どこまで削れば等級が上がるかを帯の上で示す
@@ -106,11 +112,18 @@ export class CleanScreen extends Screen {
 
     // ---- ツールバー ----
     const toolBar = h('div', { class: 'clean-tools' });
+    // 記号は道具の動きに寄せる。⛏は打つ、⌁は細く走る、〜は撫でる
+    const FACE: Record<ToolId, { icon: string; desc: string }> = {
+      pick: { icon: '⛏', desc: '硬岩を一撃で' },
+      drill: { icon: '⌁', desc: '細かく削る' },
+      brush: { icon: '〜', desc: '骨に安全' },
+    };
     (['pick', 'drill', 'brush'] as ToolId[]).forEach((id, i) => {
       const spec = TOOLS[id];
       const b = button(spec.name, () => this.selectTool(id), {
         class: 'btn--tool',
-        sub: id === 'pick' ? '硬岩を一撃で' : id === 'drill' ? '細かく削る' : '骨に安全',
+        icon: FACE[id].icon,
+        sub: FACE[id].desc,
         key: String(i + 1),
       });
       this.toolBtns.set(id, b);
@@ -224,24 +237,47 @@ export class CleanScreen extends Screen {
     this.running = true;
     this.idleSpin = 1;
 
-    this.scene.load(p.defId, p.rarity, p.seed);
+    this.removed = 0;
+    this.rockTotal = 0;
+    this.shownClean = -1;
+    // 受け口は load より先に繋ぐ。load は総量を1度だけ知らせるので、
+    // 後から繋ぐとその1回を取りこぼし、最初の一削りまで計器が 0 のままになる
     this.scene.events.onProgress = (removed, total) => {
-      const r = total > 0 ? removed / total : 0;
-      this.progressBar.set(r);
-      this.progressText.textContent = `${Math.round(r * 100)}%`;
-      if (r >= 0.999) this.finish();
+      this.removed = removed;
+      this.rockTotal = total;
+      this.renderClean();
+      if (total > 0 && removed / total >= 0.999) this.finish();
     };
     this.scene.events.onBoneHit = (dmg) => {
       this.renderBone();
       this.ui.flash('#d9512f', 0.22);
       this.ui.toast(`骨を削ってしまった −${dmg.toFixed(1)}`, 'bad', 1400);
     };
+    this.scene.load(p.defId, p.rarity, p.seed);
 
     const def = getRevos(p.defId);
     this.nameEl.textContent = `${def.name} の化石`;
     this.renderBone();
     this.selectTool('pick');
     this.ui.toast('岩を削って骨を露出させよう', 'info', 2600);
+  }
+
+  /**
+   * 計器に出すのは除去率ではなくクリーン度そのもの。
+   *
+   * 帯の目盛り（70 / 85）も、天井の斜線も、等級の境目もクリーン度の値で
+   * 決まっている。除去率を出していた間は、85% まで削った手元と
+   * 「甲」の線が指す所が別物で、線の意味が読めなかった。
+   * 時間ぶんの 12 点もここに乗るので、放っておけば数字は下がる。
+   */
+  private renderClean(): void {
+    const c = this.rockTotal > 0
+      ? scoreClean(this.removed, this.rockTotal, this.remain, this.limit, this.scene.boneDamage).clean
+      : 0;
+    if (c === this.shownClean) return;
+    this.shownClean = c;
+    this.progressBar.set(c / 100);
+    this.progressText.textContent = String(c);
   }
 
   private renderBone(): void {
@@ -254,8 +290,21 @@ export class CleanScreen extends Screen {
     const cap = cleanCap(d);
     this.capEl.style.left = `${cap}%`;
     this.capEl.hidden = cap >= 100;
-    this.boneNumEl.textContent = d > 0 ? `上限 ${cap}` : '無傷';
-    this.boneNumEl.classList.toggle('is-bad', cap < 85);
+    this.boneNumEl.textContent = d > 0 ? `−${d.toFixed(1)}` : '0.0';
+    this.boneNumEl.classList.toggle('is-bad', d > 0);
+    // 天井が下がればクリーン度も頭を打つ。同じ操作で両方が動く
+    this.renderClean();
+  }
+
+  /** 頭の「やめる」。途中で捨てる規則は作らず、必ず採点を通して閉じる */
+  private async abort(): Promise<void> {
+    if (!this.running) return;
+    const ok = await this.ui.confirm(
+      '精錬をやめる',
+      'ここまでの出来で採点して閉じる。削り残しはそのまま点に響く。',
+      'やめる', true,
+    );
+    if (ok) this.finish();
   }
 
   private finish(): void {
@@ -276,6 +325,8 @@ export class CleanScreen extends Screen {
       const s = Math.floor(this.remain % 60);
       this.timeEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
       this.timeEl.classList.toggle('is-low', this.remain < 10);
+      // 時間ぶんの点が減るので、削っていなくても数字は動く
+      this.renderClean();
     }
 
     if (this.dragging && this.pointerNdc) {
