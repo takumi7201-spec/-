@@ -735,7 +735,10 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 /* ---- 編成 ---- */
 .party-body {
   position: absolute;
-  top: calc(var(--safe-t) + var(--head-h) + 6px); bottom: 96px;
+  top: calc(var(--safe-t) + var(--head-h) + 6px);
+  /* 「決定」の札（上の余白 8 + 高さ 56）とその下の下タブを避ける。
+     固定の 96px のままだと、最後の段の手持ちが札の裏に入って押せない */
+  bottom: calc(var(--deck-bottom) + 72px);
   left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
   overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
   display: flex; flex-direction: column; gap: 8px;
