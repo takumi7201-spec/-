@@ -1,6 +1,5 @@
 import type { BiomeId } from '../../voxel/palette';
-import type { FormationId, TeamSetup } from '../battle/types';
-import { getRevos } from './revos';
+import type { TeamSetup } from '../battle/types';
 
 /**
  * イベント戦。
@@ -19,11 +18,10 @@ export interface EventDef {
   name: string;
   subtitle: string;
   desc: string;
-  /** 敵編成。先頭が前列 */
+  /** 敵編成。立ち位置は役職が決めるので、並びは横の位置だけに効く */
   enemies: string[];
   enemyLevel: number;
   enemyClean: number;
-  formation: FormationId;
   /** 初回勝利で獲得できるリヴォス */
   reward: { defId: string; level: number; clean: number };
   /** 初回のコイン。2回目以降はこの 1/4 */
@@ -44,7 +42,6 @@ export const EVENTS: EventDef[] = [
     enemies: ['tyrannosaurus-1915', 'velociraptor', 'pteranodon'],
     enemyLevel: 14,
     enemyClean: 72,
-    formation: 'rush',
     reward: { defId: 'tyrannosaurus-1915', level: 10, clean: 70 },
     coins: 600,
     requires: 3,
@@ -60,7 +57,6 @@ export const EVENTS: EventDef[] = [
     enemies: ['spinosaurus-1915', 'iguanodon', 'triceratops'],
     enemyLevel: 16,
     enemyClean: 74,
-    formation: 'ring',
     reward: { defId: 'spinosaurus-1915', level: 10, clean: 70 },
     coins: 700,
     requires: 5,
@@ -85,7 +81,5 @@ export function buildEventTeam(ev: EventDef): TeamSetup {
       skillLevel: 1,
     })),
     order: [0, 1, 2],
-    formation: ev.formation,
-    targetPrefs: ev.enemies.map((defId) => getRevos(defId).defaultPref),
   };
 }

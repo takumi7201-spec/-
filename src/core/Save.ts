@@ -1,4 +1,3 @@
-import type { FormationId, Stance, TargetPref } from '../game/battle/types';
 import type { QualityTier } from './Quality';
 import type { BiomeId } from '../voxel/palette';
 import type { Engraving } from '../game/engraving';
@@ -66,7 +65,8 @@ export interface SaveData {
   updatedAt: number;
   player: { name: string; level: number; exp: number; coins: number };
   roster: OwnedRevos[];
-  party: { order: [string, string, string] | null; formation: FormationId; stances: Stance[]; targetPrefs: TargetPref[] };
+  /** 出撃する3体。立ち位置と狙いは役職が決めるので、持つのは顔ぶれだけ */
+  party: { order: [string, string, string] | null };
   /** 未精錬の化石ストック */
   stock: { defId: string; rarity: number; biome: BiomeId }[];
   dex: string[];
@@ -202,12 +202,7 @@ export function defaultSave(): SaveData {
     updatedAt: Date.now(),
     player: { name: 'ディガー', level: 1, exp: 0, coins: 300 },
     roster: [],
-    party: {
-      order: null,
-      formation: 'wedge',
-      stances: ['balanced', 'balanced', 'balanced'],
-      targetPrefs: ['front', 'lowhp', 'support'],
-    },
+    party: { order: null },
     stock: [],
     dex: [],
     unlockedBiomes: ['canyon'],
@@ -282,7 +277,8 @@ export function load(): SaveData {
       ...data,
       settings: { ...base.settings, ...(data.settings ?? {}) },
       player: { ...base.player, ...(data.player ?? {}) },
-      party: { ...base.party, ...(data.party ?? {}) },
+      // 陣形・構え・狙いは廃止した。古いセーブに残っていても読み捨てる
+      party: { order: data.party?.order ?? null },
       events: { ...base.events, ...(data.events ?? {}) },
       mail: data.mail ?? [],
       login: { ...base.login, ...(data.login ?? {}) },

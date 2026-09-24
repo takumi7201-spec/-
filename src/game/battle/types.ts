@@ -1,57 +1,8 @@
 import type { ElementId } from '../../voxel/palette';
 import type { Engraving } from '../engraving';
+import type { Role } from '../data/revos';
 
-export type Row = 'front' | 'back';
 export type Side = 0 | 1;
-export type Stance = 'aggressive' | 'balanced' | 'conservative';
-/** 作戦。誰から狙うかだけを決める */
-export type TargetPref = 'front' | 'back' | 'lowhp' | 'defense' | 'support';
-
-export const TARGET_PREFS: { id: TargetPref; name: string; desc: string }[] = [
-  { id: 'front', name: '前衛優先', desc: '前に出ている敵から崩す' },
-  { id: 'back', name: '後衛優先', desc: '奥の敵を狙う' },
-  { id: 'lowhp', name: '手負い優先', desc: '体力の減った敵を仕留める' },
-  { id: 'defense', name: '硬い敵優先', desc: '守りの厚い敵から削る' },
-  { id: 'support', name: '支援役優先', desc: '回復・強化役を先に潰す' },
-];
-export type FormationId = 'wedge' | 'ring' | 'rush' | 'metro';
-
-export interface Formation {
-  id: FormationId;
-  name: string;
-  desc: string;
-  frontDamage: number;
-  backHitRateBonus: number;
-  allDamageTaken: number;
-  allDamageDealt: number;
-  spdMul: number;
-  defMul: number;
-  startOd: number;
-  odGainMul: number;
-}
-
-export const FORMATIONS: Record<FormationId, Formation> = {
-  wedge: {
-    id: 'wedge', name: '楔陣', desc: '前列の与ダメージ +20%',
-    frontDamage: 1.2, backHitRateBonus: 0.05, allDamageTaken: 1, allDamageDealt: 1,
-    spdMul: 1, defMul: 1, startOd: 0, odGainMul: 1,
-  },
-  ring: {
-    id: 'ring', name: '環陣', desc: '被ダメージ −12% / 与ダメージ −8%',
-    frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 0.88, allDamageDealt: 0.92,
-    spdMul: 1, defMul: 1, startOd: 0, odGainMul: 1,
-  },
-  rush: {
-    id: 'rush', name: '疾陣', desc: '速度 +15% / 防御 −10%',
-    frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 1, allDamageDealt: 1,
-    spdMul: 1.15, defMul: 0.9, startOd: 0, odGainMul: 1,
-  },
-  metro: {
-    id: 'metro', name: '律陣', desc: '開始 必殺 +40 / 獲得 +15%',
-    frontDamage: 1, backHitRateBonus: 0, allDamageTaken: 1, allDamageDealt: 1,
-    spdMul: 1, defMul: 1, startOd: 40, odGainMul: 1.15,
-  },
-};
 
 export type ModKind = 'atk' | 'def' | 'spd' | 'dealt' | 'taken';
 
@@ -62,11 +13,8 @@ export interface Mod {
   /** 残り行動数。対象の行動が回るたびに1減る */
   turns: number;
   /**
-   * 時間で切れるバフの失効時刻（BattleSim.clock と同じ単位）。
-   *
-   * 行動数ではなく「秒」で効くものにだけ使う。実時間で数えると倍速で
-   * 結果が変わってしまい、同じシードが同じ戦闘にならなくなるので、
-   * 標準速の秒数を戦闘内時刻に換算して持たせる。
+   * 時間で切れるバフの失効時刻（BattleSim.clock、戦闘内の秒）。
+   * 行動数ではなく「秒」で効くものにだけ使う。
    */
   until?: number;
   source: string;
@@ -74,6 +22,7 @@ export interface Mod {
 
 export interface StatusEffect {
   kind: 'burn' | 'regen' | 'poison';
+  /** 残りの刻み数。火傷・毒は STATUS_TICK 秒ごと、再生は 1 秒ごとに 1 減る */
   turns: number;
   /**
    * burn / poison: 1行動あたりに削る最大体力の割合 / regen: 1回あたりの回復量（実数）
@@ -114,11 +63,8 @@ export interface RevosInstance {
 
 export interface TeamSetup {
   members: RevosInstance[];
-  /** members のインデックス。0番目が前列、以降が昇格優先順 */
-  order: [number, number, number];
-  formation: FormationId;
-  stances?: Stance[];
-  targetPrefs?: TargetPref[];
+  /** members のインデックス。並びは初期の横位置にだけ使う——立ち位置は役職が決める */
+  order: number[];
 }
 
 export interface Fighter {
@@ -126,9 +72,12 @@ export interface Fighter {
   defId: string;
   name: string;
   element: ElementId;
+  role: Role;
+  /** 特性と必殺の id。毎回データ表を引かないよう、組んだときに控える */
+  passive: string;
+  odId: string;
   side: Side;
   slot: number;
-  row: Row;
   level: number;
   clean: number;
   skillLevel: number;
@@ -138,20 +87,27 @@ export interface Fighter {
   def: number;
   spd: number;
   basicPower: number;
-  av: number;
+  /** 戦場の位置。x は横、z は奥行き（自軍 0 は +z 側、敵 1 は −z 側） */
+  x: number;
+  z: number;
+  /** 1ステップ前の位置。描画はここと今の位置のあいだを補間する */
+  px: number;
+  pz: number;
+  /** 行動ゲージ。1 に届いたら次の攻撃を出せる。追撃系の効果で 1 を超えることもある */
+  ready: number;
   od: number;
   alive: boolean;
   mods: Mod[];
   statuses: StatusEffect[];
   shield: Shield | null;
-  stance: Stance;
-  targetPref: TargetPref;
+  /** いま狙っている相手 */
+  target: string | null;
+  /** 構え中の技。打点の時刻が来たら当たる。構えている間は動かない */
+  cast: Cast | null;
+  /** この時刻までは自分で動けない（引き寄せ・足止め） */
+  rootedUntil: number;
   /** 「堆積」など戦闘中の永続蓄積 */
   stacks: Record<string, number>;
-  /** 昇格を遅延させられている残り行動数 */
-  promoteDelay: number;
-  /** 「断層牽引」で強制的に前列にされている残り行動数 */
-  draggedTurns: number;
   /** 累積の与ダメ・被ダメ（リザルト表示用） */
   dealt: number;
   taken: number;
@@ -159,10 +115,17 @@ export interface Fighter {
   kills: number;
 }
 
+export interface Cast {
+  kind: 'basic' | 'od';
+  /** 構えた時点で狙った相手。打点で倒れていれば選び直す */
+  target: string | null;
+  /** 打点の時刻（戦闘内の秒） */
+  at: number;
+}
+
 export type BattleEvent =
   | { t: 'start'; fighters: FighterSnapshot[] }
-  | { t: 'turnBegin'; uid: string }
-  | { t: 'action'; uid: string; kind: 'basic' | 'od'; name: string; targets: string[] }
+  | { t: 'action'; uid: string; kind: 'basic' | 'od'; name: string; targets: string[]; ranged: boolean; windup: number }
   | { t: 'damage'; uid: string; from: string; amount: number; crit: boolean; eff: 1.5 | 1 | 0.7; hp: number; shielded: number }
   | { t: 'heal'; uid: string; from: string; amount: number; hp: number }
   | { t: 'shield'; uid: string; amount: number }
@@ -172,9 +135,9 @@ export type BattleEvent =
   | { t: 'od'; uid: string; value: number }
   | { t: 'odReady'; uid: string }
   | { t: 'ko'; uid: string; by: string }
-  | { t: 'promote'; uid: string; from: Row; to: Row }
+  | { t: 'pull'; uid: string; by: string }
+  | { t: 'leap'; uid: string; to: string }
   | { t: 'passive'; uid: string; label: string }
-  | { t: 'turnEnd'; uid: string }
   | { t: 'end'; winner: Side | -1; turns: number };
 
 export interface FighterSnapshot {
@@ -183,7 +146,8 @@ export interface FighterSnapshot {
   name: string;
   element: ElementId;
   side: Side;
-  row: Row;
+  x: number;
+  z: number;
   maxHp: number;
   hp: number;
   atk: number;

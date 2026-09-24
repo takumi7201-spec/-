@@ -1,8 +1,8 @@
 import { h, clear, bar } from './dom';
 import { revosIcon } from './revosIcon';
-import { getRevos, revosShortName } from '../game/data/revos';
+import { ROLE_NAMES, getRevos, revosShortName } from '../game/data/revos';
+import { isWall } from '../game/battle/roles';
 import { BIOMES, ELEMENT_NAMES, type BiomeId } from '../voxel/palette';
-import { FORMATIONS } from '../game/battle/types';
 import type { SaveData } from '../core/Save';
 import { cleanRank } from '../game/battle/simulate';
 
@@ -139,9 +139,9 @@ export class InventoryPanel {
     this.page = Math.min(this.page, this.pages.length - 1);
     this.renderGrid();
 
-    // ---- FORMATION ----
-    const form = FORMATIONS[ctx.data.party.formation];
-    this.formName.textContent = `${form.name} — ${form.desc}`;
+    // ---- 編成 ----
+    // 立ち位置は役職が決める。列ではなく役職の名前を添える
+    this.formName.textContent = '立ち位置は役職で決まる';
     clear(this.formList);
     const order = ctx.data.party.order;
     const members = (order ?? [])
@@ -151,16 +151,16 @@ export class InventoryPanel {
     if (fallback.length === 0) {
       this.formList.appendChild(h('div', { class: 'inv-empty', text: '編成なし' }));
     }
-    fallback.slice(0, 3).forEach((u, i) => {
+    fallback.slice(0, 3).forEach((u) => {
       const def = getRevos(u.defId);
       this.formList.appendChild(
-        h('div', { class: `inv-form-row ${i === 0 ? 'is-front' : ''}` },
+        h('div', { class: `inv-form-row ${isWall(def.role) ? 'is-front' : ''}` },
           revosIcon(u.defId, 'inv-silho'),
           h('div', { class: 'inv-form-main' },
             h('div', { class: 'inv-form-name', text: revosShortName(def.id) },
               h('span', { class: `dot dot--${def.element}`, title: ELEMENT_NAMES[def.element] }),
             ),
-            h('div', { class: 'inv-form-sub num', text: `${i === 0 ? '前列' : '後列'} · Lv${u.level} · ${cleanRank(u.clean)}` }),
+            h('div', { class: 'inv-form-sub num', text: `${ROLE_NAMES[def.role]} · Lv${u.level} · ${cleanRank(u.clean)}` }),
           ),
         ),
       );

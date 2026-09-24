@@ -246,7 +246,7 @@ async function main(): Promise<void> {
   }
 
   async function startBattle(ev: EventDef | null = null, stage = data.stageProgress + 1): Promise<void> {
-    const mine = buildTeamSetup(data.roster, data.party.order, data.party.formation, data.party.targetPrefs);
+    const mine = buildTeamSetup(data.roster, data.party.order);
     if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); goHome(); return; }
     activeEvent = ev;
     lastEvent = ev;
@@ -575,7 +575,7 @@ async function main(): Promise<void> {
     }
     countToday(data, 'battle');
     // 出撃回数。誰を連れて行きがちかは、勝敗と別に残しておく
-    for (const uid of buildTeamSetup(data.roster, data.party.order, data.party.formation)?.members.map((m) => m.defId) ?? []) {
+    for (const uid of buildTeamSetup(data.roster, data.party.order)?.members.map((m) => m.defId) ?? []) {
       data.stats.sorties[uid] = (data.stats.sorties[uid] ?? 0) + 1;
     }
     const ev = activeEvent;
@@ -620,7 +620,7 @@ async function main(): Promise<void> {
     } else {
       data.stats.streak = 0;
       rows.push({ label: '結果', value: winner === 1 ? '敗北' : '引き分け' });
-      rows.push({ label: '助言', value: '編成と陣形を見直そう' });
+      rows.push({ label: '助言', value: '編成を見直そう' });
     }
     addPlayerExp(data, winner === 0 ? 120 : 40);
 
@@ -636,7 +636,7 @@ async function main(): Promise<void> {
      * 半分しか入らない後列は、いつまでも前列の半分のレベルで固定され、
      * 編成を組み替えた瞬間に壊れる。
      */
-    const setup = buildTeamSetup(data.roster, data.party.order, data.party.formation, data.party.targetPrefs);
+    const setup = buildTeamSetup(data.roster, data.party.order);
     const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
     const base = winner === 0 ? 900 : 340;
     setup?.members.forEach((m) => {
@@ -659,8 +659,8 @@ async function main(): Promise<void> {
       eyebrow: '戦闘終了',
       title: winner === 0 ? '勝 利' : winner === 1 ? '敗 北' : '引 き 分 け',
       subtitle: ev
-        ? `${ev.name} — ${player?.sim.turnCount ?? 0} 手で決着`
-        : `ステージ ${activeStage} — ${player?.sim.turnCount ?? 0} 手で決着`,
+        ? `${ev.name} — ${Math.round(player?.sim.clock ?? 0)} 秒で決着`
+        : `ステージ ${activeStage} — ${Math.round(player?.sim.clock ?? 0)} 秒で決着`,
       good: winner === 0,
       cast: setup?.members.map((m) => m.defId) ?? [],
       rows,
@@ -725,10 +725,8 @@ async function main(): Promise<void> {
   debugScreen.onChanged = () => writeSave(data);
 
   partyScreen.onBack = () => goUnit();
-  partyScreen.onApply = (order, formation, prefs) => {
+  partyScreen.onApply = (order) => {
     data.party.order = order;
-    data.party.formation = formation;
-    data.party.targetPrefs = prefs;
     writeSave(data);
     ui.toast('編成を保存した', 'info', 1600);
     goUnit();

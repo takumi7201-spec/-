@@ -10,7 +10,7 @@ import { DebrisSystem } from '../fx/Debris';
 import { StatAura } from '../fx/StatAura';
 import { DamageNumbers } from '../fx/DamageNumbers';
 import { getRevos, type Role } from '../game/data/revos';
-import type { Fighter, Row, Side } from '../game/battle/types';
+import type { Fighter, Side } from '../game/battle/types';
 import type { QualitySettings } from '../core/Quality';
 
 /**
@@ -25,94 +25,49 @@ export interface BattleUnitView {
   uid: string;
   unit: SpriteUnit;
   anim: SpriteAnimator;
-  /** 持ち場。スロットと列で決まる基準点。ここ自体は動かない */
-  anchor: THREE.Vector3;
-  /** いま立ちたい点。持ち場＋間合い＋揺らぎ＋押し合いで毎フレーム決まる */
-  home: THREE.Vector3;
+  /**
+   * 足元の位置。シミュレータの座標を追う。踏み込みやのけぞりは
+   * この上に足す見た目だけのずれで、ここには混ぜない
+   */
+  base: THREE.Vector3;
+  /** シミュレータの座標を刻みのあいだで補間した、いま立つべき点 */
+  goal: THREE.Vector3;
   side: Side;
-  row: Row;
   role: Role;
   element: ElementId;
   alive: boolean;
-  /** 揺らぎの位相。個体ごとにずらす——揃うと6体が同じ拍で揺れる */
-  phase: number;
-  /** 被弾で押し戻される量 */
+  /** のけぞりの量と向き */
   knock: number;
+  knockX: number;
+  knockZ: number;
   flash: number;
   facingRight: boolean;
-  /** 踏み込みの最中だけ入る軌跡。無ければ home を追うだけ */
-  strike?: {
-    from: THREE.Vector3;
-    to: THREE.Vector3;
-    /** 向くべき相手の横位置 */
-    faceX: number;
-    t: number;
-    /** 踏み込みに使う秒数。打点が出る時刻に合わせる */
-    in: number;
-    /** 戻りに使う秒数 */
-    back: number;
-  };
+  /** 向くべき相手の横位置。無ければ敵陣の重心を見る */
+  faceX: number | null;
+  /** 近接の踏み込み。位置そのものはシミュレータが持つので、前のめりの絵だけ */
+  lunge?: { dx: number; dz: number; t: number; in: number; back: number };
+  /** 跳躍の残り時間 */
+  hop: number;
 }
 
-/**
- * 自軍は左手前、敵は右奥。真正面の奥行き配置だと、横向きに描かれた
- * スプライト同士が向き合って見えない。斜めに置けば奥行きも左右の
- * 対峙も同時に成り立つ。
- */
-const SLOT_POS: Record<Side, Record<number, [number, number]>> = {
-  0: { 0: [-1.2, 3.4], 1: [-1.95, 5.5], 2: [0.9, 6.0] },
-  1: { 0: [1.2, -3.4], 1: [1.95, -5.5], 2: [-0.9, -6.0] },
-};
-
-/**
- * 役割ごとの立ち回り。
- *
- * 壁役は前に出たまま小さく構え、脚の速い役ほど広く動き回り、
- * 支援役は下がって間合いを取る。数値は絵だけに効く——戦闘の計算は
- * シミュレータ側で完結しているので、ここを触っても勝敗は1ミリも動かない。
- */
-interface Gait {
-  /** 敵へ寄る量。負なら下がる */
-  lean: number;
-  /** 待機中に動き回る幅 */
-  sway: number;
-  /** 歩調。大きいほど落ち着かない */
-  rate: number;
-  /** 攻撃時に詰める間合い。遠い役はその場で撃つ */
-  reach: number;
+/** 飛び道具。射撃役の通常攻撃を、撃った側から当たる側へ運ぶ */
+interface Shot {
+  mesh: THREE.Mesh;
+  from: THREE.Vector3;
+  target: string;
+  t: number;
+  dur: number;
 }
 
-const ROLE_GAIT: Record<Role, Gait> = {
-  Tank: { lean: 1.55, sway: 0.30, rate: 0.55, reach: 1.15 },
-  Guardian: { lean: 1.35, sway: 0.32, rate: 0.60, reach: 1.20 },
-  Striker: { lean: 1.00, sway: 0.62, rate: 0.95, reach: 1.05 },
-  Breaker: { lean: 0.90, sway: 0.56, rate: 0.88, reach: 1.10 },
-  Finisher: { lean: 0.80, sway: 0.68, rate: 1.00, reach: 1.00 },
-  Sprinter: { lean: 0.55, sway: 0.98, rate: 1.35, reach: 0.95 },
-  Healer: { lean: -0.85, sway: 0.34, rate: 0.70, reach: 6.5 },
-  Buffer: { lean: -0.70, sway: 0.38, rate: 0.75, reach: 6.0 },
-  Debuffer: { lean: -0.35, sway: 0.60, rate: 0.98, reach: 4.0 },
-  Technical: { lean: -0.15, sway: 0.52, rate: 0.85, reach: 4.6 },
-  'All-round': { lean: 0.55, sway: 0.52, rate: 0.82, reach: 2.4 },
-  Apex: { lean: 0.75, sway: 0.46, rate: 0.68, reach: 1.30 },
-};
-
-/** 踏み込みの上限。これ以上詰めると、遠い相手へ瞬間移動したように見える */
-const DASH_MAX = 3.6;
-/** 射程持ちでも最低これだけは前に出る。棒立ちで撃たれると当たった気がしない */
-const DASH_MIN = 0.5;
-/** 体どうしの最小間隔。これより近づいたら押し合う */
-const SEPARATION = 1.55;
-/**
- * 押し合いを測るときの奥行きの重み。
- *
- * カメラは浅く見下ろしているので、奥行きの差は画面上でほとんど潰れる。
- * 素の距離で測ると「離れているのに重なって見える」並びを許してしまうので、
- * 奥行きを軽く数えて、横へ開く方向に逃がす。
- */
-const DEPTH_WEIGHT = 0.6;
-/** 中線。自陣と敵陣がすれ違うと、どちらが味方か読めなくなる */
-const MIDLINE = 1.6;
+/** 踏み込みの深さ。必殺は大きく出る */
+const LUNGE = 0.45;
+const LUNGE_OD = 0.85;
+/** 跳躍の長さと高さ */
+const HOP_TIME = 0.45;
+const HOP_HEIGHT = 1.5;
+/** 位置の追い方。大きく離れた（引き寄せ・跳躍）ときは、ゆっくり引きずって見せる */
+const FOLLOW_NEAR = 22;
+const FOLLOW_FAR = 7;
 
 export class BattleScene {
   readonly scene = new THREE.Scene();
@@ -139,9 +94,13 @@ export class BattleScene {
   private tmp = new THREE.Vector3();
   /** 揺らぎの時計。ヒットストップ中は止まる */
   private time = 0;
-  /** いま追っている行動者と対象。位置が動くので毎フレーム構図を取り直す */
-  private focusA: string | null = null;
-  private focusB: string | null = null;
+  /** 必殺の寄り。撃った本人と相手を、残り時間のあいだだけ大きく映す */
+  private spotA: string | null = null;
+  private spotB: string | null = null;
+  private spotLeft = 0;
+  private shots: Shot[] = [];
+  private shotPool: THREE.Mesh[] = [];
+  private shotGeo = new THREE.SphereGeometry(0.16, 10, 8);
   /**
    * 画面比ごとのフレーミング補正。
    *
@@ -259,29 +218,29 @@ export class BattleScene {
         shadow: 0.3,
         holo: def.rarity >= 5,
       });
-      const [px, pz] = SLOT_POS[f.side][f.slot];
-      unit.root.position.set(px, 0, pz);
+      unit.root.position.set(f.x, 0, f.z);
       this.scene.add(unit.root);
 
       const view: BattleUnitView = {
         uid: f.uid,
         unit,
         anim: new SpriteAnimator(unit),
-        anchor: new THREE.Vector3(px, 0, pz),
-        home: new THREE.Vector3(px, 0, pz),
+        base: new THREE.Vector3(f.x, 0, f.z),
+        goal: new THREE.Vector3(f.x, 0, f.z),
         side: f.side,
-        row: f.row,
         role: def.role,
         element: def.element,
         alive: true,
-        phase: hash01(f.uid) * Math.PI * 2,
-        knock: 0,
+        knock: 0, knockX: 0, knockZ: 0,
         flash: 0,
         facingRight: f.side === 0,
+        faceX: null,
+        hop: 0,
       };
       view.anim.play('idle');
       this.units.set(f.uid, view);
     }
+    this.wideShot();
   }
 
   private clearUnits(): void {
@@ -292,6 +251,30 @@ export class BattleScene {
       u.unit.dispose();
     }
     this.units.clear();
+    for (const s of this.shots) this.releaseShot(s);
+    this.shots = [];
+  }
+
+  /**
+   * シミュレータの位置を受け取る。alpha は直前の刻みから次の刻みまでの
+   * 進み具合で、刻みのあいだを補間して 30Hz のカクつきを消す。
+   */
+  syncFighters(fighters: Fighter[], alpha: number): void {
+    const k = Math.max(0, Math.min(1, alpha));
+    for (const f of fighters) {
+      const u = this.units.get(f.uid);
+      if (!u || !u.alive) continue;
+      u.goal.set(f.px + (f.x - f.px) * k, 0, f.pz + (f.z - f.pz) * k);
+      const t = f.target ? this.units.get(f.target) : undefined;
+      u.faceX = t ? t.base.x : null;
+    }
+  }
+
+  /** 戦闘の時計の速さ。ヒットストップ中は 0、決着のスロー中は 0.25 */
+  timeScale(): number {
+    if (this.hitStop > 0) return 0;
+    if (this.slowMo > 0) return 0.25;
+    return 1;
   }
 
   // ------------------------------------------------------------ 演出API
@@ -301,45 +284,74 @@ export class BattleScene {
   }
 
   /**
-   * 攻撃の踏み込み。対象へ寄ってから持ち場へ帰る。
-   *
-   * 詰める距離は役割の間合いで決まる。近接は相手の鼻先まで歩き、
-   * 射程を持つ役は半歩だけ前に出る。踏み込みに使う秒数は再生機から
-   * 受け取る——打点が出る時刻に着いていないと、当たる前に当たって見える。
+   * 攻撃の構え。近接は相手へ前のめりに踏み込み、射撃は弾を飛ばす。
+   * どちらも打点（windup 秒後）に届くように合わせる——着く前に数字が
+   * 出ると、当たる前に当たって見える。
    */
-  lunge(uid: string, targetUid: string, strikeIn = 0.26): void {
+  attack(uid: string, targetUid: string | null, windup: number, ranged: boolean, od: boolean): void {
     const a = this.units.get(uid);
-    const b = this.units.get(targetUid);
-    if (!a || !b) return;
+    if (!a || !a.alive) return;
     a.anim.play('attack');
-    const from = a.unit.root.position.clone().setY(0);
-    const dir = this.tmp.copy(b.unit.root.position).setY(0).sub(from);
-    const dist = dir.length();
-    const faceX = b.unit.root.position.x;
-    if (dist < 0.01 || a === b) {
-      // 自分を対象に取る技。踏み込む先が無いので、その場で構えるだけ
-      a.strike = { from, to: from.clone(), faceX, t: 0, in: Math.max(0.1, strikeIn), back: 0.34 };
+    const b = targetUid ? this.units.get(targetUid) : undefined;
+    if (!b || b === a || b.side === a.side) return;
+    a.faceX = b.base.x;
+    if (ranged) {
+      this.fire(a, b.uid, Math.max(0.12, windup));
       return;
     }
-    dir.divideScalar(dist);
-    const gap = dist - ROLE_GAIT[a.role].reach;
-    const travel = Math.max(DASH_MIN, Math.min(DASH_MAX, gap));
-    a.strike = {
-      from,
-      to: from.clone().addScaledVector(dir, travel),
-      faceX,
-      t: 0,
-      in: Math.max(0.1, strikeIn),
-      back: 0.34,
-    };
+    const dx = b.base.x - a.base.x;
+    const dz = b.base.z - a.base.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 1e-3) return;
+    const reach = Math.min(d * 0.6, od ? LUNGE_OD : LUNGE);
+    a.lunge = { dx: (dx / d) * reach, dz: (dz / d) * reach, t: 0, in: Math.max(0.08, windup), back: 0.26 };
   }
 
-  hit(uid: string, amount: number, crit: boolean, eff: number, maxHp: number): void {
+  /** 跳ぶ。位置はシミュレータがもう動かしているので、弧だけを描く */
+  leap(uid: string): void {
+    const u = this.units.get(uid);
+    if (!u) return;
+    u.hop = HOP_TIME;
+    u.anim.play('attack');
+  }
+
+  private fire(from: BattleUnitView, target: string, dur: number): void {
+    const mesh = this.shotPool.pop() ?? new THREE.Mesh(
+      this.shotGeo,
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95, depthWrite: false }),
+    );
+    (mesh.material as THREE.MeshBasicMaterial).color.set(ELEMENT_COLORS[from.element]);
+    const start = from.unit.root.position.clone();
+    start.y += from.unit.spriteHeight * 0.55;
+    mesh.position.copy(start);
+    mesh.visible = true;
+    this.scene.add(mesh);
+    this.shots.push({ mesh, from: start, target, t: 0, dur });
+  }
+
+  private releaseShot(s: Shot): void {
+    this.scene.remove(s.mesh);
+    s.mesh.visible = false;
+    this.shotPool.push(s.mesh);
+  }
+
+  hit(uid: string, fromUid: string, amount: number, crit: boolean, eff: number, maxHp: number): void {
     const u = this.units.get(uid);
     if (!u) return;
     u.anim.play('hurt');
     u.flash = 1;
-    u.knock = Math.min(0.75, 0.22 + (amount / maxHp) * 1.6);
+    // 打たれた向きへ押し返す。どこから殴られたかが体の動きで分かる
+    const from = this.units.get(fromUid);
+    let kx = u.side === 0 ? 0.5 : -0.5;
+    let kz = u.side === 0 ? 1 : -1;
+    if (from && from !== u) {
+      kx = u.base.x - from.base.x;
+      kz = u.base.z - from.base.z;
+    }
+    const kd = Math.max(1e-3, Math.hypot(kx, kz));
+    u.knockX = kx / kd;
+    u.knockZ = kz / kd;
+    u.knock = Math.min(0.6, 0.18 + (amount / maxHp) * 1.4);
 
     const pos = u.unit.root.position.clone();
     pos.y += u.unit.spriteHeight * 0.95;
@@ -347,19 +359,14 @@ export class BattleScene {
     this.numbers.spawn(pos, crit ? `${amount}!` : `${amount}`, { color, crit, scale: 0.85 + Math.min(0.45, amount / maxHp) });
 
     this.debris.burst(pos, ELEMENT_COLORS[u.element], crit ? 16 : 9, { speed: 2.4, up: 2.4, life: 0.6, size: 0.8 });
-    // ヒットストップ。倍速でも短縮しない。これが消えると手応えが完全に失われる
-    this.hitStop = Math.max(this.hitStop, crit ? 0.09 : 0.05);
-    this.addShake(crit ? 0.34 : 0.16);
+    // ヒットストップ。全員が同時に殴り合うので、単発より短く取る
+    this.hitStop = Math.max(this.hitStop, crit ? 0.07 : 0.035);
+    this.addShake(crit ? 0.3 : 0.12);
   }
 
   /**
    * ステータスが動いたユニットに粒子を重ねる。up なら火の粉、
-   * そうでなければ降りてくる青。
-   *
-   * 数値を出さないのは、これが「量」ではなく「乗った」を伝える合図だから。
-   * 実際の増減はカードの数値が引き受ける——両方を出すと、1行動のあいだに
-   * 6件のバフが飛ぶ編成（制空覇道）や、敵3体に同時に乗るデバフ（風蝕嵐）で
-   * 画面が数字で埋まる。
+   * そうでなければ降りてくる青。数値は出さない——量ではなく「乗った」の合図。
    */
   statChange(uid: string, up: boolean): void {
     const u = this.units.get(uid);
@@ -384,12 +391,10 @@ export class BattleScene {
     if (!u) return;
     u.alive = false;
     u.anim.play('ko');
-    // 倒れた体はその場に残す。持ち場へ戻ろうとすると死体が歩く
-    u.strike = undefined;
-    u.home.copy(u.unit.root.position).setY(0);
-    u.anchor.copy(u.home);
+    // 倒れた体はその場に残す
+    u.lunge = undefined;
+    u.goal.copy(u.base);
     this.hitStop = Math.max(this.hitStop, 0.12);
-    // 決着の一撃だけスローにする。1戦に1回だから効く
     this.addShake(0.5);
     const pos = u.unit.root.position.clone();
     pos.y += u.unit.spriteHeight * 0.5;
@@ -405,52 +410,55 @@ export class BattleScene {
     this.shake = Math.min(1.1, this.shake + v);
   }
 
-  setRow(uid: string, row: Row): void {
-    const u = this.units.get(uid);
-    if (!u) return;
-    u.row = row;
-    // 前列へ上がるときは1歩前へ出る。位置で状態が読めるようにする
-    const slot = row === 'front' ? 0 : u.anchor.x < 0 ? 1 : 2;
-    const [px, pz] = SLOT_POS[u.side][slot];
-    u.anchor.set(px, 0, pz);
-  }
-
-  /** 行動者と対象を画面に収める。以後は毎フレーム構図を取り直す */
-  focus(actorUid: string, targetUid?: string): void {
+  /** 必殺の寄り。seconds のあいだだけ、撃った本人（と相手）に寄る */
+  spotlight(actorUid: string, targetUid: string | undefined, seconds: number): void {
     if (!this.units.has(actorUid)) return;
-    this.focusA = actorUid;
-    this.focusB = targetUid && this.units.has(targetUid) ? targetUid : null;
-    this.frame();
-  }
-
-  /**
-   * 2体を収める構図を作る。
-   *
-   * 踏み込みで距離が変わるので、固定の引きでは寄りすぎたり余ったりする。
-   * 2体の間隔ぶんだけ後ろへ下がって、どちらも枠に残すようにする。
-   */
-  private frame(): void {
-    const a = this.focusA ? this.units.get(this.focusA) : undefined;
-    if (!a) return;
-    const t = this.focusB ? this.units.get(this.focusB) : undefined;
-    const mid = this.tmp.copy(a.unit.root.position);
-    let spread = 0;
-    if (t) {
-      spread = a.unit.root.position.distanceTo(t.unit.root.position);
-      mid.add(t.unit.root.position).multiplyScalar(0.5);
-    }
-    // 自軍側から見る構図を保ったまま、行動者の側へ寄る
-    const fromSelf = a.side === 0 ? 1 : 0.55;
-    const back = Math.min(3.6, Math.max(0, spread - 4) * 0.55);
-    this.camGoal.set(mid.x * 0.28, 7.8 + fromSelf * 0.7 + back * 0.22, mid.z * 0.2 + 14.0 + back);
-    this.lookGoal.set(mid.x * 0.42, 1.1, mid.z * 0.45);
+    this.spotA = actorUid;
+    this.spotB = targetUid && this.units.has(targetUid) ? targetUid : null;
+    this.spotLeft = seconds;
   }
 
   wideShot(): void {
-    this.focusA = null;
-    this.focusB = null;
-    this.camGoal.set(0, 8.6, 15.8);
-    this.lookGoal.set(0, 1.2, -0.3);
+    this.spotA = null;
+    this.spotB = null;
+    this.spotLeft = 0;
+  }
+
+  /**
+   * 構図。全員が同時に動くので、誰か1体を追うのではなく、生きている全員を
+   * 収める。広がったら引き、寄り集まったら寄る。必殺の間だけ撃った本人へ寄る。
+   */
+  private frame(): void {
+    const a = this.spotA ? this.units.get(this.spotA) : undefined;
+    if (a && this.spotLeft > 0) {
+      const t = this.spotB ? this.units.get(this.spotB) : undefined;
+      const mid = this.tmp.copy(a.base);
+      let spread = 0;
+      if (t) {
+        spread = a.base.distanceTo(t.base);
+        mid.add(t.base).multiplyScalar(0.5);
+      }
+      const back = Math.min(3.6, Math.max(0, spread - 3) * 0.55);
+      this.camGoal.set(mid.x * 0.3, 7.0 + back * 0.25, mid.z + 11.2 + back);
+      this.lookGoal.set(mid.x * 0.5, 1.1, mid.z - 0.2);
+      return;
+    }
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, n = 0;
+    for (const u of this.units.values()) {
+      if (!u.alive) continue;
+      minX = Math.min(minX, u.base.x); maxX = Math.max(maxX, u.base.x);
+      minZ = Math.min(minZ, u.base.z); maxZ = Math.max(maxZ, u.base.z);
+      n++;
+    }
+    if (n === 0) return;
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const spanX = maxX - minX;
+    const spanZ = maxZ - minZ;
+    // 上から覗き込む角度にする。浅いと奥行きが画面の縦に潰れて、
+    // 手前の味方と奥の敵が1列に重なって見える
+    this.camGoal.set(cx * 0.35, 8.8 + spanZ * 0.42 + spanX * 0.3, cz + 5.6 + spanZ * 0.34 + spanX * 0.75);
+    this.lookGoal.set(cx * 0.5, 0.6, cz - 0.9);
   }
 
   // ------------------------------------------------------------ ループ
@@ -467,19 +475,14 @@ export class BattleScene {
     }
     const sdt = dt * scale;
     this.time += sdt;
+    if (this.spotLeft > 0) this.spotLeft -= dt;
 
-    // 1) 立ち位置を決める。全員ぶん出してから押し合わせないと、
-    //    先に処理した個体だけが譲る形になって並びが片側へ寄る
-    for (const u of this.units.values()) if (u.alive) this.roam(u);
-    this.separate();
-
-    // 2) 向きの基準。敵陣の重心を見せる——横へ動くたびに背を向けられると、
-    //    誰と戦っているのか読めなくなる
+    // 向きの基準。狙いが無いときは敵陣の重心を見る
     const centre = [0, 0];
     const count = [0, 0];
     for (const u of this.units.values()) {
       if (!u.alive) continue;
-      centre[u.side] += u.unit.root.position.x;
+      centre[u.side] += u.base.x;
       count[u.side]++;
     }
     for (const side of [0, 1]) if (count[side] > 0) centre[side] /= count[side];
@@ -488,50 +491,49 @@ export class BattleScene {
       // Y はアニメーション側の持ち分。XZ だけを外から動かす
       u.anim.update(sdt);
       const animY = u.unit.root.position.y;
-      const px = u.unit.root.position.x;
-      const pz = u.unit.root.position.z;
+      const bx = u.base.x;
+      const bz = u.base.z;
 
-      if (u.strike) {
-        const k = u.strike;
-        k.t += sdt;
-        if (k.t < k.in) {
-          // 行き。打点の出る時刻に着くよう、速く出て減速する
-          const e = easeOut(k.t / k.in);
-          u.unit.root.position.x = k.from.x + (k.to.x - k.from.x) * e;
-          u.unit.root.position.z = k.from.z + (k.to.z - k.from.z) * e;
-        } else {
-          // 帰り。持ち場は揺れ続けているので、戻りきった先がそのまま待機に繋がる
-          const e = smooth(Math.min(1, (k.t - k.in) / k.back));
-          u.unit.root.position.x = k.to.x + (u.home.x - k.to.x) * e;
-          u.unit.root.position.z = k.to.z + (u.home.z - k.to.z) * e;
-          if (e >= 1) u.strike = undefined;
-        }
-      } else {
-        // 待機。遅れて追わせる。即座に合わせると歩かずに滑る
-        const f = Math.min(1, sdt * 3.0);
-        u.unit.root.position.x = px + (u.home.x - px) * f;
-        u.unit.root.position.z = pz + (u.home.z - pz) * f;
+      if (u.alive && sdt > 0) {
+        const far = Math.hypot(u.goal.x - bx, u.goal.z - bz) > 0.9;
+        const f = Math.min(1, sdt * (far ? FOLLOW_FAR : FOLLOW_NEAR));
+        u.base.x += (u.goal.x - bx) * f;
+        u.base.z += (u.goal.z - bz) * f;
       }
 
-      // のけぞりは立ち位置の上に足す。移動と取り合うと、押されたぶんが消える
+      let ox = 0;
+      let oz = 0;
+      if (u.lunge) {
+        const k = u.lunge;
+        k.t += sdt;
+        const e = k.t < k.in ? easeOut(k.t / k.in) : 1 - smooth(Math.min(1, (k.t - k.in) / k.back));
+        ox += k.dx * e;
+        oz += k.dz * e;
+        if (k.t >= k.in + k.back) u.lunge = undefined;
+      }
+      // のけぞりは踏み込みの上に足す。取り合うと、押されたぶんが消える
       if (u.knock > 0) {
-        const dir = u.side === 0 ? 1 : -1;
-        u.unit.root.position.x -= 0.5 * u.knock * dir;
-        u.unit.root.position.z += u.knock * dir;
+        ox += u.knockX * u.knock * 0.6;
+        oz += u.knockZ * u.knock * 0.6;
         u.knock = Math.max(0, u.knock - sdt * 3.4);
       }
-      u.unit.root.position.y = animY;
+      let hopY = 0;
+      if (u.hop > 0) {
+        u.hop = Math.max(0, u.hop - sdt);
+        hopY = Math.sin(Math.PI * (1 - u.hop / HOP_TIME)) * HOP_HEIGHT;
+      }
+      u.unit.root.position.set(u.base.x + ox, animY + hopY, u.base.z + oz);
 
-      // 3) 歩き・向き。動いている間だけ歩きに差し替える
+      // 歩き・向き。動いている間だけ歩きに差し替える
       if (sdt > 0 && u.alive) {
-        const moved = Math.hypot(u.unit.root.position.x - px, u.unit.root.position.z - pz) / sdt;
+        const moved = Math.hypot(u.base.x - bx, u.base.z - bz) / sdt;
         const st = u.anim.current;
         if (st === 'idle' || st === 'walk'
           || ((st === 'attack' || st === 'hurt' || st === 'roar') && u.anim.finished)) {
           u.anim.play(moved > 0.55 ? 'walk' : 'idle');
         }
-        const toX = u.strike ? u.strike.faceX : centre[u.side === 0 ? 1 : 0];
-        const d = toX - u.unit.root.position.x;
+        const toX = u.faceX ?? centre[u.side === 0 ? 1 : 0];
+        const d = toX - u.base.x;
         // 死に幅を置く。真横に並んだ瞬間に絵が裏返るのを防ぐ
         if (Math.abs(d) > 0.3 && (d > 0) !== u.facingRight) {
           u.facingRight = d > 0;
@@ -546,56 +548,31 @@ export class BattleScene {
       }
     }
 
+    // 飛び道具。的が動いても追いかけて当てる
+    for (let i = this.shots.length - 1; i >= 0; i--) {
+      const s = this.shots[i];
+      s.t += sdt;
+      const t = this.units.get(s.target);
+      const k = Math.min(1, s.t / s.dur);
+      if (t) {
+        const to = this.tmp.copy(t.unit.root.position);
+        to.y += t.unit.spriteHeight * 0.5;
+        s.mesh.position.lerpVectors(s.from, to, k);
+        s.mesh.position.y += Math.sin(Math.PI * k) * 0.6;
+      }
+      if (k >= 1 || !t) {
+        this.releaseShot(s);
+        this.shots.splice(i, 1);
+      }
+    }
+
     this.debris.update(sdt, -0.4);
     this.numbers.update(dt);
     this.buffAura.update(sdt);
     this.debuffAura.update(sdt);
     this.env.update(dt, this.camera.position);
-    // 2体とも動き続けるので、構図は毎フレーム取り直す
-    if (this.focusA) this.frame();
+    this.frame();
     this.updateCamera(dt);
-  }
-
-  /**
-   * 立ち位置を決める。
-   *
-   * 持ち場を中心に、役割ぶんだけ敵へ寄る／下がる。そこへ周期の違う
-   * 2本の正弦を重ねて、同じ間隔で往復しているようには見えないようにする。
-   * ここで動かすのは絵だけで、シミュレータ側の列（front / back）には触らない。
-   */
-  private roam(u: BattleUnitView): void {
-    const g = ROLE_GAIT[u.role];
-    const fwd = u.side === 0 ? -1 : 1;
-    const w = this.time * g.rate + u.phase;
-    // 寄り方自体をゆっくり脈打たせる。一定だと「置かれている」ままに見える
-    const lean = g.lean * (0.72 + 0.38 * Math.sin(w * 0.31));
-    u.home.set(
-      u.anchor.x + Math.sin(w * 0.9) * g.sway,
-      0,
-      u.anchor.z + fwd * lean + Math.sin(w * 0.63 + 1.7) * g.sway * 0.55,
-    );
-    u.home.z = u.side === 0 ? Math.max(MIDLINE, u.home.z) : Math.min(-MIDLINE, u.home.z);
-  }
-
-  /** 重なりを解く。敵味方の区別なく押し合う——重なると手前の1体しか見えない */
-  private separate(): void {
-    const list: BattleUnitView[] = [];
-    for (const u of this.units.values()) if (u.alive) list.push(u);
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i];
-        const b = list[j];
-        const dx = b.home.x - a.home.x;
-        const dz = (b.home.z - a.home.z) * DEPTH_WEIGHT;
-        const d = Math.hypot(dx, dz);
-        if (d >= SEPARATION || d < 1e-4) continue;
-        const push = (SEPARATION - d) * 0.5;
-        const nx = (dx / d) * push;
-        const nz = (dz / d) * push / DEPTH_WEIGHT;
-        a.home.x -= nx; a.home.z -= nz;
-        b.home.x += nx; b.home.z += nz;
-      }
-    }
   }
 
   private updateCamera(dt: number): void {
@@ -651,18 +628,10 @@ export class BattleScene {
     this.debuffAura.dispose();
     this.env.dispose();
     this.arenaMaterial.dispose();
+    for (const m of this.shotPool) (m.material as THREE.Material).dispose();
+    this.shotGeo.dispose();
   }
 }
 
 const easeOut = (t: number): number => 1 - Math.pow(1 - t, 2.4);
 const smooth = (t: number): number => t * t * (3 - 2 * t);
-
-/** uid から 0..1 を作る。揺らぎの位相を個体ごとにずらすためだけに使う */
-function hash01(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return ((h >>> 0) % 10000) / 10000;
-}

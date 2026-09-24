@@ -3,7 +3,6 @@ import { h, button, clear } from '../dom';
 import type { SaveData } from '../../core/Save';
 import { EVENTS, type EventDef } from '../../game/data/events';
 import { stagePreview } from '../../game/party';
-import { FORMATIONS } from '../../game/battle/types';
 import { ELEMENT_NAMES, BIOMES } from '../../voxel/palette';
 import { screenHead, plate, spaced } from '../chrome';
 import { eventCard } from '../eventCard';
@@ -27,7 +26,7 @@ export function stageCoins(stage: number, replay: boolean): number {
  *
  * 通常戦は到達済みの段と、その1つ先（未踏の段）までを出す。
  * ステージが決めるのは敵のレベルではなく「誰と当たるか」なので、
- * 寄っている属性・レア度の上限・陣形を札の上で予告する。
+ * 寄っている属性・レア度の上限を札の上で予告する。
  */
 export class BattleSelectScreen extends Screen {
   private data!: SaveData;
@@ -115,7 +114,6 @@ export class BattleSelectScreen extends Screen {
               `${ELEMENT_NAMES[pv.theme]}寄り`,
             ),
             h('span', { class: 'stage-trait', text: `★${pv.rarityCap} まで` }),
-            h('span', { class: 'stage-trait', text: FORMATIONS[pv.formation].name }),
           ),
         ),
         h('span', { class: 'stage-right' },

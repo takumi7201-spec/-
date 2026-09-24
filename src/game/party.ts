@@ -1,7 +1,7 @@
 import { REVOS, getRevos } from './data/revos';
 import type { OwnedRevos, SaveData } from '../core/Save';
 import { makeUid } from '../core/Save';
-import type { FormationId, TargetPref, TeamSetup } from './battle/types';
+import type { TeamSetup } from './battle/types';
 import { Rng } from '../voxel/VoxelPainter';
 import { BIOMES, type BiomeId } from '../voxel/palette';
 import { cleanMultiplier } from './battle/simulate';
@@ -11,8 +11,6 @@ import { ENGRAVE_PATTERNS, buildEngraving, type Engraving } from './engraving';
 export function buildTeamSetup(
   roster: OwnedRevos[],
   order: [string, string, string] | null,
-  formation: FormationId,
-  prefs?: TargetPref[],
 ): TeamSetup | null {
   if (roster.length === 0) return null;
   const byUid = new Map(roster.map((r) => [r.uid, r]));
@@ -40,9 +38,6 @@ export function buildTeamSetup(
       engraving: r.engraving,
     })),
     order: [0, 1, 2],
-    formation,
-    // 未設定のスロットは各リヴォスの推奨作戦で埋める
-    targetPrefs: members.map((r, i) => prefs?.[i] ?? getRevos(r.defId).defaultPref),
   };
 }
 
@@ -72,7 +67,7 @@ export interface TeamAnchor { level: number; clean: number; }
  * 実測で +2 差 → 勝率39%、+4 差 → 10%、+6 差 → 0%。つまり数戦で
  * 数学的に追いつけなくなる階段を登らされていた。
  *
- * ステージが担うのは「誰と当たるか」——レア度の上限・属性の寄せ方・陣形——
+ * ステージが担うのは「誰と当たるか」——レア度の上限・属性の寄せ方——
  * であって、素のステータス差ではない。レベルの上乗せは 0 にしてある。
  * 実測でこの置き方の勝率は 61〜81%、終盤ほど低いが、それは相手の
  * レア度が上がるからで、編成を組み替えれば戻せる範囲に収まる。
@@ -86,14 +81,12 @@ export interface TeamAnchor { level: number; clean: number; }
 export interface StagePreview {
   theme: 'flame' | 'aqua' | 'terra' | 'gale' | 'null';
   rarityCap: number;
-  formation: FormationId;
   cleanBonus: number;
   /** 闘技場の地層。選択画面の表示と実際の舞台を同じ1か所から引く */
   biome: BiomeId;
 }
 
 const STAGE_THEMES = ['flame', 'aqua', 'terra', 'gale', 'null'] as const;
-const STAGE_FORMATIONS = ['wedge', 'rush', 'ring', 'metro'] as FormationId[];
 
 export function stagePreview(stage: number): StagePreview {
   const biome = Object.values(BIOMES).find((b) => stage >= b.level[0] && stage <= b.level[1])
@@ -103,7 +96,6 @@ export function stagePreview(stage: number): StagePreview {
     theme: STAGE_THEMES[stage % STAGE_THEMES.length],
     // ★5 は終盤まで敵にも出さない。初見で「これは別格」と分かる位置に置く
     rarityCap: stage < 3 ? 2 : stage < 6 ? 3 : stage < 10 ? 4 : 5,
-    formation: STAGE_FORMATIONS[stage % STAGE_FORMATIONS.length],
     cleanBonus: Math.min(10, stage * 2),
   };
 }
@@ -151,8 +143,6 @@ export function buildEnemyTeam(stage: number, seed: number, anchor: TeamAnchor):
         : undefined,
     })),
     order: [0, 1, 2],
-    // 進行度に応じて陣形も変える。同じ相手を延々見せない
-    formation: pv.formation,
   };
 }
 

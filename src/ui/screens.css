@@ -798,39 +798,23 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 .party-total .total-elems { display: flex; gap: 3px; }
 .party-total .total-elems .dot { width: 9px; height: 9px; border-radius: 2px; }
 
-.party-forms { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
-.form-btn {
-  flex-direction: column; gap: 2px; min-height: 56px;
-  align-items: flex-start; padding: 10px 13px 11px;
-  border-radius: 13px;
-}
-.form-btn .btn-label { font-size: 14px; font-weight: 900; }
-.form-btn .btn-sub { font-size: 10px; font-weight: 500; opacity: 0.76; letter-spacing: 0; }
-
-/* 作戦。スロットごとに「誰から狙うか」だけを決める。
-   選択肢を5つに固定し、説明は選んだ1件だけ出す——並べて読ませない */
+/* 立ち回り。選ばせずに読ませる——狙いと立ち位置は役職が決める */
 .party-tactics { display: flex; flex-direction: column; gap: 8px; }
 .tactic-row {
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 11px 12px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px 11px;
   background: rgba(255, 253, 248, 0.8);
   border: 0; border-radius: 13px;
   box-shadow: 0 5px 14px rgba(72, 58, 36, 0.12);
 }
-.tactic-head { display: flex; align-items: center; gap: 7px; }
+.tactic-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .tactic-icon { width: 24px; height: 24px; flex: none; }
-.tactic-name { font-size: 12px; font-weight: 700; }
-.tactic-name.dim { color: var(--ink-faint); }
-.tactic-opts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-.tactic-btn {
-  min-height: 36px; padding: 0 2px;
-  border: 0; border-radius: var(--r-md);
-  font-weight: 700;
+.tactic-name { font-size: 12px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tactic-role {
+  margin-left: auto; flex: none;
+  font-size: 10px; font-weight: 900; letter-spacing: 0.08em; color: var(--ink-faint);
 }
-.tactic-btn .btn-label { font-size: 11px; letter-spacing: 0; }
-.tactic-btn:disabled { opacity: 0.34; }
-/* 選んだ作戦の説明だけを、その下に鉛筆で書き添える */
-.tactic-desc { font-size: 11px; color: var(--ink-soft); padding-left: 2px; }
+.tactic-desc { font-size: 11px; line-height: 1.6; color: var(--ink-soft); padding-left: 2px; }
 
 .party-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
 .roster-card {

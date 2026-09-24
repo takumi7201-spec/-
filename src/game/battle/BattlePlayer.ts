@@ -1,49 +1,35 @@
 import * as THREE from 'three';
-import { AV_THRESHOLD, BattleSim } from './simulate';
+import { BattleSim, DT } from './simulate';
 import type { BattleEvent, Side, TeamSetup } from './types';
 import type { BattleScene } from '../../scenes/BattleScene';
 import { audio } from '../../core/Audio';
 
 /**
- * シミュレータのイベント列を「見せ物」に変換する再生機。
+ * シミュレータを実時間で回し、起きたことを「見せ物」に変換する再生機。
  *
- * 勝敗はすべてシミュレータ側で確定しており、ここは絵と音と間だけを扱う。
- *
- * 再生はターン送りではなく、1本の時計で回す。シミュレータは行動と行動の
- * あいだに流れた時間（AV の単位）を持っているので、それをそのまま実時間へ
- * 割り付ける。結果として、
- *   - 誰も動かない区間では全員が同時に溜め続ける
- *   - 溜まり方が近い個体どうしは、ほぼ同時に動く
- * という、片方が動いているあいだ相手が止まっている状態が無くなる。
- *
- * 状態（HP・撃破・バフ）の適用順はイベント列のとおりに保つ。順番を崩すと
- * HP が前後して見える。重なって見えるのは動きのほうで、攻撃モーションや
- * のけぞりは発火したら勝手に走る（再生機は待たない）。
- *
- * 倍速は時計を速く回す。モーション本体も同じ比率で詰める——早回しだけだと
- * 動きが不自然になり、露骨に安っぽく見える。
+ * 勝敗・位置・行動はすべてシミュレータが決める。ここは時計を進めて、
+ * 出てきたイベントに絵と音を付けるだけ。シミュレータは固定の刻み（DT）で
+ * しか進まないので、倍速やヒットストップで実時間の流れが変わっても、
+ * 戦闘の中身は1ミリも変わらない。
  */
 
 export type Speed = 1 | 2 | 3;
 
 export interface BattlePlayerEvents {
   onEvent?(e: BattleEvent): void;
-  onSlotBegin?(uid: string): void;
   onEnd?(winner: Side | -1): void;
   onOdReady?(uid: string): void;
 }
 
-/** モーションの基準長。倍速ではここも同じ比率で詰める */
-const SLOT: Record<Speed, number> = { 1: 1.25, 2: 0.62, 3: 0.42 };
-
-/**
- * AV 1 単位を何秒で流すか（×1）。
- * SPD 110 の個体が 10000 溜めるのに約 5 秒——6体なら 0.8 秒に1回、
- * 誰かが動く勘定になる。
- */
-const SEC_PER_AV = 0.055;
 /** 倍速のときに時計を何倍で回すか */
-const RATE: Record<Speed, number> = { 1: 1, 2: 2.2, 3: 3.4 };
+const RATE: Record<Speed, number> = { 1: 1, 2: 2, 3: 3 };
+/**
+ * 1フレームに回してよい刻みの上限。タブが裏に回って戻った直後などに
+ * 溜まった時間を一気に消化すると、数十手ぶんの演出が1フレームに重なる
+ */
+const MAX_STEPS_PER_FRAME = 12;
+/** 開戦の合図から両陣が動き出すまでの間（秒） */
+const INTRO = 0.9;
 
 export class BattlePlayer {
   readonly sim: BattleSim;
@@ -52,48 +38,19 @@ export class BattlePlayer {
   paused = false;
   finished = false;
 
-  private queue: BattleEvent[] = [];
-  /** 戦闘の時計。シミュレータの clock と同じ単位で進む */
-  private clock = 0;
-  /** 次のイベントを出してよい時刻 */
-  private cursor = 0;
-  /** 開幕の間（秒） */
+  /** まだ刻みに変えていない戦闘内時間 */
+  private acc = 0;
   private intro = 0;
-  private currentActor: string | null = null;
-  private pendingTarget: string | null = null;
   private maxHp = new Map<string, number>();
+  private sideOf = new Map<string, 0 | 1>();
   private odFired = false;
   private tmpVec = new THREE.Vector3();
 
   /**
    * この1戦でプレイヤー側が出した記録。
-   *
-   * シミュレータの result() は各個体の累計を持っているが、「最大の一撃」は
-   * 1発ずつのダメージを見ないと取れない。イベント列はここを必ず通るので、
-   * 数えるならここ。演出には使わないので、シミュレータ側は汚さない。
+   * 「最大の一撃」は1発ずつ見ないと取れないので、イベントを通すここで数える。
    */
   readonly tally = { damage: 0, bestHit: 0, kos: 0, odFired: 0 };
-  private sideOf = new Map<string, 0 | 1>();
-
-  /*
-   * 攻撃間隔の表示。
-   *
-   * 時計で回すようになったので、補間ではなく素の式で出せる。
-   * ある step の直後を起点に、AV は実効 SPD で線形に増える——
-   * シミュレータの計算そのもの。リングが満ちる瞬間＝その個体が動く瞬間に
-   * ぴったり一致する。
-   */
-  private baseAv = new Map<string, number>();
-  private baseClock = 0;
-  /** 撃ち終えた個体。ここから先は実際に空いた値を映す */
-  private released: string | null = null;
-  /** 直前の行動を終えた時点の AV。リングの 0 をここに置く */
-  private floor = new Map<string, number>();
-  /**
-   * 見せてよい時刻の上限。次に誰かが動く時刻で、1フレームに1度だけ引く。
-   * 個体ごとに引くと、6体ぶん毎フレーム生存者の配列を作り直すことになる。
-   */
-  private shownAt = 0;
 
   constructor(
     seed: number,
@@ -102,7 +59,6 @@ export class BattlePlayer {
     private scene: BattleScene,
   ) {
     this.sim = new BattleSim(seed, teamA, teamB);
-    this.shownAt = this.sim.clock;
     for (const f of this.sim.fighters) {
       this.maxHp.set(f.uid, f.maxHp);
       this.sideOf.set(f.uid, f.side);
@@ -111,13 +67,11 @@ export class BattlePlayer {
 
   start(): void {
     this.scene.setFighters(this.sim.fighters);
-    this.scene.wideShot();
     for (const e of this.sim.startEvents()) this.events.onEvent?.(e);
-    this.intro = 0.6;
-    this.snapshotAv(null);
+    this.intro = INTRO;
   }
 
-  /** プレイヤーが OD を手動で撃つ。AI に任せるより最大 ×1.35 まで伸ばせる */
+  /** プレイヤーが OD を手動で撃つ。間合いに入った最初の刻みで出る */
   fireOd(uid: string): void {
     this.sim.fireOd(uid);
     this.odFired = true;
@@ -135,180 +89,93 @@ export class BattlePlayer {
       .map((f) => ({ uid: f.uid, od: f.od }));
   }
 
-  /** 秒 → AV 単位。倍速は時計の速さそのもの */
-  private avPerSec(): number { return RATE[this.speed] / SEC_PER_AV; }
-
   update(dt: number): void {
-    if (this.finished || this.paused) return;
-    if (this.intro > 0) { this.intro -= dt; return; }
+    if (this.finished || this.paused) {
+      this.scene.syncFighters(this.sim.fighters, 1);
+      return;
+    }
+    if (this.intro > 0) {
+      this.intro -= dt;
+      this.scene.syncFighters(this.sim.fighters, 1);
+      return;
+    }
 
-    this.clock += dt * this.avPerSec();
-    this.shownAt = Math.min(this.clock, this.sim.nextActorAt());
-
-    // 出せるイベントは、この1フレームのうちに全部出す。
-    // 「1フレーム1イベント」だと、近い時刻に重なった行動が引き伸ばされる
-    let guard = 0;
-    while (guard++ < 96) {
-      if (this.queue.length === 0) {
-        if (this.sim.isOver) { this.finish(); return; }
-        // まだ誰も動かない区間。ここで全員が同時に溜めている
-        if (this.sim.nextActorAt() > this.clock) break;
-        this.queue = this.sim.step();
-        if (this.queue.length === 0) { this.finish(); return; }
-        this.snapshotAv(this.actorOf(this.queue));
-        this.shownAt = Math.min(this.clock, this.sim.nextActorAt());
-        this.cursor = Math.max(this.cursor, this.sim.clock);
+    // ヒットストップ・スローは戦闘の時計ごと止める。絵だけ止めると、
+    // 止まっている間にも位置が進んで、再開した瞬間に滑って見える
+    this.acc += dt * RATE[this.speed] * this.scene.timeScale();
+    let n = 0;
+    while (this.acc >= DT && n++ < MAX_STEPS_PER_FRAME) {
+      this.acc -= DT;
+      for (const e of this.sim.step()) {
+        this.present(e);
+        this.events.onEvent?.(e);
+        if (this.finished) return;
       }
-      if (this.cursor > this.clock) break;
-      const e = this.queue.shift()!;
-      this.cursor += this.present(e) * this.avPerSec();
-      this.events.onEvent?.(e);
-      // 'end' を出した時点で終わり。ここで抜けないと onEnd が二重に飛ぶ
-      if (this.finished) return;
+      if (this.sim.isOver && !this.finished) { this.finish(this.sim.currentWinner); return; }
     }
+    // 追いつけなかったぶんは捨てる。溜め込むと次のフレームでまた詰まる
+    if (this.acc > DT) this.acc = DT;
+    this.scene.syncFighters(this.sim.fighters, this.acc / DT);
   }
 
-  private finish(): void {
+  private finish(winner: Side | -1): void {
+    if (this.finished) return;
     this.finished = true;
-    this.events.onEnd?.(this.sim.currentWinner);
-  }
-
-  private actorOf(evs: BattleEvent[]): string | null {
-    const begin = evs.find((e) => e.t === 'turnBegin');
-    return begin && begin.t === 'turnBegin' ? begin.uid : null;
-  }
-
-  /**
-   * step 直後の AV を控える。行動する本人だけは、技を出すまで満杯のまま
-   * 見せる——空けるのは撃った瞬間で、そうしないと「溜まる前に動いた」
-   * ように読める。
-   */
-  private snapshotAv(actor: string | null): void {
-    this.baseClock = this.sim.clock;
-    this.released = null;
-    for (const f of this.sim.fighters) {
-      this.baseAv.set(f.uid, f.uid === actor ? AV_THRESHOLD : f.av);
-    }
-  }
-
-  /** 溜めを使い切った瞬間を記録する */
-  private release(uid: string): void {
-    if (this.released === uid) return;
-    this.released = uid;
-    const f = this.sim.fighters.find((x) => x.uid === uid);
-    if (!f) return;
-    this.floor.set(uid, f.av);
-    // いまこの瞬間に f.av を指すよう起点をずらす
-    this.baseAv.set(uid, f.av - this.sim.speedOf(f) * (this.clock - this.baseClock));
-  }
-
-  /**
-   * 表示用の AV。
-   *
-   * 起点はシミュレータの時計、伸ばすのは再生の時計——この2つは同じ速さでは
-   * 進まない。1手ぶんの演出（構え・踏み込み・当たり・のけぞり）は、その手と
-   * 次の手のあいだの AV 差より長いことが多く、再生は少しずつ後ろへ溜まる。
-   * 素の差で伸ばすと、溜まったぶんだけ余計に進んで上限に張り付き、
-   * 誰のリングも行動直後に満ちて見えた。
-   *
-   * 伸ばす先は「次に誰かが動く時刻」まで。そこから先はまだ起きていない
-   * 出来事なので、見せる時計をそこで止める。
-   */
-  displayAv(uid: string): number {
-    const f = this.sim.fighters.find((x) => x.uid === uid);
-    if (!f) return 0;
-    const base = this.baseAv.get(uid);
-    if (base === undefined) return f.av;
-    const v = base + this.sim.speedOf(f) * Math.max(0, this.shownAt - this.baseClock);
-    return Math.min(AV_THRESHOLD, v);
+    if (winner === 0) audio.victory();
+    else audio.defeat();
+    this.scene.wideShot();
+    this.events.onEnd?.(winner);
   }
 
   /** 攻撃間隔の充填率 0..1 */
   displayCharge(uid: string): number {
-    // 追撃で AV が残っている場合は、その残りを縮めない（起点は 0 のまま）
-    const floor = Math.min(0, this.floor.get(uid) ?? 0);
-    const v = (this.displayAv(uid) - floor) / (AV_THRESHOLD - floor);
-    return v < 0 ? 0 : v > 1 ? 1 : v;
+    const f = this.sim.fighters.find((x) => x.uid === uid);
+    return f ? this.sim.charge(f) : 0;
   }
 
-  /** 1イベントを演出し、次までの待ち時間を返す */
-  private present(e: BattleEvent): number {
-    const slot = SLOT[this.speed];
-    const beat = slot / 1.25; // 倍速の詰め率
-
+  /** 1イベントに絵と音を付ける。時間は取らない——時計はシミュレータが持つ */
+  private present(e: BattleEvent): void {
+    const rate = RATE[this.speed];
     switch (e.t) {
-      case 'turnBegin': {
-        this.currentActor = e.uid;
-        this.pendingTarget = null;
-        this.odFired = false;
-        this.scene.focus(e.uid);
-        this.events.onSlotBegin?.(e.uid);
-        // 満ちきった状態を一拍だけ見せてから技に入る
-        return 0.10 * beat;
-      }
-
       case 'action': {
-        // 技を出した＝溜めを使い切った
-        this.release(e.uid);
-        this.pendingTarget = e.targets[0] ?? null;
-        if (this.pendingTarget) this.scene.focus(e.uid, this.pendingTarget);
+        this.scene.attack(e.uid, e.targets[0] ?? null, e.windup / rate, e.ranged && e.kind === 'basic', e.kind === 'od');
         if (e.kind === 'od') {
           if (this.sideOf.get(e.uid) === 0) this.tally.odFired++;
+          this.odFired = true;
           this.scene.play(e.uid, 'roar');
           this.scene.addShake(0.3);
+          this.scene.spotlight(e.uid, e.targets.length === 1 ? e.targets[0] : undefined, 1.1 / rate);
           audio.odFire();
-          // カットインぶんの 0.4 秒は倍速でも半分までしか詰めない。
-          // ここを削ると必殺技が「ただの強い通常攻撃」に見える
-          return 0.4 * Math.max(0.5, beat) + 0.24 * beat;
         }
-        // 踏み込みに使える時間をそのまま渡す。打点が出る時刻に着いていないと、
-        // 届く前に当たって見える。戻りの絵は再生機を待たせない——
-        // 待たないぶんが、次の個体の動きと重なる
-        const strikeIn = 0.26 * Math.max(0.5, beat);
-        this.scene.lunge(e.uid, this.pendingTarget ?? e.uid, strikeIn);
-        return strikeIn;
+        break;
       }
 
       case 'damage': {
         const maxHp = this.maxHp.get(e.uid) ?? 1000;
-        // 味方が出したぶんだけ数える。自傷（大噴火）は差し引かない——
-        // 撃った本人のダメージであることに変わりはない
+        // 味方が出したぶんだけ数える。自傷（大噴火）は差し引かない
         if (this.sideOf.get(e.from) === 0 && e.from !== e.uid) {
           this.tally.damage += e.amount;
           if (e.amount > this.tally.bestHit) this.tally.bestHit = e.amount;
         }
-        this.scene.hit(e.uid, e.amount, e.crit, e.eff, maxHp);
+        this.scene.hit(e.uid, e.from, e.amount, e.crit, e.eff, maxHp);
         audio.hit(Math.min(1, e.amount / (maxHp * 0.35)), e.crit);
-        return 0.07 * Math.max(0.4, beat);
+        break;
       }
 
-      case 'heal': {
+      case 'heal':
         this.scene.heal(e.uid, e.amount);
         audio.heal();
-        return 0.22 * beat;
-      }
+        break;
 
-      case 'shield': {
+      case 'shield':
         this.scene.heal(e.uid, 0);
-        return 0.1 * beat;
-      }
+        break;
 
       case 'mod': {
-        /*
-         * ステータスが動いたユニットに粒子を重ねる。
-         *
-         * 符号だけでは足りない。taken（被ダメージ）は +25% が「弱くなった」
-         * を意味するので、そこだけ向きが逆になる。値の正負ではなく
-         * 「このユニットにとって得か」で判定して、上下の絵を選ぶ。
-         * 敵に付けたデバフは敵の体に出る——受けた側に出すのが筋。
-         *
-         * 間引きは BuffAura 側でユニット単位に行う。ここで止めると、
-         * 同じ行動で別々の味方に乗ったぶんまで落ちる。
-         */
+        // 得か損かで絵を選ぶ。被ダメージ +25% は「弱くなった」なので向きが逆
         const good = e.kind === 'taken' ? e.value < 0 : e.value > 0;
         this.scene.statChange(e.uid, good);
-        // 尺は取らない。強化も弱体も行動の一部で、それ自体が間を持つものではない
-        return 0;
+        break;
       }
 
       case 'ko': {
@@ -316,52 +183,43 @@ export class BattlePlayer {
         this.scene.ko(e.uid);
         audio.ko();
         // 最後の1体を倒す瞬間だけスロー。1戦に1回だから効く
-        const enemiesLeft = this.sim.fighters.filter(
-          (f) => f.alive && f.side === (this.sim.fighters.find((x) => x.uid === e.uid)?.side ?? 0),
-        ).length;
-        if (enemiesLeft === 0) this.scene.slowMotion(0.4);
-        return 0.42 * Math.max(0.6, beat);
+        const side = this.sideOf.get(e.uid);
+        const left = this.sim.fighters.filter((f) => f.alive && f.side === side).length;
+        if (left === 0) this.scene.slowMotion(0.5);
+        break;
       }
 
-      case 'promote': {
-        this.scene.setRow(e.uid, e.to);
-        return 0.16 * beat;
-      }
+      case 'pull':
+        this.scene.play(e.uid, 'hurt');
+        this.scene.addShake(0.2);
+        break;
 
-      case 'odReady': {
+      case 'leap':
+        this.scene.leap(e.uid);
+        break;
+
+      case 'odReady':
         audio.odReady();
         this.events.onOdReady?.(e.uid);
-        return 0.04;
-      }
+        break;
 
       case 'statusTick': {
         const at = this.scene.worldOf(e.uid, this.tmpVec);
         // 火傷は橙、毒は紫。同じ色で出すと、どちらが切れたのか読めない
         const color = e.kind === 'poison' ? '#9d6bd8' : '#ff9c3c';
         if (at) this.scene.numbers.spawn(at.clone(), `${e.amount}`, { color, scale: 0.8 });
-        return 0.10 * beat;
+        break;
       }
 
-      case 'turnEnd':
-        // 技が出ないまま終わる行動（対象なしなど）の保険
-        this.release(e.uid);
-        this.currentActor = null;
-        return 0.04 * beat;
-
       case 'end':
-        this.finished = true;
-        if (e.winner === 0) audio.victory();
-        else audio.defeat();
-        this.scene.wideShot();
-        this.events.onEnd?.(e.winner);
-        return 1.2;
+        this.finish(e.winner);
+        break;
 
       default:
-        return 0.02;
+        break;
     }
   }
 
-  get actor(): string | null { return this.currentActor; }
   get didFireOd(): boolean { return this.odFired; }
 
   /** 結果画面用。シミュレータ側の確定値を返す */

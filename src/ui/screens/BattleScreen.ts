@@ -109,7 +109,7 @@ export class BattleScreen extends Screen {
       h('div', { class: 'battle-enemy-head' },
         h('span', { class: 'label enemy-tag' }, h('span', { text: '敵' })),
         this.enemyTotal.el,
-        (this.roundEl = h('span', { class: 'num round', text: '0 手' })),
+        (this.roundEl = h('span', { class: 'num round', text: '0:00' })),
       ),
       h('div', { class: 'enemy-cards' }),
     );
@@ -205,12 +205,6 @@ export class BattleScreen extends Screen {
 
   private onEvent(e: BattleEvent): void {
     switch (e.t) {
-      case 'turnBegin': {
-        const c = this.card(e.uid);
-        for (const x of [...this.allyCards, ...this.enemyCards]) x.el.classList.toggle('is-acting', x === c);
-        this.roundEl.textContent = `${this.player.sim.turnCount} 手`;
-        break;
-      }
       case 'damage': {
         const c = this.card(e.uid);
         if (c) {
@@ -248,14 +242,24 @@ export class BattleScreen extends Screen {
         break;
       }
       case 'action': {
+        // 全員が同時に動くので、動いた札を一瞬だけ光らせる。
+        // 「いま誰の番か」ではなく「いま誰が殴ったか」を示す
+        const c = this.card(e.uid);
+        if (c) {
+          c.el.classList.add('is-acting');
+          setTimeout(() => c.el.classList.remove('is-acting'), 380);
+        }
         if (e.kind === 'od') {
           this.banner(e.name, 700);
           this.pushLog(`${this.nameOf(e.uid)} ${e.name}`);
         }
         break;
       }
-      case 'promote':
-        this.pushLog(`${this.nameOf(e.uid)} が${e.to === 'front' ? '前' : '後'}列へ`);
+      case 'pull':
+        this.pushLog(`${this.nameOf(e.by)} が ${this.nameOf(e.uid)} を引きずり出した`);
+        break;
+      case 'leap':
+        this.pushLog(`${this.nameOf(e.uid)} が跳んだ`);
         break;
       case 'passive':
         this.pushLog(`${this.nameOf(e.uid)} 特性「${e.label}」`);
@@ -358,14 +362,17 @@ export class BattleScreen extends Screen {
 
   update(dt: number): void {
     this.updateCooldowns(dt);
+    // 経過時間。手数ではなく時計で出す——全員が同時に動くので、手数は数えにくい
+    const sec = Math.floor(this.player.sim.clock);
+    const txt = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    if (this.roundEl.textContent !== txt) this.roundEl.textContent = txt;
   }
 
   /**
    * 攻撃間隔の可視化。
    *
-   * 値は BattlePlayer の表示用 AV を使う。シミュレータの生の AV を読むと、
-   * 1行動ぶんの時間がまとめて進むせいで、全員のリングが同じ瞬間に跳ねる。
-   * 指数補間はそのうえで、行動直後の落ち込みを角なく見せるために残す。
+   * 値はシミュレータの行動ゲージそのもの。刻みが 1/30 秒なので素で滑らかに
+   * 伸びる。指数補間は、行動直後の落ち込みを角なく見せるためだけに残す。
    */
   private updateCooldowns(dt: number): void {
     const k = 1 - Math.exp(-dt * 7);

@@ -5,24 +5,12 @@
  */
 import { BattleSim } from '../src/game/battle/simulate.ts';
 import { REVOS } from '../src/game/data/revos.ts';
-import type { TeamSetup, FormationId, BattleEvent, TargetPref } from '../src/game/battle/types.ts';
+import type { TeamSetup, BattleEvent } from '../src/game/battle/types.ts';
 
-const FORMS: FormationId[] = ['wedge', 'ring', 'rush', 'metro'];
-
-/**
- * 作戦はユニット固有の強さではなく戦術なので、性能比較では固定する。
- * 種ごとの推奨作戦のまま測ると「作戦の有利不利」がユニットの勝率に
- * 化けて、どちらを直すべきか読めなくなる。
- */
-function mkTeam(
-  ids: string[], form: FormationId, level: number, clean: number, tag: string,
-  pref: TargetPref = 'front',
-): TeamSetup {
+function mkTeam(ids: string[], level: number, clean: number, tag: string): TeamSetup {
   return {
     members: ids.map((id, i) => ({ uid: `${tag}${i}`, defId: id, level, clean, skillLevel: 1 })),
     order: [0, 1, 2],
-    formation: form,
-    targetPrefs: [pref, pref, pref],
   };
 }
 
@@ -42,9 +30,12 @@ const wins = new Map<string, number>();
 const plays = new Map<string, number>();
 const kills = new Map<string, number>();
 const dmg = new Map<string, number>();
-for (const r of REVOS) { wins.set(r.id, 0); plays.set(r.id, 0); kills.set(r.id, 0); dmg.set(r.id, 0); }
+const healed = new Map<string, number>();
+for (const r of REVOS) { wins.set(r.id, 0); plays.set(r.id, 0); kills.set(r.id, 0); dmg.set(r.id, 0); healed.set(r.id, 0); }
 
 let totalTurns = 0;
+let totalSec = 0;
+const secHist: number[] = [];
 let draws = 0;
 let firstWins = 0;
 const turnHist: number[] = [];
@@ -63,10 +54,7 @@ for (let i = 0; i < N; i++) {
   };
   const a = pickTeam();
   const b = pickTeam();
-  const fa = FORMS[rngInt(s, 4)];
-  const fb = FORMS[rngInt(s, 4)];
-
-  const sim = new BattleSim(i * 7919 + 13, mkTeam(a, fa, 10, 60, 'a'), mkTeam(b, fb, 10, 60, 'b'));
+  const sim = new BattleSim(i * 7919 + 13, mkTeam(a, 10, 60, 'a'), mkTeam(b, 10, 60, 'b'));
   const events: BattleEvent[] = sim.runToEnd();
   const res = sim.result();
 
@@ -79,10 +67,13 @@ for (let i = 0; i < N; i++) {
   for (const f of res.fighters) {
     kills.set(f.defId, kills.get(f.defId)! + f.kills);
     dmg.set(f.defId, dmg.get(f.defId)! + f.dealt);
+    healed.set(f.defId, healed.get(f.defId)! + f.healed);
   }
 
   totalTurns += res.turns;
   turnHist.push(res.turns);
+  totalSec += res.seconds;
+  secHist.push(res.seconds);
   for (const e of events) {
     if (e.t === 'action' && e.kind === 'od') odFires++;
     else if (e.t === 'ko') kos++;
@@ -93,21 +84,25 @@ for (let i = 0; i < N; i++) {
 turnHist.sort((x, y) => x - y);
 const p = (q: number) => turnHist[Math.floor(turnHist.length * q)];
 
-console.log(`\n=== ${N} 戦 / Lv10 / クリーン度60 / ランダム3体・ランダム陣形 ===\n`);
-console.log(`平均ターン数     : ${(totalTurns / N).toFixed(1)}  (中央値 ${p(0.5)}, p10 ${p(0.1)}, p90 ${p(0.9)}, max ${turnHist[turnHist.length - 1]})`);
+secHist.sort((x, y) => x - y);
+const q = (k: number) => secHist[Math.floor(secHist.length * k)].toFixed(1);
+console.log(`\n=== ${N} 戦 / Lv10 / クリーン度60 / ランダム3体 ===\n`);
+console.log(`平均の長さ       : ${(totalSec / N).toFixed(1)} 秒  (中央値 ${q(0.5)}, p10 ${q(0.1)}, p90 ${q(0.9)}, max ${secHist[secHist.length - 1].toFixed(1)})`);
+console.log(`平均行動数       : ${(totalTurns / N).toFixed(1)}  (中央値 ${p(0.5)}, p10 ${p(0.1)}, p90 ${p(0.9)}, max ${turnHist[turnHist.length - 1]})`);
 console.log(`引き分け率       : ${((draws / N) * 100).toFixed(2)}%`);
 console.log(`先攻側勝率       : ${((firstWins / (N - draws)) * 100).toFixed(1)}%   (50%から離れるほど編成以外の偏りがある)`);
 console.log(`1戦あたりOD発動  : ${(odFires / N).toFixed(2)} 回`);
 console.log(`1戦あたり撃破    : ${(kos / N).toFixed(2)} 体`);
 console.log(`クリティカル率   : ${((crits / damageEvents) * 100).toFixed(1)}%`);
 console.log(`\n--- ユニット別 (勝率順) ---`);
-console.log('  ' + 'ユニット'.padEnd(16) + '属性  ロール'.padEnd(20) + '勝率     撃破/戦   与ダメ/戦');
+console.log('  ' + 'ユニット'.padEnd(16) + '属性  ロール'.padEnd(20) + '勝率     撃破/戦   与ダメ/戦  回復/戦');
 
 const rows = REVOS.map((r) => ({
   r,
   wr: wins.get(r.id)! / Math.max(1, plays.get(r.id)!),
   kpb: kills.get(r.id)! / Math.max(1, plays.get(r.id)!),
   dpb: dmg.get(r.id)! / Math.max(1, plays.get(r.id)!),
+  hpb: healed.get(r.id)! / Math.max(1, plays.get(r.id)!),
 })).sort((x, y) => y.wr - x.wr);
 
 for (const row of rows) {
@@ -115,7 +110,7 @@ for (const row of rows) {
   console.log(
     '  ' + row.r.name.padEnd(18 - row.r.name.length) + row.r.name.padEnd(2) +
     ` ${row.r.element.padEnd(6)}${row.r.role.padEnd(12)}` +
-    `${(row.wr * 100).toFixed(1)}%   ${row.kpb.toFixed(2)}      ${Math.round(row.dpb).toString().padStart(5)}${flag}`,
+    `${(row.wr * 100).toFixed(1)}%   ${row.kpb.toFixed(2)}      ${Math.round(row.dpb).toString().padStart(5)}    ${Math.round(row.hpb).toString().padStart(5)}${flag}`,
   );
 }
 const spread = rows[0].wr - rows[rows.length - 1].wr;

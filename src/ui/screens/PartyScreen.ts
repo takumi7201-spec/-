@@ -1,8 +1,8 @@
 import { Screen } from '../UIRoot';
 import { h, button, bar, clear } from '../dom';
 import type { SaveData, OwnedRevos } from '../../core/Save';
-import { getRevos, revosShortName } from '../../game/data/revos';
-import { FORMATIONS, TARGET_PREFS, type FormationId, type TargetPref } from '../../game/battle/types';
+import { ROLE_NAMES, getRevos, revosShortName } from '../../game/data/revos';
+import { ROLE_MOVES, isWall, postName } from '../../game/battle/roles';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
 import { partyPower } from '../../game/party';
@@ -23,24 +23,19 @@ export class PartyScreen extends Screen {
   private slotsEl!: HTMLElement;
   private rosterEl!: HTMLElement;
   private totalEl!: HTMLElement;
-  private formEl!: HTMLElement;
   private tacticEl!: HTMLElement;
   private order: (string | null)[] = [null, null, null];
-  private formation: FormationId = 'wedge';
-  private prefs: TargetPref[] = ['front', 'front', 'front'];
   private selected: string | null = null;
   private powerPlate = plate('戦力', { tone: 'amber' });
 
   onBack?: () => void;
   onDetail?: (defId: string, unit: OwnedRevos) => void;
-  onApply?: (order: [string, string, string], formation: FormationId, prefs: TargetPref[]) => void;
+  onApply?: (order: [string, string, string]) => void;
 
   constructor() { super('party', 'unit'); }
 
   setData(d: SaveData): void {
     this.data = d;
-    this.formation = d.party.formation;
-    const savedPrefs = d.party.targetPrefs ?? [];
     const saved = d.party.order;
     this.order = [0, 1, 2].map((i) => {
       const uid = saved?.[i];
@@ -53,12 +48,6 @@ export class PartyScreen extends Screen {
       if (empty < 0) break;
       this.order[empty] = r.uid;
     }
-    // 未保存のスロットは、そのリヴォスの推奨作戦から始める
-    this.prefs = [0, 1, 2].map((i) => {
-      if (savedPrefs[i]) return savedPrefs[i];
-      const u = this.unitOf(this.order[i]);
-      return u ? getRevos(u.defId).defaultPref : 'front';
-    });
     this.render();
   }
 
@@ -71,16 +60,13 @@ export class PartyScreen extends Screen {
 
     this.slotsEl = h('div', { class: 'party-field' });
     this.totalEl = h('div', { class: 'party-total' });
-    this.formEl = h('div', { class: 'party-forms' });
     this.tacticEl = h('div', { class: 'party-tactics' });
     this.rosterEl = h('div', { class: 'party-roster' });
 
     const body = h('div', { class: 'party-body' },
       this.slotsEl,
       this.totalEl,
-      h('div', { class: 'label party-label', text: spaced('陣形') }),
-      this.formEl,
-      h('div', { class: 'label party-label', text: spaced('作戦') }),
+      h('div', { class: 'label party-label', text: spaced('立ち回り') }),
       this.tacticEl,
       h('div', { class: 'label party-label', text: spaced('手持ち') }),
       h('div', { class: 'party-hint', text: '長押しで詳細' }),
@@ -105,20 +91,21 @@ export class PartyScreen extends Screen {
 
     // ---- スロット ----
     clear(this.slotsEl);
-    const labels = ['前列', '後列', '後列'];
     this.order.forEach((uid, i) => {
       const u = this.unitOf(uid);
+      // 立ち位置は役職が決める。並びの順ではなく、その子の持ち場を札に出す
+      const role = u ? getRevos(u.defId).role : null;
       const slot = button(
         '',
         () => this.tapSlot(i),
         {
-          class: `party-slot ${u ? '' : 'is-empty'} ${i === 0 ? 'is-front' : ''}`,
+          class: `party-slot ${u ? '' : 'is-empty'} ${role && isWall(role) ? 'is-front' : ''}`,
           onLongPress: u ? () => this.openDetail(u) : undefined,
         },
       );
       slot.append(
         h('span', { class: 'slot-dots' }, h('i'), h('i')),
-        h('span', { class: 'slot-label', text: spaced(labels[i]) }),
+        h('span', { class: 'slot-label', text: spaced(role ? postName(role) : '空き') }),
       );
       if (u) {
         const def = getRevos(u.defId);
@@ -170,45 +157,22 @@ export class PartyScreen extends Screen {
       party: { ...this.data.party, order: this.order as [string, string, string] },
     })));
 
-    // ---- 作戦 ----
-    // 誰を狙うかはスロットごとに決める。編成とセットで意味が出る決定なので、
-    // 別画面には切らず、スロットのすぐ下に置く。
+    // ---- 立ち回り ----
+    // 狙いと立ち位置は役職が決める。選ばせる代わりに、何をするかを読ませる
     clear(this.tacticEl);
-    this.order.forEach((uid, i) => {
+    this.order.forEach((uid) => {
       const u = this.unitOf(uid);
-      const row = h('div', { class: 'tactic-row' });
-      const head = h('div', { class: 'tactic-head' });
-      if (u) {
-        head.append(revosIcon(u.defId, 'tactic-icon'), h('span', { class: 'tactic-name', text: getRevos(u.defId).name }));
-      } else {
-        head.append(h('span', { class: 'tactic-name dim', text: `スロット${i + 1}` }));
-      }
-      const opts = h('div', { class: 'tactic-opts' });
-      for (const t of TARGET_PREFS) {
-        const on = this.prefs[i] === t.id;
-        const b = button(t.name.replace('優先', ''), () => {
-          audio.uiTap();
-          this.prefs[i] = t.id;
-          this.render();
-        }, { class: `btn--sm tactic-btn ${on ? 'is-on' : 'btn--opt'}` });
-        b.title = t.desc;
-        b.disabled = !u;
-        opts.appendChild(b);
-      }
-      const cur = TARGET_PREFS.find((t) => t.id === this.prefs[i]);
-      row.append(head, opts, h('span', { class: 'tactic-desc', text: cur?.desc ?? '' }));
-      this.tacticEl.appendChild(row);
+      if (!u) return;
+      const d = getRevos(u.defId);
+      this.tacticEl.appendChild(h('div', { class: 'tactic-row' },
+        h('div', { class: 'tactic-head' },
+          revosIcon(u.defId, 'tactic-icon'),
+          h('span', { class: 'tactic-name', text: d.name }),
+          h('span', { class: 'tactic-role', text: `${postName(d.role)} · ${ROLE_NAMES[d.role]}` }),
+        ),
+        h('span', { class: 'tactic-desc', text: ROLE_MOVES[d.role] }),
+      ));
     });
-
-    // ---- 陣形 ----
-    clear(this.formEl);
-    for (const f of Object.values(FORMATIONS)) {
-      const b = button(f.name, () => { audio.uiTap(); this.formation = f.id; this.render(); }, {
-        class: `btn--sm form-btn ${this.formation === f.id ? 'is-on' : 'btn--opt'}`,
-        sub: f.desc,
-      });
-      this.formEl.appendChild(b);
-    }
 
     // ---- 手持ち ----
     clear(this.rosterEl);
@@ -280,6 +244,6 @@ export class PartyScreen extends Screen {
     }
     while (filled.length < 3) filled.push(filled[0]);
     audio.uiConfirm();
-    this.onApply?.([filled[0], filled[1], filled[2]], this.formation, [...this.prefs]);
+    this.onApply?.([filled[0], filled[1], filled[2]]);
   }
 }
