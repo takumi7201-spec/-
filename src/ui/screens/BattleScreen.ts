@@ -156,6 +156,7 @@ export class BattleScreen extends Screen {
     clear(this.enemyRow);
     this.allyCards = [];
     this.enemyCards = [];
+    this.enemyRow.classList.toggle('is-solo', this.player.sim.fighters.filter((f) => f.side === 1).length === 1);
 
     for (const f of this.player.sim.fighters) {
       const def = getRevos(f.defId);
@@ -355,15 +356,19 @@ export class BattleScreen extends Screen {
   private onEnd(winner: Side | -1): void {
     if (this.ended) return;
     this.ended = true;
-    this.banner(winner === 0 ? 'VICTORY' : winner === 1 ? 'DEFEAT' : 'DRAW', 1600);
+    const timeUp = this.player.sim.hasLimit && this.player.sim.result().timeUp;
+    this.banner(winner === 0 ? 'VICTORY' : winner === 1 ? 'DEFEAT' : timeUp ? 'TIME UP' : 'DRAW', 1600);
     for (const x of [...this.allyCards, ...this.enemyCards]) x.el.classList.remove('is-acting');
     setTimeout(() => this.onFinish?.(winner), 1700);
   }
 
   update(dt: number): void {
     this.updateCooldowns(dt);
-    // 経過時間。手数ではなく時計で出す——全員が同時に動くので、手数は数えにくい
-    const sec = Math.floor(this.player.sim.clock);
+    // 経過時間。手数ではなく時計で出す——全員が同時に動くので、手数は数えにくい。
+    // 制限時間のある戦い（巨獣）では、残りを数える
+    const sim = this.player.sim;
+    const sec = sim.hasLimit ? Math.max(0, Math.ceil(sim.limit - sim.clock)) : Math.floor(sim.clock);
+    this.roundEl.classList.toggle('is-low', sim.hasLimit && sec <= 10);
     const txt = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
     if (this.roundEl.textContent !== txt) this.roundEl.textContent = txt;
   }

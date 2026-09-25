@@ -73,7 +73,13 @@ export interface SaveData {
   unlockedBiomes: BiomeId[];
   stageProgress: number;
   /** クリア済みイベントの id。報酬のリヴォスは初回だけ配る */
-  events: { cleared: string[] };
+  events: {
+    cleared: string[];
+    /** 今日の戦場。日付が変わったら中身ごと読み替える */
+    daily?: { date: string; won: boolean };
+    /** 巨獣討伐。週が変わったら中身ごと読み替える */
+    boss?: { week: string; best: number; claimed: number[] };
+  };
   /** 受信箱。新しいものが先頭 */
   mail: MailItem[];
   /**

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BattleSim, DT } from './simulate';
-import type { BattleEvent, Side, TeamSetup } from './types';
+import type { BattleEvent, BattleRules, Side, TeamSetup } from './types';
 import type { BattleScene } from '../../scenes/BattleScene';
 import { audio } from '../../core/Audio';
 
@@ -57,8 +57,9 @@ export class BattlePlayer {
     teamA: TeamSetup,
     teamB: TeamSetup,
     private scene: BattleScene,
+    rules: BattleRules = {},
   ) {
-    this.sim = new BattleSim(seed, teamA, teamB);
+    this.sim = new BattleSim(seed, teamA, teamB, rules);
     for (const f of this.sim.fighters) {
       this.maxHp.set(f.uid, f.maxHp);
       this.sideOf.set(f.uid, f.side);

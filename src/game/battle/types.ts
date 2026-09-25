@@ -59,6 +59,37 @@ export interface RevosInstance {
   skillLevel: number;
   /** 刻印。クリーン度の倍率とは別枠で、最後に足す加算 */
   engraving?: Engraving;
+  /** イベントの敵だけが持つ上乗せ（巨獣・城壁など） */
+  boost?: Boost;
+}
+
+/**
+ * 個体への上乗せ。倍率はレベル・クリーン度・刻印を全部入れたあとに掛ける。
+ */
+export interface Boost {
+  hp?: number;
+  atk?: number;
+  def?: number;
+  spd?: number;
+  /** 体の大きさ。絵の大きさと、体どうしの間合いの両方に効く */
+  size?: number;
+  /** 引き寄せ・足止め・身代わりの割り込みで動かされない */
+  anchored?: boolean;
+}
+
+/**
+ * 場の決まり。イベント戦だけが持つ、敵味方どちらにも効く条件。
+ */
+export interface BattleRules {
+  /** 属性ごとの与ダメージ倍率 */
+  elementDealt?: Partial<Record<ElementId, number>>;
+  /** 行動ゲージと必殺の溜まりの倍率。大きいほど目まぐるしい */
+  tempo?: number;
+  /**
+   * 制限時間（秒）。過ぎたら引き分け（時間切れ）で終わる。
+   * 通常戦の打ち切り（体力の割合で判定）とは違い、削りきれなかったことそのものが結果になる
+   */
+  timeLimit?: number;
 }
 
 export interface TeamSetup {
@@ -87,6 +118,11 @@ export interface Fighter {
   def: number;
   spd: number;
   basicPower: number;
+  /** 体の大きさ（1 が標準）と、押し合いに使う半径 */
+  size: number;
+  radius: number;
+  /** 引き寄せ・足止めを受けない */
+  anchored: boolean;
   /** 戦場の位置。x は横、z は奥行き（自軍 0 は +z 側、敵 1 は −z 側） */
   x: number;
   z: number;

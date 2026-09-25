@@ -44,11 +44,16 @@ import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { DetailScreen } from './ui/screens/DetailScreen';
-import { REVOS } from './game/data/revos';
+import { REVOS, getRevos } from './game/data/revos';
+import {
+  BOSS_TIERS, BOSS_TIME, DAILY_REPLAY_COINS,
+  bossFor, bossState, buildBossTeam, buildDailyTeam, dailyReward, dailyRuleFor, dailyState,
+  rollBossFossil, rollDailyFossil, rotationBadge,
+} from './game/data/rotation';
 import { audio } from './core/Audio';
 import {
   load as loadSave, save as writeSave, defaultSave, dropDecay, addExp, addPlayerExp,
-  countToday, rollDaily, clearSave,
+  countToday, rollDaily, clearSave, todayKey,
   type SaveData,
 } from './core/Save';
 import type { BiomeId } from './voxel/palette';
@@ -113,6 +118,13 @@ async function main(): Promise<void> {
   let activeEvent: EventDef | null = null;
   /** 直前に挑んだイベント。リザルトの「もう一度」で同じ相手へ戻す */
   let lastEvent: EventDef | null = null;
+  /**
+   * 挑戦中の日替わり・週替わり。日付を持たせておく——戦っている最中に日が
+   * 変わっても、報酬は挑んだ日のぶんとして数える
+   */
+  type Special = { kind: 'daily' | 'boss'; date: string };
+  let activeSpecial: Special | null = null;
+  let lastSpecial: Special | null = null;
   /**
    * 挑戦中の段。通常戦でどの段を選んだかは進行度と一致しない——
    * 到達済みの段へ戻れるようにしたので、勝っても進めない戦いがある
@@ -245,20 +257,30 @@ async function main(): Promise<void> {
     setTimeout(() => boot.classList.add('hidden'), 200);
   }
 
-  async function startBattle(ev: EventDef | null = null, stage = data.stageProgress + 1): Promise<void> {
+  async function startBattle(
+    ev: EventDef | null = null, stage = data.stageProgress + 1, special: Special | null = null,
+  ): Promise<void> {
     const mine = buildTeamSetup(data.roster, data.party.order);
     if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); goHome(); return; }
     activeEvent = ev;
     lastEvent = ev;
+    activeSpecial = special;
+    lastSpecial = special;
     activeStage = Math.max(1, stage);
     lastStage = activeStage;
     boot.classList.remove('hidden');
-    await progress(0.4, ev ? '記録を読み出しています…' : '闘技場を生成しています…');
+    await progress(0.4, ev ? '記録を読み出しています…' : special?.kind === 'boss' ? '巨獣の気配を探っています…' : '闘技場を生成しています…');
     const seed = (Date.now() ^ (activeStage * 104729)) >>> 0;
     // 段ごとに舞台を変える。選択画面が予告した地層と実際の闘技場を一致させる
-    battle.buildArena(ev ? ev.biome : stagePreview(activeStage).biome, seed);
-    const foes = ev ? buildEventTeam(ev) : buildEnemyTeam(activeStage, seed, teamAnchor(mine));
-    player = new BattlePlayer(seed, mine, foes, battle);
+    const daily = special?.kind === 'daily' ? dailyRuleFor(special.date) : null;
+    const boss = special?.kind === 'boss' ? bossFor(special.date) : null;
+    battle.buildArena(ev ? ev.biome : daily ? daily.biome : boss ? boss.biome : stagePreview(activeStage).biome, seed);
+    const foes = ev ? buildEventTeam(ev)
+      : daily ? buildDailyTeam(special!.date, data.stageProgress, teamAnchor(mine))
+      : boss ? buildBossTeam(boss, teamAnchor(mine))
+      : buildEnemyTeam(activeStage, seed, teamAnchor(mine));
+    const rules = daily ? daily.rules : boss ? { timeLimit: BOSS_TIME } : {};
+    player = new BattlePlayer(seed, mine, foes, battle, rules);
     battleScreen.setPlayer(player);
     player.speed = data.settings.battleSpeed;
     // 設定に入っていたのに、どこからも読んでいなかった。
@@ -356,6 +378,8 @@ async function main(): Promise<void> {
     ui.tabBadge('unit', data.roster.length > 0 && effectiveParty(data).length < 3 ? 1 : 0);
     ui.tabBadge('home', unclaimedCount(data) + readyCount(data));
     ui.tabBadge('dig', data.stock.length);
+    // 今日の戦場・今週の巨獣に手を付けていなければ、バトルの札に知らせる
+    ui.tabBadge('battle', data.roster.length > 0 ? rotationBadge(data, todayKey()) : 0);
   };
   ui.onShow = () => refreshTabs();
   refreshTabs();
@@ -580,19 +604,71 @@ async function main(): Promise<void> {
     }
     const ev = activeEvent;
     activeEvent = null;
+    const sp = activeSpecial;
+    activeSpecial = null;
     const rows: ResultData['rows'] = [];
+
+    // 巨獣は勝ち負けではなく、どこまで削ったかで決まる。段の報酬は勝敗に関わらず渡す
+    let bossFrac = 0;
+    if (sp?.kind === 'boss' && player) {
+      const foe = player.sim.fighters.find((f) => f.side === 1);
+      if (foe) bossFrac = Math.min(1, 1 - foe.hp / foe.maxHp);
+      const boss = bossFor(sp.date);
+      const st = bossState(data, sp.date);
+      const next = { week: st.week, best: Math.max(st.best, bossFrac), claimed: [...st.claimed] };
+      rows.push({
+        label: '与ダメージ',
+        value: `${Math.floor(bossFrac * 100)}%${bossFrac > st.best ? '（今週の最高）' : ''}`,
+      });
+      BOSS_TIERS.forEach((t, i) => {
+        if (bossFrac + 1e-9 < t.at || next.claimed.includes(i)) return;
+        next.claimed.push(i);
+        data.player.coins += t.coins;
+        let extra = '';
+        if (t.fossil) {
+          const defId = t.fossil === 'boss' ? boss.defId : rollBossFossil(boss, t.fossil.rarity, Math.random);
+          data.stock.push({ defId, rarity: getRevos(defId).rarity, biome: boss.biome });
+          extra = ` ＋ ${label(defId)}の化石`;
+        }
+        rows.push({ label: `${t.name}の報酬`, value: `◈ ${t.coins}${extra}`, kind: t.fossil ? 'new' : 'coin' });
+      });
+      const nextTier = BOSS_TIERS.find((_, i) => !next.claimed.includes(i));
+      if (nextTier) {
+        rows.push({ label: '次の段', value: `${nextTier.name} — ${nextTier.at >= 1 ? '討伐' : `${Math.round(nextTier.at * 100)}%`}` });
+      }
+      data.events.boss = next;
+    }
+
     if (winner === 0) {
       data.stats.wins++;
       data.stats.streak++;
       countToday(data, 'win');
       data.stats.bestStreak = Math.max(data.stats.bestStreak, data.stats.streak);
       const turns = player?.sim.turnCount ?? 0;
-      // 0 は「未達成」。初回は無条件に入れないと、いつまでも 0 のまま
-      if (turns > 0 && (data.stats.fastestWin === 0 || turns < data.stats.fastestWin)) {
+      // 0 は「未達成」。初回は無条件に入れないと、いつまでも 0 のまま。
+      // 場の決まりが違う戦いは比べられないので、通常戦と物語だけで数える
+      if (!sp && turns > 0 && (data.stats.fastestWin === 0 || turns < data.stats.fastestWin)) {
         data.stats.fastestWin = turns;
       }
-      let coins: number;
-      if (ev) {
+      let coins = 0;
+      if (sp?.kind === 'daily') {
+        // 今日の戦場。その日の初勝利だけが化石を落とす
+        const st = dailyState(data, sp.date);
+        if (!st.won) {
+          data.events.daily = { date: sp.date, won: true };
+          const rw = dailyReward(data.stageProgress);
+          const rule = dailyRuleFor(sp.date);
+          const defId = rollDailyFossil(rule, rw.rarity, Math.random);
+          data.stock.push({ defId, rarity: getRevos(defId).rarity, biome: rule.biome });
+          coins = rw.coins;
+          rows.push({ label: '今日の初勝利', value: `${label(defId)}の化石（ストックへ）`, kind: 'new' });
+        } else {
+          coins = DAILY_REPLAY_COINS;
+          rows.push({ label: '再戦', value: '今日の初勝利は受け取り済み' });
+        }
+      } else if (sp?.kind === 'boss') {
+        // 段の報酬は上で渡した
+      } else if (ev) {
         // イベントは進行度を進めない。編成を試す場としていつでも戻れるようにする
         const first = !data.events.cleared.includes(ev.id);
         coins = first ? ev.coins : Math.round(ev.coins / 4);
@@ -615,12 +691,20 @@ async function main(): Promise<void> {
         coins = stageCoins(activeStage, !advanced);
         if (!advanced) rows.push({ label: '再挑戦', value: `ステージ ${activeStage}` });
       }
-      data.player.coins += coins;
-      rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
+      if (coins > 0) {
+        data.player.coins += coins;
+        rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
+      }
+    } else if (sp?.kind === 'boss') {
+      // 巨獣は倒しきれないのが普通。連勝は切らない
+      rows.push({ label: '結果', value: winner === 1 ? '全滅' : '時間切れ' });
     } else {
       data.stats.streak = 0;
       rows.push({ label: '結果', value: winner === 1 ? '敗北' : '引き分け' });
-      rows.push({ label: '助言', value: '編成を見直そう' });
+      rows.push({
+        label: '助言',
+        value: sp?.kind === 'daily' ? `勝ち筋：${dailyRuleFor(sp.date).hint}` : '編成を見直そう',
+      });
     }
     addPlayerExp(data, winner === 0 ? 120 : 40);
 
@@ -638,7 +722,7 @@ async function main(): Promise<void> {
      */
     const setup = buildTeamSetup(data.roster, data.party.order);
     const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
-    const base = winner === 0 ? 900 : 340;
+    const base = winner === 0 || bossFrac >= 0.55 ? 900 : 340;
     setup?.members.forEach((m) => {
       const unit = data.roster.find((r) => r.uid === m.uid);
       if (!unit) return;
@@ -653,15 +737,23 @@ async function main(): Promise<void> {
         kind: 'exp',
       });
     });
-    if (winner === 0 && !ev) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
+    if (winner === 0 && !ev && !sp) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
     writeSave(data);
+    const secs = Math.round(player?.sim.clock ?? 0);
+    const isBoss = sp?.kind === 'boss';
     showResult({
-      eyebrow: '戦闘終了',
-      title: winner === 0 ? '勝 利' : winner === 1 ? '敗 北' : '引 き 分 け',
-      subtitle: ev
-        ? `${ev.name} — ${Math.round(player?.sim.clock ?? 0)} 秒で決着`
-        : `ステージ ${activeStage} — ${Math.round(player?.sim.clock ?? 0)} 秒で決着`,
-      good: winner === 0,
+      eyebrow: isBoss ? '巨獣討伐' : sp ? '今日の戦場' : '戦闘終了',
+      title: isBoss
+        ? (bossFrac >= 1 ? '討 伐' : winner === 1 ? '全 滅' : '時 間 切 れ')
+        : winner === 0 ? '勝 利' : winner === 1 ? '敗 北' : '引 き 分 け',
+      subtitle: isBoss
+        ? `${bossFor(sp!.date).title} — 与ダメージ ${Math.floor(bossFrac * 100)}%`
+        : sp
+          ? `${dailyRuleFor(sp.date).name} — ${secs} 秒で決着`
+          : ev
+            ? `${ev.name} — ${secs} 秒で決着`
+            : `ステージ ${activeStage} — ${secs} 秒で決着`,
+      good: isBoss ? bossFrac >= BOSS_TIERS[0].at : winner === 0,
       cast: setup?.members.map((m) => m.defId) ?? [],
       rows,
     });
@@ -702,6 +794,8 @@ async function main(): Promise<void> {
   selectScreen.onBack = () => goHome();
   selectScreen.onNormal = (stage) => { void startBattle(null, stage); };
   selectScreen.onEvent = (ev) => { void startBattle(ev); };
+  selectScreen.onDaily = () => { void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() }); };
+  selectScreen.onBoss = () => { void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() }); };
 
   /**
    * デバッグモードを開く。
@@ -741,7 +835,8 @@ async function main(): Promise<void> {
       if (data.stock.length > 0) { stockScreen.setData(data); ui.show('stock'); return; }
       void startBattle();
     } else {
-      void startBattle(lastEvent, lastStage);
+      // 日替わり・週替わりは、もう一度押した時点の日付で挑み直す
+      void startBattle(lastEvent, lastStage, lastSpecial ? { kind: lastSpecial.kind, date: todayKey() } : null);
     }
   };
 
@@ -770,6 +865,8 @@ async function main(): Promise<void> {
     else if (jump === 'party') { partyScreen.setData(data); ui.show('party'); }
     else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
     else if (jump === 'event') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'event' }); }
+    else if (jump === 'daily') void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() });
+    else if (jump === 'boss') void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() });
     else if (jump === 'select') { selectScreen.setData(data); ui.show('battleSelect'); }
     else if (jump === 'mail') { deliverMail(false); mailScreen.setData(data); ui.show('mail'); }
     else if (jump === 'digSelect') { digSelectScreen.setData(data); ui.show('digSelect'); }

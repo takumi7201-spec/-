@@ -419,7 +419,11 @@ body[data-layout='wide'] .title-actions { width: min(520px, 100%); }
   min-width: 44px; text-align: right;
 }
 
+.battle-enemy-head .round.is-low { color: var(--pen-red); }
+
 .enemy-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+/* 巨獣は1体きり。札を横いっぱいに使い、体力の帯を長く見せる */
+.enemy-cards.is-solo { grid-template-columns: 1fr; }
 /* 敵の1枚。白い板。読ませるのは名前と残量だけ */
 .enemy-card {
   display: flex; flex-direction: column; gap: 4px;
@@ -1867,6 +1871,92 @@ body[data-layout='wide'] .det-body { left: 16vw; right: 16vw; }
   pointer-events: auto;
 }
 .sel-body--stages { gap: 8px; }
+.sel-section { margin: 6px 2px -4px; }
+
+/* ---- 日替わり・週替わり ----
+   物語の札と同じ白い板。違いは、上端の色の帯と「あと何時間」の添え書き */
+/* 縦に積む箱の中で縮ませない。overflow を隠すと、中身の高さを最小値に数えなくなる */
+.rot-card { overflow: hidden; flex: none; }
+.rot-card::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+}
+.rot-card--daily::before { background: linear-gradient(90deg, var(--hl-amber-deep), var(--hl-amber)); }
+.rot-card--boss::before { background: linear-gradient(90deg, #8a2f22, var(--hl-rose)); }
+.rot-remain {
+  margin-left: auto;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink-faint);
+}
+.rot-card .event-stamp { margin-left: 6px; }
+.rot-hint {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 12px; line-height: 1.6; color: var(--ink);
+  padding: 7px 10px; border-radius: var(--r-md);
+  background: rgba(245, 166, 35, 0.14);
+}
+.rot-hint-tag {
+  flex: none; font-size: 10px; font-weight: 900; letter-spacing: 0.12em; color: var(--pen-brown);
+}
+.rot-rewards { display: flex; flex-direction: column; gap: 4px; }
+.rot-reward {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  font-size: 13px; font-weight: 700;
+}
+.rot-reward .num { color: var(--pen-brown); }
+.rot-reward.is-done { font-size: 11px; font-weight: 500; color: var(--ink-faint); }
+.rot-reward-tag {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.14em;
+  color: #fff6f4; background: var(--hl-amber-deep);
+  padding: 2px 7px; border-radius: 5px;
+}
+
+.rot-boss { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
+.rot-boss-icon {
+  width: 72px; height: 72px; flex: none;
+  background: #f4efe2; border-radius: var(--r-md); padding: 3px;
+  box-shadow: var(--lift-1);
+}
+.rot-boss-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rot-boss-sub {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--ink-soft);
+}
+.rot-boss-sub .chip { height: 17px; font-size: 9px; padding: 0 5px; }
+
+.rot-track-head { display: flex; align-items: baseline; justify-content: space-between; margin-top: 6px; }
+.rot-best { font-size: 18px; color: var(--ink); }
+/* 与ダメージの帯。段の境目に杭を立て、受け取った段の杭は塗る */
+.rot-track {
+  position: relative; height: 12px; border-radius: 6px;
+  background: rgba(42, 37, 30, 0.1);
+}
+.rot-track-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #8a2f22, var(--hl-rose));
+}
+.rot-tick {
+  position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1.5px;
+  background: var(--paper-card); border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(42, 37, 30, 0.25);
+}
+.rot-tick:last-child { margin-left: -3px; }
+.rot-tick.is-got { background: var(--hl-amber); }
+.rot-tiers { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.rot-tier {
+  display: grid; grid-template-columns: 26px 38px 1fr auto; align-items: center; gap: 6px;
+  font-size: 12px;
+}
+.rot-tier-name {
+  display: grid; place-items: center; height: 20px; border-radius: 5px;
+  font-size: 11px; font-weight: 900; color: #fff;
+}
+.rot-tier-name--0 { background: #a8703f; }
+.rot-tier-name--1 { background: #8f9aa6; }
+.rot-tier-name--2 { background: var(--hl-amber-deep); }
+.rot-tier-at { font-size: 11px; color: var(--ink-soft); }
+.rot-tier-reward { min-width: 0; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rot-tier-mark { font-size: 10px; font-weight: 700; color: var(--pen-green); }
+.rot-tier.is-got .rot-tier-reward { color: var(--ink-faint); text-decoration: line-through; }
 
 /* 段の札。左に番号、中に予告、右に状態と報酬 */
 .stage-card {

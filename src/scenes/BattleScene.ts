@@ -213,7 +213,8 @@ export class BattleScene {
     for (const f of fighters) {
       const def = getRevos(f.defId);
       const unit = new SpriteUnit(def.sprite, {
-        height: 1.95 * (def.build.scale ?? 1),
+        // 巨獣は体ごと大きい。シミュレータの押し合いの半径と同じ倍率で描く
+        height: 1.95 * (def.build.scale ?? 1) * f.size,
         facingRight: f.side === 0,
         shadow: 0.3,
         holo: def.rarity >= 5,

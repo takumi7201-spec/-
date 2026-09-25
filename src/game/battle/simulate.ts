@@ -1,7 +1,7 @@
 import { getRevos } from '../data/revos';
 import {
   elementFactor,
-  type BattleEvent, type Fighter, type FighterSnapshot, type Mod, type ModKind,
+  type BattleEvent, type BattleRules, type Fighter, type FighterSnapshot, type Mod, type ModKind,
   type Side, type TeamSetup,
 } from './types';
 import { TACTICS, isBackliner, isRanged, isWall } from './roles';
@@ -58,8 +58,10 @@ const ZOC = 2.6;
 const LEASH = 4.5;
 /** 狙う相手が持ち場の外にいるとき、壁が立つ位置（本隊の中心から敵側へ） */
 const GUARD_AHEAD = 2.2;
-/** 体どうしの最小間隔（中心間） */
+/** 体どうしの最小間隔（中心間）。標準の体どうしのとき */
 const BODY = 1.35;
+/** 標準の体の半径 */
+const R0 = BODY / 2;
 /** 戦場の広さ。自軍は +z 側、敵は −z 側から始まる */
 const ARENA_X = 4.2;
 const ARENA_Z = 7.2;
@@ -174,6 +176,8 @@ function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
     const eg = inst.engraving ?? NO_ENGRAVING;
     const x = LANE_X[slot % LANE_X.length];
     const z = back * (FRONT_Z + TACTICS[def.role].depth * DEPTH_STEP);
+    const b = inst.boost ?? {};
+    const size = b.size ?? 1;
     out.push({
       uid: inst.uid,
       defId: def.id,
@@ -189,12 +193,15 @@ function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
       skillLevel: inst.skillLevel,
       // 刻印はレベルもクリーン度も掛からない純粋な加算。最後に足す——
       // 倍率の中に入れると、育てるほど刻印の差まで広がって二重に効く
-      maxHp: Math.round(def.hp * ls * mc) + eg.hp,
-      hp: Math.round(def.hp * ls * mc) + eg.hp,
-      atk: Math.round(def.atk * ls * mc) + eg.atk,
-      def: Math.round(def.def * ls * mc) + eg.def,
-      spd: Math.round(def.spd * ls) + eg.spd,
+      maxHp: Math.round((Math.round(def.hp * ls * mc) + eg.hp) * (b.hp ?? 1)),
+      hp: Math.round((Math.round(def.hp * ls * mc) + eg.hp) * (b.hp ?? 1)),
+      atk: Math.round((Math.round(def.atk * ls * mc) + eg.atk) * (b.atk ?? 1)),
+      def: Math.round((Math.round(def.def * ls * mc) + eg.def) * (b.def ?? 1)),
+      spd: Math.round((Math.round(def.spd * ls) + eg.spd) * (b.spd ?? 1)),
       basicPower: def.basicPower,
+      size,
+      radius: R0 * size,
+      anchored: b.anchored ?? false,
       x, z, px: x, pz: z,
       ready: 0,
       od: 30,
@@ -226,6 +233,8 @@ export interface BattleResult {
   turns: number;
   /** 決着までの秒数（戦闘内時刻） */
   seconds: number;
+  /** 制限時間で打ち切られたか */
+  timeUp: boolean;
   survivors: number;
   fighters: Fighter[];
 }
@@ -249,9 +258,14 @@ export class BattleSim {
   private byUid = new Map<string, Fighter>();
   /** 本隊の中心。刻みごとに1度だけ出す */
   private anchors: [{ x: number; z: number } | null, { x: number; z: number } | null] = [null, null];
+  private rules: BattleRules;
+  private timeLimit: number;
+  private timedOut = false;
 
-  constructor(seed: number, teamA: TeamSetup, teamB: TeamSetup) {
+  constructor(seed: number, teamA: TeamSetup, teamB: TeamSetup, rules: BattleRules = {}) {
     this.rng = new Prng(seed);
+    this.rules = rules;
+    this.timeLimit = rules.timeLimit ?? MAX_TIME;
     this.fighters = [...buildFighters(teamA, 0), ...buildFighters(teamB, 1)];
     this.fighters.forEach((f, i) => {
       this.byUid.set(f.uid, f);
@@ -268,6 +282,10 @@ export class BattleSim {
   get turnCount(): number { return this.turn; }
   /** 戦闘内の経過秒 */
   get clock(): number { return this.clockV; }
+  /** 制限時間（秒） */
+  get limit(): number { return this.timeLimit; }
+  /** 場の決まりで制限時間が付いているか。付いていれば残りを数えて見せる */
+  get hasLimit(): boolean { return this.rules.timeLimit !== undefined; }
 
   /** バフ込みの実効 SPD */
   speedOf(f: Fighter): number { return this.effSpd(f); }
@@ -346,11 +364,14 @@ export class BattleSim {
     this.separate();
 
     if (this.checkEnd(ev)) return ev;
-    if (this.clockV >= MAX_TIME) {
-      // 決着しない編成は HP 割合の合計で判定する（オートバトルを無限にしない）
+    if (this.clockV >= this.timeLimit) {
+      this.timedOut = true;
+      // 場の決まりで時間を切られた戦い（巨獣）は時間切れ＝引き分け。
+      // 通常戦の打ち切りは、決着しない編成を無限にしないための保険なので、
+      // HP 割合の合計で判定する
       const a = this.teamHpRatio(0);
       const b = this.teamHpRatio(1);
-      this.winner = a === b ? -1 : a > b ? 0 : 1;
+      this.winner = this.rules.timeLimit !== undefined ? -1 : a === b ? -1 : a > b ? 0 : 1;
       this.finished = true;
       ev.push({ t: 'end', winner: this.winner, turns: this.turn });
     }
@@ -359,7 +380,7 @@ export class BattleSim {
 
   runToEnd(): BattleEvent[] {
     const all: BattleEvent[] = [...this.startEvents()];
-    const limit = Math.ceil(MAX_TIME / DT) + 8;
+    const limit = Math.ceil(this.timeLimit / DT) + 8;
     let guard = 0;
     while (!this.finished && guard++ < limit) all.push(...this.step());
     return all;
@@ -370,6 +391,7 @@ export class BattleSim {
       winner: this.winner,
       turns: this.turn,
       seconds: this.clockV,
+      timeUp: this.timedOut,
       survivors: this.alive(this.winner === -1 ? undefined : (this.winner as Side)).length,
       fighters: this.fighters,
     };
@@ -380,7 +402,7 @@ export class BattleSim {
   private think(f: Fighter, ev: BattleEvent[]): void {
     // 構えている間はゲージも足も止まる
     if (f.cast) return;
-    if (f.ready < 1) f.ready = Math.min(1, f.ready + DT * this.effSpd(f) / ACTION_BASE);
+    if (f.ready < 1) f.ready = Math.min(1, f.ready + DT * this.effSpd(f) * (this.rules.tempo ?? 1) / ACTION_BASE);
 
     let t = f.target ? this.byUid.get(f.target) ?? null : null;
     if (!t || !t.alive || this.clockV >= (this.retargetAt.get(f.uid) ?? 0)) {
@@ -397,7 +419,7 @@ export class BattleSim {
       if (shape !== 'single') { this.startCast(f, 'od', null, ev); return; }
       const ot = f.odId === 'faulthaul' ? this.haulTarget(f) : t;
       const reach = OD_REACH[f.odId] ?? tac.range;
-      if (ot && dist(f, ot) <= reach + 0.2) { this.startCast(f, 'od', ot, ev); return; }
+      if (ot && gap(f, ot) <= reach + 0.2) { this.startCast(f, 'od', ot, ev); return; }
     }
 
     // 回復役の通常行動。傷んだ味方がいれば、殴るより先にそちらへ手を回す
@@ -407,7 +429,7 @@ export class BattleSim {
     }
 
     // 通常攻撃
-    if (t && f.ready >= 1 && dist(f, t) <= tac.range + 0.2) {
+    if (t && f.ready >= 1 && gap(f, t) <= tac.range + 0.2) {
       this.startCast(f, 'basic', t, ev);
       return;
     }
@@ -474,8 +496,8 @@ export class BattleSim {
     if (tac.held && !isRanged(f.role)) {
       const slip = f.role === 'Finisher' && pick.hp / pick.maxHp < 0.4;
       if (!slip) {
-        const walls = enemies.filter((e) => isWall(e.role) && dist(f, e) <= ZOC);
-        if (walls.length > 0 && !walls.includes(pick)) pick = minBy(walls, (e) => dist(f, e));
+        const walls = enemies.filter((e) => isWall(e.role) && gap(f, e) <= ZOC);
+        if (walls.length > 0 && !walls.includes(pick)) pick = minBy(walls, (e) => gap(f, e));
       }
     }
     return pick;
@@ -498,7 +520,7 @@ export class BattleSim {
     const enemies = this.alive(other(f.side));
     if (enemies.length === 0) return null;
     const reach = OD_REACH.faulthaul;
-    const inReach = enemies.filter((e) => dist(f, e) <= reach);
+    const inReach = enemies.filter((e) => gap(f, e) <= reach && !e.anchored);
     if (inReach.length === 0) return null;
     return minBy(inReach, (e) => (this.engaged(e) ? 10 : 0) + (isBackliner(e.role) ? -1 : 0) + dist(f, e) * 0.05);
   }
@@ -518,14 +540,14 @@ export class BattleSim {
     let gx = f.x;
     let gz = f.z;
     if (tac.keepAway > 0) {
-      const near = minBy(this.alive(other(f.side)), (e) => dist(f, e));
-      const dn = dist(f, near);
+      const near = minBy(this.alive(other(f.side)), (e) => gap(f, e));
+      const dn = gap(f, near);
       if (dn < tac.keepAway) {
         // 寄られた。相手から離れる向きへ下がる
         const k = 1 / Math.max(1e-4, dn);
         gx = f.x + (f.x - near.x) * k;
         gz = f.z + (f.z - near.z) * k;
-      } else if (dist(f, t) > tac.range * 0.9) {
+      } else if (gap(f, t) > tac.range * 0.9) {
         gx = t.x; gz = t.z;
       } else {
         return;
@@ -541,7 +563,7 @@ export class BattleSim {
       gz = home.z + (dz / d) * GUARD_AHEAD;
       if (Math.hypot(gx - f.x, gz - f.z) < 0.15) return;
     } else {
-      if (dist(f, t) <= tac.range * 0.85) return;
+      if (gap(f, t) <= tac.range * 0.85) return;
       gx = t.x; gz = t.z;
     }
 
@@ -601,13 +623,13 @@ export class BattleSim {
   private inPost(f: Fighter, e: Fighter): boolean {
     const home = this.anchors[f.side];
     if (!home) return true;
-    return dist(f, e) <= ZOC || Math.hypot(e.x - home.x, e.z - home.z) <= LEASH;
+    return gap(f, e) <= ZOC || Math.hypot(e.x - home.x, e.z - home.z) <= LEASH;
   }
 
   /** 前線に立っているか。敵が手の届く距離にいる */
   private engaged(f: Fighter): boolean {
     for (const e of this.fighters) {
-      if (e.alive && e.side !== f.side && dist(f, e) <= CONTACT) return true;
+      if (e.alive && e.side !== f.side && gap(f, e) <= CONTACT) return true;
     }
     return false;
   }
@@ -622,16 +644,18 @@ export class BattleSim {
         const dx = b.x - a.x;
         const dz = b.z - a.z;
         const d = Math.hypot(dx, dz);
-        if (d >= BODY) continue;
+        const min = a.radius + b.radius;
+        if (d >= min) continue;
         // 完全に重なったときは、並び順で決まる向きへ離す
         const ux = d < 1e-4 ? (a.side === b.side ? 1 : 0) : dx / d;
         const uz = d < 1e-4 ? (a.side === b.side ? 0 : 1) : dz / d;
-        const push = (BODY - d) * 0.5;
+        const push = (min - d) * 0.5;
         const nx = ux * push;
         const nz = uz * push;
         // 構えている者と動けない者は押されにくい。打つ瞬間に滑ると間合いが崩れる
-        const wa = a.cast || this.clockV < a.rootedUntil ? 0.3 : 1;
-        const wb = b.cast || this.clockV < b.rootedUntil ? 0.3 : 1;
+        // 大きい体は押されにくい
+        const wa = (a.cast || this.clockV < a.rootedUntil ? 0.3 : 1) / (a.size * a.size);
+        const wb = (b.cast || this.clockV < b.rootedUntil ? 0.3 : 1) / (b.size * b.size);
         const sum = wa + wb;
         a.x -= nx * (2 * wa / sum); a.z -= nz * (2 * wa / sum);
         b.x += nx * (2 * wb / sum); b.z += nz * (2 * wb / sum);
@@ -797,7 +821,7 @@ export class BattleSim {
         const t = single(); if (!t) break;
         this.dealDamage(actor, t, power, ev);
         // 地割れで足を取る。しばらくその場から動けない
-        if (t.alive) t.rootedUntil = Math.max(t.rootedUntil, this.clockV + CRUSH_ROOT);
+        if (t.alive && !t.anchored) t.rootedUntil = Math.max(t.rootedUntil, this.clockV + CRUSH_ROOT);
         break;
       }
       case 'flamevolley': {
@@ -865,7 +889,8 @@ export class BattleSim {
         const t = picked && picked.alive ? picked : this.haulTarget(actor);
         if (!t) break;
         this.dealDamage(actor, t, power, ev);
-        if (t.alive) {
+        // 巨体は引きずれない。当てるだけで終わる
+        if (t.alive && !t.anchored) {
           const dx = t.x - actor.x;
           const dz = t.z - actor.z;
           const d = Math.max(1e-4, Math.hypot(dx, dz));
@@ -981,8 +1006,9 @@ export class BattleSim {
         const dx = actor.x - t.x;
         const dz = actor.z - t.z;
         const d = Math.max(1e-4, Math.hypot(dx, dz));
-        actor.x = clamp(t.x + (dx / d) * 1.1, -ARENA_X, ARENA_X);
-        actor.z = clamp(t.z + (dz / d) * 1.1, -ARENA_Z, ARENA_Z);
+        const land = 1.1 + (t.radius - R0);
+        actor.x = clamp(t.x + (dx / d) * land, -ARENA_X, ARENA_X);
+        actor.z = clamp(t.z + (dz / d) * land, -ARENA_Z, ARENA_Z);
         ev.push({ t: 'leap', uid: actor.uid, to: t.uid });
         this.dealDamage(actor, t, power, ev);
         if (t.alive) this.addMod(t, { kind: 'taken', value: 0.25, turns: 3, source: 'leapstrike' }, ev, '被ダメ上昇');
@@ -1102,6 +1128,8 @@ export class BattleSim {
     if (atk.passive === 'immutable' || def.passive === 'immutable') eff = 1;
 
     let buff = (1 + this.modSum(atk, 'dealt')) * (1 + this.modSum(def, 'taken'));
+    // 場の効果。その属性の攻撃が、敵味方の別なく通りやすくなる
+    buff *= this.rules.elementDealt?.[atk.element] ?? 1;
 
     const pa = atk.passive;
     // 役職の噛み合わせ。崩し役は壁を割り、特攻役は後衛を刈る
@@ -1251,7 +1279,7 @@ export class BattleSim {
   private gainOd(f: Fighter, amount: number, ev: BattleEvent[]): void {
     if (!f.alive) return;
     // 前線で殴り合っている者ほど早く溜まる
-    let mul = this.engaged(f) ? 1.2 : 1;
+    let mul = (this.engaged(f) ? 1.2 : 1) * (this.rules.tempo ?? 1);
     // 「制海」: 海の主が生きている間、向かいの側は必殺技が溜まりにくい
     if (this.alive(other(f.side)).some((e) => e.passive === 'deepreign')) mul *= 0.8;
     // 「大喙」: 通常攻撃が重いぶん、必殺技の出番が遅い
@@ -1375,6 +1403,14 @@ function odPower(f: Fighter): number {
 
 function dist(a: { x: number; z: number }, b: { x: number; z: number }): number {
   return Math.hypot(a.x - b.x, a.z - b.z);
+}
+
+/**
+ * 体の縁どうしの距離を、標準の体どうしに直したもの。
+ * 間合い・接敵・壁の足止めはこれで測る——巨体は中心が遠くても手が届く
+ */
+function gap(a: Fighter, b: Fighter): number {
+  return dist(a, b) - (a.radius + b.radius - 2 * R0);
 }
 
 /** 敵陣へ向かう向きで測った前進量。自軍は −z が前 */

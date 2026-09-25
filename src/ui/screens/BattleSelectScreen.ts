@@ -1,11 +1,13 @@
 import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
-import type { SaveData } from '../../core/Save';
+import { todayKey, type SaveData } from '../../core/Save';
 import { EVENTS, type EventDef } from '../../game/data/events';
 import { stagePreview } from '../../game/party';
 import { ELEMENT_NAMES, BIOMES } from '../../voxel/palette';
 import { screenHead, plate, spaced } from '../chrome';
 import { eventCard } from '../eventCard';
+import { dailyCard, bossCard } from '../rotationCards';
+import { rotationBadge } from '../../game/data/rotation';
 import { audio } from '../../core/Audio';
 
 export type BattleMode = 'normal' | 'event';
@@ -39,6 +41,8 @@ export class BattleSelectScreen extends Screen {
   onBack?: () => void;
   onNormal?: (stage: number) => void;
   onEvent?: (ev: EventDef) => void;
+  onDaily?: () => void;
+  onBoss?: () => void;
 
   constructor() { super('battleSelect', 'battle'); }
 
@@ -68,7 +72,7 @@ export class BattleSelectScreen extends Screen {
 
     const open = EVENTS.filter(
       (e) => this.data.stageProgress >= e.requires && !this.data.events.cleared.includes(e.id),
-    ).length;
+    ).length + rotationBadge(this.data, todayKey());
 
     // ---- 切り替え ----
     clear(this.tabsEl);
@@ -89,7 +93,20 @@ export class BattleSelectScreen extends Screen {
     clear(this.bodyEl);
     this.bodyEl.classList.toggle('sel-body--stages', this.mode === 'normal');
     if (this.mode === 'normal') this.renderStages(frontier);
-    else for (const ev of EVENTS) this.bodyEl.appendChild(eventCard(ev, this.data, (e) => this.onEvent?.(e)));
+    else this.renderEvents();
+  }
+
+  /**
+   * イベント欄。入れ替わるもの（今日・今週）を上に、物語の一本勝負を下に置く。
+   * 物語は一度勝てば終わるが、上の2枚はいつ開いても何かが残っている
+   */
+  private renderEvents(): void {
+    this.bodyEl.append(
+      dailyCard(this.data, () => this.onDaily?.()),
+      bossCard(this.data, () => this.onBoss?.()),
+      h('div', { class: 'label sel-section', text: spaced('物語') }),
+    );
+    for (const ev of EVENTS) this.bodyEl.appendChild(eventCard(ev, this.data, (e) => this.onEvent?.(e)));
   }
 
   private renderStages(frontier: number): void {
