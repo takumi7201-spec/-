@@ -19,7 +19,7 @@ import { HomeScene } from './scenes/HomeScene';
 import { BattlePlayer } from './game/battle/BattlePlayer';
 import {
   buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, mergeFossil,
-  teamAnchor, stagePreview, effectiveParty,
+  teamAnchor, stagePreview, effectiveParty, PARTY_SIZE,
 } from './game/party';
 import { tabBar } from './ui/chrome';
 import { unclaimedCount } from './game/mail';
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
     const daily = special?.kind === 'daily' ? dailyRuleFor(special.date) : null;
     const boss = special?.kind === 'boss' ? bossFor(special.date) : null;
     battle.buildArena(ev ? ev.biome : daily ? daily.biome : boss ? boss.biome : stagePreview(activeStage).biome, seed);
-    const foes = ev ? buildEventTeam(ev)
+    const foes = ev ? buildEventTeam(ev, mine.members.length)
       : daily ? buildDailyTeam(special!.date, data.stageProgress, teamAnchor(mine))
       : boss ? buildBossTeam(boss, teamAnchor(mine))
       : buildEnemyTeam(activeStage, seed, teamAnchor(mine));
@@ -375,7 +375,7 @@ async function main(): Promise<void> {
    * 居るあいだしか正しくならない——札は常駐しているので、数も常駐させる。
    */
   const refreshTabs = (): void => {
-    ui.tabBadge('unit', data.roster.length > 0 && effectiveParty(data).length < 3 ? 1 : 0);
+    ui.tabBadge('unit', data.roster.length > 0 && effectiveParty(data).length < Math.min(PARTY_SIZE, data.roster.length) ? 1 : 0);
     ui.tabBadge('home', unclaimedCount(data) + readyCount(data));
     ui.tabBadge('dig', data.stock.length);
     // 今日の戦場・今週の巨獣に手を付けていなければ、バトルの札に知らせる

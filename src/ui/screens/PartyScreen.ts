@@ -5,7 +5,7 @@ import { ROLE_NAMES, getRevos, revosShortName } from '../../game/data/revos';
 import { ROLE_MOVES, isWall, postName } from '../../game/battle/roles';
 import { ELEMENT_NAMES } from '../../voxel/palette';
 import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
-import { partyPower } from '../../game/party';
+import { PARTY_SIZE, partyPower } from '../../game/party';
 import { revosIcon } from '../revosIcon';
 import { screenHead, plate, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
@@ -24,20 +24,20 @@ export class PartyScreen extends Screen {
   private rosterEl!: HTMLElement;
   private totalEl!: HTMLElement;
   private tacticEl!: HTMLElement;
-  private order: (string | null)[] = [null, null, null];
+  private order: (string | null)[] = Array(PARTY_SIZE).fill(null);
   private selected: string | null = null;
   private powerPlate = plate('戦力', { tone: 'amber' });
 
   onBack?: () => void;
   onDetail?: (defId: string, unit: OwnedRevos) => void;
-  onApply?: (order: [string, string, string]) => void;
+  onApply?: (order: string[]) => void;
 
   constructor() { super('party', 'unit'); }
 
   setData(d: SaveData): void {
     this.data = d;
     const saved = d.party.order;
-    this.order = [0, 1, 2].map((i) => {
+    this.order = Array.from({ length: PARTY_SIZE }, (_, i) => {
       const uid = saved?.[i];
       return uid && d.roster.some((r) => r.uid === uid) ? uid : null;
     });
@@ -154,7 +154,7 @@ export class PartyScreen extends Screen {
     // 戦力の式はユニットの入口と共有する。画面ごとに違う数を出さない
     this.powerPlate.set(String(partyPower({
       ...this.data,
-      party: { ...this.data.party, order: this.order as [string, string, string] },
+      party: { ...this.data.party, order: this.order.filter((x): x is string => !!x) },
     })));
 
     // ---- 立ち回り ----
@@ -237,13 +237,13 @@ export class PartyScreen extends Screen {
 
   private apply(): void {
     const filled = this.order.filter((x): x is string => !!x);
-    if (filled.length < Math.min(3, this.data.roster.length)) {
+    // 手持ちが枠より少ないうちは、持っているぶん全部で出られればよい
+    if (filled.length < Math.min(PARTY_SIZE, this.data.roster.length)) {
       audio.uiError();
       this.ui.toast('スロットを埋めてください', 'warn');
       return;
     }
-    while (filled.length < 3) filled.push(filled[0]);
     audio.uiConfirm();
-    this.onApply?.([filled[0], filled[1], filled[2]]);
+    this.onApply?.(filled);
   }
 }

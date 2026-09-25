@@ -2,6 +2,7 @@ import { h, clear, bar } from './dom';
 import { revosIcon } from './revosIcon';
 import { ROLE_NAMES, getRevos, revosShortName } from '../game/data/revos';
 import { isWall } from '../game/battle/roles';
+import { PARTY_SIZE } from '../game/party';
 import { BIOMES, ELEMENT_NAMES, type BiomeId } from '../voxel/palette';
 import type { SaveData } from '../core/Save';
 import { cleanRank } from '../game/battle/simulate';
@@ -147,11 +148,11 @@ export class InventoryPanel {
     const members = (order ?? [])
       .map((uid) => ctx.data.roster.find((r) => r.uid === uid))
       .filter((u): u is NonNullable<typeof u> => !!u);
-    const fallback = members.length > 0 ? members : ctx.data.roster.slice(0, 3);
+    const fallback = members.length > 0 ? members : ctx.data.roster.slice(0, PARTY_SIZE);
     if (fallback.length === 0) {
       this.formList.appendChild(h('div', { class: 'inv-empty', text: '編成なし' }));
     }
-    fallback.slice(0, 3).forEach((u) => {
+    fallback.slice(0, PARTY_SIZE).forEach((u) => {
       const def = getRevos(u.defId);
       this.formList.appendChild(
         h('div', { class: `inv-form-row ${isWall(def.role) ? 'is-front' : ''}` },

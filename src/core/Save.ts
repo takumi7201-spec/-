@@ -66,7 +66,7 @@ export interface SaveData {
   player: { name: string; level: number; exp: number; coins: number };
   roster: OwnedRevos[];
   /** 出撃する3体。立ち位置と狙いは役職が決めるので、持つのは顔ぶれだけ */
-  party: { order: [string, string, string] | null };
+  party: { order: string[] | null };
   /** 未精錬の化石ストック */
   stock: { defId: string; rarity: number; biome: BiomeId }[];
   dex: string[];

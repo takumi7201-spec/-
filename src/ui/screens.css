@@ -421,7 +421,7 @@ body[data-layout='wide'] .title-actions { width: min(520px, 100%); }
 
 .battle-enemy-head .round.is-low { color: var(--pen-red); }
 
-.enemy-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.enemy-cards { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 6px; }
 /* 巨獣は1体きり。札を横いっぱいに使い、体力の帯を長く見せる */
 .enemy-cards.is-solo { grid-template-columns: 1fr; }
 /* 敵の1枚。白い板。読ませるのは名前と残量だけ */
@@ -534,7 +534,23 @@ body[data-layout='wide'] .title-actions { width: min(520px, 100%); }
 .deck--battle { flex-direction: column; align-items: stretch; }
 .battle-deck-inner { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 
-.ally-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.ally-cards { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 7px; }
+
+/*
+ * 5枚並び。1枚が 70px を切るので、属性は色の点、状態異常はアイコンの肩に
+ * 載せて、名前・体力・必殺の3本だけを縦に積む
+ */
+.ally-cards.is-many, .enemy-cards.is-many { gap: 4px; }
+.is-many > .ally-card, .is-many > .enemy-card { position: relative; padding: 6px 6px 7px; gap: 4px; border-radius: 11px; }
+.is-many .unit-icon { width: 28px; height: 28px; }
+.is-many .card-top { gap: 4px; }
+.is-many .card-top .chip { width: 10px; height: 10px; min-width: 0; padding: 0; border-radius: 3px; font-size: 0; }
+.is-many .card-status { position: absolute; right: 4px; top: 4px; }
+.is-many .card-status-icon { width: 14px; height: 14px; }
+.is-many .card-name { font-size: 9px; letter-spacing: 0; }
+.is-many .card-row { gap: 3px; }
+.is-many .card-hp { font-size: 10px; min-width: 0; }
+.is-many .card-od-label { display: none; }
 /* 味方は黒い板。必殺が満ちた1枚だけを白へ反転させる——
    「いま押せるのはこれ」を、色ではなく明るさの差で示す */
 .ally-card {
@@ -750,13 +766,17 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 }
 .party-label { margin-top: 12px; }
 .party-hint { font-size: 10px; color: var(--ink-faint); margin: -4px 0 2px 2px; }
-.party-field { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.party-field { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+/* 5枠は 3＋2 の二段。下の段は中央に寄せる */
+.party-field > .party-slot { grid-column: span 2; }
+.party-field > .party-slot:nth-child(4) { grid-column: 2 / span 2; }
+.party-field > .party-slot:nth-child(5) { grid-column: 4 / span 2; }
 /* 編成の1枠。前列だけ白く、後列は黒い板。
    列の違いを枠線ではなく面の明るさで出す——文字を読ませずに並びが分かる */
 .party-slot {
   position: relative;
   flex-direction: column; align-items: stretch; gap: 0;
-  min-height: 150px; padding: 9px 9px 11px;
+  min-height: 132px; padding: 9px 9px 11px;
   border: 0; border-radius: 15px;
   background: var(--plate); color: var(--on-plate);
   box-shadow: var(--lift-1);
@@ -780,7 +800,7 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 }
 .party-slot.is-front .slot-label { color: var(--pen-brown); }
 .party-slot.is-empty .slot-label { color: var(--ink-faint); }
-.slot-art { height: 70px; display: grid; place-items: center; margin: 3px 0 2px; }
+.slot-art { height: 58px; display: grid; place-items: center; margin: 3px 0 2px; }
 .party-slot .slot-name {
   font-size: 11px; font-weight: 700; line-height: 1.25; height: 28px; overflow: hidden;
 }
@@ -895,7 +915,8 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 .event-desc { margin: 2px 0 6px; font-size: 12px; color: var(--ink-soft); line-height: 1.85; }
 .event-sub { margin-top: 4px; }
 
-.event-foes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+/* 相手の数だけ列を切る。3体でも5体でも1段に収める */
+.event-foes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 .event-foe {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 6px 3px 7px;
@@ -1387,6 +1408,10 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
 .result-cast-slot.is-lead { width: 100px; height: 100px; }
 .result-cast-img { width: 100%; height: 100%; filter: drop-shadow(0 8px 13px rgba(90, 74, 48, 0.32)); }
 .result-cast-slot.is-lead .result-cast-img { filter: drop-shadow(0 10px 17px rgba(90, 74, 48, 0.36)); }
+/* 5体は1枚ずつ小さくして横に収める */
+.result-cast.is-many { gap: 4px; }
+.result-cast.is-many .result-cast-slot { width: 58px; height: 58px; }
+.result-cast.is-many .result-cast-slot.is-lead { width: 80px; height: 80px; }
 .result-skip { position: absolute; inset: 0; }
 .result-wrap { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 var(--gutter); pointer-events: none; }
 /* 報告。板で囲わず、地の上に直接積む */
@@ -1441,7 +1466,8 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
 .screen--dex .dex-body { left: calc(var(--gutter) + var(--safe-l)); }
 body[data-layout='wide'] .party-body,
 body[data-layout='wide'] .dex-body { left: 14vw; right: 14vw; }
-body[data-layout='wide'] .party-field { grid-template-columns: repeat(3, 180px); justify-content: center; }
+body[data-layout='wide'] .party-field { grid-template-columns: repeat(5, 150px); justify-content: center; }
+body[data-layout='wide'] .party-field > .party-slot { grid-column: auto; }
 
 /* 情報を読ませる画面は、3D を地で覆いきる。
    半透明のパネルを重ねるのではなく、面で塞ぐのが正しい */
@@ -2429,7 +2455,7 @@ body[data-layout='wide'] .shop-body { left: 18vw; right: 18vw; }
   padding-bottom: 12px;
   pointer-events: auto;
 }
-/* 編成中の3体。どの面へ行くにも、いま誰を出しているかが起点になる */
+/* 編成中の面々。どの面へ行くにも、いま誰を出しているかが起点になる */
 .unit-faces {
   flex: none; display: flex; gap: 8px; min-width: 0;
   padding: 10px; border-radius: 15px;
@@ -2440,7 +2466,7 @@ body[data-layout='wide'] .shop-body { left: 18vw; right: 18vw; }
   flex: 1; min-width: 0;
   display: flex; flex-direction: column; align-items: center; gap: 1px;
 }
-.unit-face-img { width: 54px; height: 54px; }
+.unit-face-img { width: 48px; height: 48px; }
 .unit-face-name {
   font-size: 10px; font-weight: 900; max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

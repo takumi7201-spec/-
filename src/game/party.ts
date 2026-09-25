@@ -7,10 +7,19 @@ import { BIOMES, type BiomeId } from '../voxel/palette';
 import { cleanMultiplier } from './battle/simulate';
 import { ENGRAVE_PATTERNS, buildEngraving, type Engraving } from './engraving';
 
-/** 所持ユニットから編成を作る。足りなければ先頭から埋める */
+/** 出撃する枠の数 */
+export const PARTY_SIZE = 5;
+
+/**
+ * 所持ユニットから編成を作る。空いた枠は手持ちの先頭から埋める。
+ *
+ * 手持ちが枠より少なければ、そのぶん少ないまま出す。以前は同じ個体を
+ * 重ねて数を合わせていたが、同じ uid が戦場に2体立つことになる——
+ * 敵の数を出撃した数に合わせるので、少ないまま出ても不利にはならない。
+ */
 export function buildTeamSetup(
   roster: OwnedRevos[],
-  order: [string, string, string] | null,
+  order: string[] | null,
 ): TeamSetup | null {
   if (roster.length === 0) return null;
   const byUid = new Map(roster.map((r) => [r.uid, r]));
@@ -22,12 +31,11 @@ export function buildTeamSetup(
     }
   }
   for (const r of roster) {
-    if (picked.length >= 3) break;
+    if (picked.length >= PARTY_SIZE) break;
     if (!picked.includes(r)) picked.push(r);
   }
-  while (picked.length < 3) picked.push(picked[picked.length % Math.max(1, picked.length)]);
 
-  const members = picked.slice(0, 3);
+  const members = picked.slice(0, PARTY_SIZE);
   return {
     members: members.map((r) => ({
       uid: r.uid,
@@ -37,7 +45,7 @@ export function buildTeamSetup(
       skillLevel: r.skillLevel,
       engraving: r.engraving,
     })),
-    order: [0, 1, 2],
+    order: members.map((_, i) => i),
   };
 }
 
@@ -52,10 +60,15 @@ export function teamAnchor(setup: TeamSetup): TeamAnchor {
   const n = Math.max(1, setup.members.length);
   const avg = (f: (m: TeamSetup['members'][number]) => number): number =>
     setup.members.reduce((a, m) => a + f(m), 0) / n;
-  return { level: Math.floor(avg((m) => m.level)), clean: Math.round(avg((m) => m.clean)) };
+  return {
+    level: Math.floor(avg((m) => m.level)),
+    clean: Math.round(avg((m) => m.clean)),
+    size: setup.members.length,
+  };
 }
 
-export interface TeamAnchor { level: number; clean: number; }
+/** size は出撃した数。敵はこの数に揃える——5対3で殴られる段を作らない */
+export interface TeamAnchor { level: number; clean: number; size: number }
 
 /**
  * 敵編成。
@@ -114,10 +127,13 @@ export function buildEnemyTeam(stage: number, seed: number, anchor: TeamAnchor):
     return list[Math.floor(rng.next() * list.length)].id;
   };
 
+  const want = Math.max(1, Math.min(PARTY_SIZE, anchor.size));
   const ids: string[] = [];
-  while (ids.length < 3) {
+  let guard = 0;
+  while (ids.length < want) {
     const id = pick();
-    if (!ids.includes(id) || ids.length > 6) ids.push(id);
+    // 候補が少ない段では重複を許す（uid は席ごとに別なので、同じ種が2体いてもよい）
+    if (!ids.includes(id) || ++guard > 24) ids.push(id);
   }
 
   return {
@@ -142,11 +158,11 @@ export function buildEnemyTeam(stage: number, seed: number, anchor: TeamAnchor):
         )
         : undefined,
     })),
-    order: [0, 1, 2],
+    order: ids.map((_, i) => i),
   };
 }
 
-/** 初回起動時の配布。属性が偏らない3体を渡す */
+/** 初回起動時の配布。属性が偏らない3体を渡す（残りの枠は掘って埋める） */
 export function grantStarters(data: SaveData): void {
   if (data.roster.length > 0) return;
   for (const defId of ['ankylosaurus', 'yutyrannus', 'shonisaurus']) {
@@ -232,7 +248,7 @@ export function revosName(defId: string): string {
 }
 
 /**
- * 実際に出撃する3体。
+ * 実際に出撃する面々（最大 PARTY_SIZE 体）。
  *
  * order が未設定でも buildTeamSetup は手持ちの先頭から埋めて出撃させる。
  * 画面側が order をそのまま読むと「0 / 3」と出て、出撃できないように
@@ -246,10 +262,10 @@ export function effectiveParty(data: SaveData): OwnedRevos[] {
     if (u && !out.includes(u)) out.push(u);
   }
   for (const r of data.roster) {
-    if (out.length >= 3) break;
+    if (out.length >= PARTY_SIZE) break;
     if (!out.includes(r)) out.push(r);
   }
-  return out.slice(0, 3);
+  return out.slice(0, PARTY_SIZE);
 }
 
 /**

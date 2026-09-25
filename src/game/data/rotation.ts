@@ -155,7 +155,8 @@ function rarityCap(stageProgress: number): number {
   return s < 3 ? 2 : s < 6 ? 3 : s < 10 ? 4 : 5;
 }
 
-export interface Anchor { level: number; clean: number }
+/** 出撃する編成の基準。size は出撃した数で、敵の数と巨獣の体力を合わせる */
+export interface Anchor { level: number; clean: number; size: number }
 
 /**
  * 今日の敵。日付から決めるので、その日のうちは何度挑んでも同じ3体。
@@ -169,9 +170,10 @@ export function buildDailyTeam(dateKey: string, stageProgress: number, anchor: A
   let pool = OPEN_POOL.filter((r) => r.rarity <= cap && rule.pick(r));
   if (pool.length < 3) pool = OPEN_POOL.filter((r) => rule.pick(r));
   if (pool.length < 3) pool = OPEN_POOL.filter((r) => r.rarity <= cap);
+  const want = Math.max(1, Math.min(5, anchor.size));
   const ids: string[] = [];
   let guard = 0;
-  while (ids.length < 3 && guard++ < 64) {
+  while (ids.length < want && guard++ < 64) {
     const id = pool[Math.floor(rng.next() * pool.length)].id;
     if (!ids.includes(id) || guard > 32) ids.push(id);
   }
@@ -184,7 +186,7 @@ export function buildDailyTeam(dateKey: string, stageProgress: number, anchor: A
       skillLevel: 1,
       boost: rule.boost,
     })),
-    order: [0, 1, 2],
+    order: ids.map((_, i) => i),
   };
 }
 
@@ -226,7 +228,7 @@ export const BOSS_TIME = 60;
 /**
  * 巨獣の表。
  *
- * 体力の倍率は種ごとに測って決めた（ランダムな3体・同レベルで挑んだとき、
+ * 体力の倍率は種ごとに測って決めた（ランダムな5体・同レベルで挑んだとき、
  * 与ダメージの中央値がおよそ体力の半分になる値）。役職で戦い方が違う——
  * 回復役の巨獣は下がって自分を癒し、特攻役の巨獣は後衛へ突っ込んでくる——
  * ので、一律の倍率では週によって易しすぎたり、手も足も出なかったりする。
@@ -235,32 +237,32 @@ export const BOSSES: BossDef[] = [
   {
     defId: 'tyrannosaurus-sue', title: '暴君の再臨',
     desc: '六千万年を越えて、最も完全な暴君が立ち上がる。相性を無視して、あらゆる者に重く噛みつく。',
-    biome: 'canyon', boost: { hp: 9.8, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
+    biome: 'canyon', boost: { hp: 29.8, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
   },
   {
     defId: 'pliosaurus-funkei', title: '深淵の顎',
     desc: '海の主が浅瀬まで上がってきた。生きている間、こちらの必殺は溜まりにくい。',
-    biome: 'tidehollow', boost: { hp: 12.9, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
+    biome: 'tidehollow', boost: { hp: 46, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
   },
   {
     defId: 'spinosaurus', title: '帆を焼く者',
     desc: '背の帆が赤く灼けている。追い詰めるほど、牙が熱を帯びる。',
-    biome: 'emberfield', boost: { hp: 19.5, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
+    biome: 'emberfield', boost: { hp: 99, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
   },
   {
     defId: 'therizinosaurus', title: '大鎌の番人',
     desc: '三本の鎌は盾を素通りする。硬い者ほど深く裂かれる。',
-    biome: 'canyon', boost: { hp: 9.7, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
+    biome: 'canyon', boost: { hp: 28.2, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
   },
   {
     defId: 'hatzegopteryx', title: '島の頂点',
     desc: 'ハツェグ島を統べた巨翼。最初の一撃が通った瞬間から、手がつけられなくなる。',
-    biome: 'frostpeak', boost: { hp: 11.8, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
+    biome: 'frostpeak', boost: { hp: 45, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
   },
   {
     defId: 'kronosaurus', title: '底なしの圧',
     desc: '速い者ほど、その圧に押し潰される。',
-    biome: 'tidehollow', boost: { hp: 9.0, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
+    biome: 'tidehollow', boost: { hp: 24.8, atk: 1.2, def: 1.1, size: BOSS_SIZE, anchored: true },
   },
 ];
 
@@ -269,8 +271,13 @@ export function bossFor(dateKey: string): BossDef {
   return BOSSES[((n % BOSSES.length) + BOSSES.length) % BOSSES.length];
 }
 
-/** 巨獣は1体きり。レベルは出撃する編成の平均より1つ上 */
+/**
+ * 巨獣は1体きり。レベルは出撃する編成の平均より1つ上。
+ * 体力は5体で挑んだときに合わせてあり、出撃した数に比例させる——
+ * 手持ちが少ないうちに、削りきれない壁にしない
+ */
 export function buildBossTeam(boss: BossDef, anchor: Anchor): TeamSetup {
+  const n = Math.max(1, Math.min(5, anchor.size));
   return {
     members: [{
       uid: 'boss',
@@ -278,7 +285,7 @@ export function buildBossTeam(boss: BossDef, anchor: Anchor): TeamSetup {
       level: Math.max(1, anchor.level + 1),
       clean: Math.max(50, Math.min(95, anchor.clean + 5)),
       skillLevel: 1,
-      boost: boss.boost,
+      boost: { ...boss.boost, hp: (boss.boost.hp ?? 1) * (n / 5) },
     }],
     order: [0],
   };

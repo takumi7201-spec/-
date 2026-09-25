@@ -18,7 +18,10 @@ export interface EventDef {
   name: string;
   subtitle: string;
   desc: string;
-  /** 敵編成。立ち位置は役職が決めるので、並びは横の位置だけに効く */
+  /**
+   * 敵編成。立ち位置は役職が決めるので、並びは横の位置だけに効く。
+   * 出撃した数ぶんを先頭から使う——大事な個体ほど前に書く
+   */
   enemies: string[];
   enemyLevel: number;
   enemyClean: number;
@@ -39,7 +42,7 @@ export const EVENTS: EventDef[] = [
     desc:
       '組み上げられたまま倉庫に残っていた骨格が、記録の中から立ち上がる。' +
       '尾を引きずる姿勢は今では誤りとされているが、押しのける力は当時の図版のままだ。',
-    enemies: ['tyrannosaurus-1915', 'velociraptor', 'pteranodon'],
+    enemies: ['tyrannosaurus-1915', 'velociraptor', 'pteranodon', 'dimorphodon', 'velociraptor'],
     enemyLevel: 14,
     enemyClean: 72,
     reward: { defId: 'tyrannosaurus-1915', level: 10, clean: 70 },
@@ -54,7 +57,7 @@ export const EVENTS: EventDef[] = [
     desc:
       '原標本は空襲で失われ、残ったのは一枚の図版と記述だけ。' +
       'その紙の上の姿がそのまま出てくる。背の帆は、実物より記録のほうが厚い。',
-    enemies: ['spinosaurus-1915', 'iguanodon', 'triceratops'],
+    enemies: ['spinosaurus-1915', 'iguanodon', 'triceratops', 'ankylosaurus', 'albertaceratops'],
     enemyLevel: 16,
     enemyClean: 74,
     reward: { defId: 'spinosaurus-1915', level: 10, clean: 70 },
@@ -71,15 +74,16 @@ export function getEvent(id: string): EventDef | undefined {
 }
 
 /** イベントの敵編成を戦闘用に組む。固定なので乱数を一切入れない */
-export function buildEventTeam(ev: EventDef): TeamSetup {
+export function buildEventTeam(ev: EventDef, size = ev.enemies.length): TeamSetup {
+  const ids = ev.enemies.slice(0, Math.max(1, size));
   return {
-    members: ev.enemies.map((defId, i) => ({
+    members: ids.map((defId, i) => ({
       uid: `ev${i}`,
       defId,
       level: ev.enemyLevel,
       clean: ev.enemyClean,
       skillLevel: 1,
     })),
-    order: [0, 1, 2],
+    order: ids.map((_, i) => i),
   };
 }

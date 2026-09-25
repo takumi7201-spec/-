@@ -114,9 +114,9 @@ export function applyTransfer(d: SaveData, targetUid: string, coreUid: string): 
   d.roster.splice(idx, 1);
   // 編成に入っていた核を残すと、出撃時に居ない個体を指したままになる
   if (d.party.order) {
-    const order = d.party.order.map((uid) => (uid === coreUid ? '' : uid));
-    const left = order.filter((uid) => uid !== '');
-    d.party.order = left.length === 3 ? (left as [string, string, string]) : null;
+    // 抜けた枠はそのまま空ける。出撃時に手持ちの先頭から埋まる
+    const left = d.party.order.filter((uid) => uid !== coreUid);
+    d.party.order = left.length > 0 ? left : null;
   }
   return q;
 }

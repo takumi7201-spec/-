@@ -3,7 +3,7 @@ import { h, button, clear } from '../dom';
 import type { SaveData } from '../../core/Save';
 import { REVOS, getRevos } from '../../game/data/revos';
 import { cleanRank } from '../../game/battle/simulate';
-import { effectiveParty, partyPower } from '../../game/party';
+import { PARTY_SIZE, effectiveParty, partyPower } from '../../game/party';
 import { TRANSFER_MIN_CLEAN, transferPairs } from '../../game/transfer';
 import { revosIcon } from '../revosIcon';
 import { screenHead, plate } from '../chrome';
@@ -45,9 +45,9 @@ export class UnitScreen extends Screen {
     const roster = this.data.roster;
     this.countPlate.set(String(roster.length));
 
-    // ---- 編成中の3体。どの画面へ行くにも、いま誰を出しているかが起点になる ----
+    // ---- 編成中の面々。どの画面へ行くにも、いま誰を出しているかが起点になる ----
     clear(this.facesEl);
-    // 出撃時と同じ埋め方で数える。order が空でも手前の3体が出る
+    // 出撃時と同じ埋め方で数える。order が空でも手持ちの先頭から出る
     const party = effectiveParty(this.data);
     if (party.length === 0) {
       this.facesEl.appendChild(h('div', { class: 'unit-faces-empty', text: '編成がまだ決まっていない。' }));
@@ -76,7 +76,9 @@ export class UnitScreen extends Screen {
       },
       {
         key: 'party', icon: '◈', title: '編成', tone: 'amber',
-        note: party.length === 3 ? `戦力 ${partyPower(this.data).toLocaleString('ja-JP')}` : 'あと少しで3体そろう',
+        note: party.length >= PARTY_SIZE
+          ? `戦力 ${partyPower(this.data).toLocaleString('ja-JP')}`
+          : `あと ${PARTY_SIZE - party.length} 体で枠がそろう`,
         value: `${party.length} / 3`,
       },
       {

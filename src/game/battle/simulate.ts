@@ -159,8 +159,11 @@ const POISON_TURNS = 5;
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
 const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };
 
-/** 開戦時の横位置。並び順で左・中・右に置く */
-const LANE_X = [-1.7, 0, 1.7];
+/**
+ * 開戦時の横位置。並び順で中央から左右へ振り分ける。
+ * 同じ列に立つ者どうしが体の間隔（BODY）より近くならないよう、1.4 ずつ空ける
+ */
+const LANE_X = [0, -1.4, 1.4, -2.8, 2.8];
 /** 最前列の奥行きと、列ごとの間隔 */
 const FRONT_Z = 3.6;
 const DEPTH_STEP = 1.25;
@@ -350,15 +353,19 @@ export class BattleSim {
     for (const f of this.fighters) if (f.alive) this.tickTimers(f, ev);
     if (this.checkEnd(ev)) return ev;
 
+    // 処理の順を刻みごとに入れ替える。いつも自軍から回すと、同じ刻みで
+    // 打ち合ったときに必ず自軍の一撃が先に通り、相討ちが自軍の勝ちに化ける
+    const order = this.stepOrder();
+
     // 2) 構えていた技の打点
-    for (const f of this.fighters) {
+    for (const f of order) {
       if (f.alive && f.cast && f.cast.at <= this.clockV + 1e-9) this.resolveCast(f, ev);
     }
     if (this.checkEnd(ev)) return ev;
 
     // 3) 狙う・構える・動く
     this.anchors = [this.anchorOf(0), this.anchorOf(1)];
-    for (const f of this.fighters) if (f.alive) this.think(f, ev);
+    for (const f of order) if (f.alive) this.think(f, ev);
 
     // 4) 押し合い。全員の移動を出してから解かないと、先に動いた個体だけが譲る
     this.separate();
@@ -376,6 +383,13 @@ export class BattleSim {
       ev.push({ t: 'end', winner: this.winner, turns: this.turn });
     }
     return ev;
+  }
+
+  private tick = 0;
+  /** 奇数の刻みは並びを逆にたどる。乱数を使わないので、再現性はそのまま */
+  private stepOrder(): Fighter[] {
+    this.tick++;
+    return this.tick % 2 === 0 ? this.fighters : [...this.fighters].reverse();
   }
 
   runToEnd(): BattleEvent[] {
@@ -732,7 +746,8 @@ export class BattleSim {
     // 「共鳴」: 味方全体の OD を押し上げる
     if (f.passive === 'resonance') {
       ev.push({ t: 'passive', uid: f.uid, label: '共鳴' });
-      for (const a of this.alive(f.side)) this.gainOd(a, 10, ev);
+      // 5体に配るので、1体ぶんは3体のころより薄くする
+      for (const a of this.alive(f.side)) this.gainOd(a, 6, ev);
     }
   }
 
@@ -772,7 +787,7 @@ export class BattleSim {
     holder.stacks.sky = st + 1;
     ev.push({ t: 'passive', uid: holder.uid, label: '掌握する空' });
     for (const a of this.alive(actor.side)) {
-      this.addMod(a, { kind: 'atk', value: 0.05, turns: 999, source: 'skygrasp' }, ev, 'ATK上昇');
+      this.addMod(a, { kind: 'atk', value: 0.03, turns: 999, source: 'skygrasp' }, ev, 'ATK上昇');
     }
   }
 
@@ -1281,7 +1296,7 @@ export class BattleSim {
     // 前線で殴り合っている者ほど早く溜まる
     let mul = (this.engaged(f) ? 1.2 : 1) * (this.rules.tempo ?? 1);
     // 「制海」: 海の主が生きている間、向かいの側は必殺技が溜まりにくい
-    if (this.alive(other(f.side)).some((e) => e.passive === 'deepreign')) mul *= 0.8;
+    if (this.alive(other(f.side)).some((e) => e.passive === 'deepreign')) mul *= 0.88;
     // 「大喙」: 通常攻撃が重いぶん、必殺技の出番が遅い
     if (f.passive === 'greatbeak') mul *= 0.8;
     // 「掌握する空」: 空を握りきっている間、味方の必殺技が早く回る

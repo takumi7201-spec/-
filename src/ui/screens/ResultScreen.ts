@@ -79,8 +79,12 @@ export class ResultScreen extends Screen {
     // 出撃した面々。数字の列より先に、誰が戦ったかを見せる
     clear(this.castEl);
     const cast = d.cast ?? [];
-    cast.slice(0, 3).forEach((id, i) => {
-      this.castEl.appendChild(h('div', { class: `result-cast-slot ${i === 1 ? 'is-lead' : ''}` },
+    // 真ん中の1体を大きく。5体なら3番目、3体なら2番目が中央に来る
+    const shown = cast.slice(0, 5);
+    const lead = Math.floor((shown.length - 1) / 2);
+    this.castEl.classList.toggle('is-many', shown.length > 3);
+    shown.forEach((id, i) => {
+      this.castEl.appendChild(h('div', { class: `result-cast-slot ${i === lead ? 'is-lead' : ''}` },
         revosIcon(id, 'result-cast-img'),
       ));
     });

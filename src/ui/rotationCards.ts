@@ -20,9 +20,9 @@ import { audio } from '../core/Audio';
  * 残り時間が見えて初めて「今日のうちに」という理由になる。
  */
 
-function anchorOf(data: SaveData): { level: number; clean: number } {
+function anchorOf(data: SaveData): { level: number; clean: number; size: number } {
   const setup = buildTeamSetup(data.roster, data.party.order);
-  return setup ? teamAnchor(setup) : { level: 1, clean: 60 };
+  return setup ? teamAnchor(setup) : { level: 1, clean: 60, size: 1 };
 }
 
 export function dailyCard(data: SaveData, onGo: () => void): HTMLElement {

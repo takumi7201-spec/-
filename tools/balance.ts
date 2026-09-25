@@ -7,10 +7,13 @@ import { BattleSim } from '../src/game/battle/simulate.ts';
 import { REVOS } from '../src/game/data/revos.ts';
 import type { TeamSetup, BattleEvent } from '../src/game/battle/types.ts';
 
+/** 1チームの数。編成の枠と揃える */
+const TEAM = 5;
+
 function mkTeam(ids: string[], level: number, clean: number, tag: string): TeamSetup {
   return {
     members: ids.map((id, i) => ({ uid: `${tag}${i}`, defId: id, level, clean, skillLevel: 1 })),
-    order: [0, 1, 2],
+    order: ids.map((_, i) => i),
   };
 }
 
@@ -49,7 +52,7 @@ const s = { v: 12345 };
 for (let i = 0; i < N; i++) {
   const pickTeam = (): string[] => {
     const set = new Set<number>();
-    while (set.size < 3) set.add(rngInt(s, REVOS.length));
+    while (set.size < TEAM) set.add(rngInt(s, REVOS.length));
     return [...set].map((k) => REVOS[k].id);
   };
   const a = pickTeam();
@@ -86,7 +89,7 @@ const p = (q: number) => turnHist[Math.floor(turnHist.length * q)];
 
 secHist.sort((x, y) => x - y);
 const q = (k: number) => secHist[Math.floor(secHist.length * k)].toFixed(1);
-console.log(`\n=== ${N} 戦 / Lv10 / クリーン度60 / ランダム3体 ===\n`);
+console.log(`\n=== ${N} 戦 / Lv10 / クリーン度60 / ランダム${TEAM}体 ===\n`);
 console.log(`平均の長さ       : ${(totalSec / N).toFixed(1)} 秒  (中央値 ${q(0.5)}, p10 ${q(0.1)}, p90 ${q(0.9)}, max ${secHist[secHist.length - 1].toFixed(1)})`);
 console.log(`平均行動数       : ${(totalTurns / N).toFixed(1)}  (中央値 ${p(0.5)}, p10 ${p(0.1)}, p90 ${p(0.9)}, max ${turnHist[turnHist.length - 1]})`);
 console.log(`引き分け率       : ${((draws / N) * 100).toFixed(2)}%`);

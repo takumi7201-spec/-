@@ -156,7 +156,14 @@ export class BattleScreen extends Screen {
     clear(this.enemyRow);
     this.allyCards = [];
     this.enemyCards = [];
-    this.enemyRow.classList.toggle('is-solo', this.player.sim.fighters.filter((f) => f.side === 1).length === 1);
+    const foes = this.player.sim.fighters.filter((f) => f.side === 1).length;
+    const mine = this.player.sim.fighters.filter((f) => f.side === 0).length;
+    this.enemyRow.classList.toggle('is-solo', foes === 1);
+    // 4体以上は札を詰める。名前と帯を残し、飾りの文字を落とす
+    this.enemyRow.classList.toggle('is-many', foes > 3);
+    this.allyRow.classList.toggle('is-many', mine > 3);
+    this.enemyRow.style.setProperty('--cols', String(Math.max(1, foes)));
+    this.allyRow.style.setProperty('--cols', String(Math.max(1, mine)));
 
     for (const f of this.player.sim.fighters) {
       const def = getRevos(f.defId);
