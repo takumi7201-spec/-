@@ -2190,7 +2190,21 @@ body[data-layout='wide'] .home-mission {
    画面いっぱいには伸ばさない——札が縦長になるほど中身が薄く見える */
 /* 縦並びの子は既定で親幅まで伸びるが、最小内容幅のほうが広いと
    そちらが勝って画面からはみ出す。潰せることを明示する */
-.digsel-slot { flex: 1 1 0; min-height: 150px; max-height: 250px; display: flex; min-width: 0; }
+.digsel-slot { flex: 1 1 0; min-height: 132px; max-height: 250px; display: flex; min-width: 0; }
+/*
+ * 特別許可区。他の2枚が「いつでもできること」なのに対して、ここは券を
+ * 切る場所——紫の縁で、同じ並びの中で1枚だけ別の場所だと分かるようにする
+ */
+.digsel-card--permit {
+  background: linear-gradient(120deg, rgba(122, 96, 166, 0.22), rgba(255, 253, 248, 0.9) 58%);
+  box-shadow: inset 0 0 0 2px rgba(122, 96, 166, 0.38), var(--lift-1);
+}
+.digsel-card--permit.is-empty { opacity: 0.62; box-shadow: inset 0 0 0 2px rgba(122, 96, 166, 0.2); }
+.digsel-mark--ticket { display: grid; place-items: center; }
+.digsel-ticket-img { width: 34px; height: 34px; image-rendering: pixelated; }
+.digsel-go--ticket { display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.digsel-go--ticket .num { font-size: 20px; }
+.digsel-go-sub { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.75; }
 .digsel-card {
   flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 13px;

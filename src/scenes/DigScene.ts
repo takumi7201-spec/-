@@ -134,12 +134,12 @@ export class DigScene {
 
   // ------------------------------------------------------------ 生成
 
-  load(biomeId: BiomeId, seed: number, speciesPool: SpeciesEntry[], rarityScale = 1): void {
+  load(biomeId: BiomeId, seed: number, speciesPool: SpeciesEntry[], rarityScale = 1, floorRarity = 2): void {
     this.unloadSite();
     this.biomeId = biomeId;
     const biome = BIOMES[biomeId];
 
-    this.site = generateDigSite({ biome, seed, speciesPool, material: this.material, rarityScale });
+    this.site = generateDigSite({ biome, seed, speciesPool, material: this.material, rarityScale, floorRarity });
     this.world = this.site.world;
     this.scene.add(this.world.group);
 

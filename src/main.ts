@@ -134,11 +134,27 @@ async function main(): Promise<void> {
   /** 直前の周回の成果。リザルトで見せる */
   let pendingResult: ResultData | null = null;
 
-  // イベント専用の個体は地層に埋まっていない。発掘の抽選から外す
-  const speciesPool = REVOS.filter((r) => !r.eventOnly).map((r) => ({
+  // イベント専用の個体は地層に埋まっていない。発掘の抽選から外す。
+  // 特別許可区の個体も、通常の層からは出ない
+  const speciesPool = REVOS.filter((r) => !r.eventOnly && !r.permitOnly).map((r) => ({
     id: r.id,
     rarity: r.rarity,
     weight: r.rarity === 1 ? 10 : r.rarity === 2 ? 6 : r.rarity === 3 ? 3 : 1,
+  }));
+  /**
+   * 特別許可区の抽選。
+   *
+   * 通常の層と違い、低レアの重みを落として上を厚くする。チケットを1枚
+   * 切って降りる以上、★1 ばかり出ては割に合わない。ニッポニテスはここにしか
+   * 居ないので、重みを他の★4より厚くして「ここへ来た理由」を返す。
+   */
+  const PERMIT_RARITY_SCALE = 1.8;
+  const PERMIT_FLOOR = 4;
+  const permitPool = REVOS.filter((r) => !r.eventOnly).map((r) => ({
+    id: r.id,
+    rarity: r.rarity,
+    weight: r.permitOnly ? 5
+      : r.rarity === 1 ? 2 : r.rarity === 2 ? 3 : r.rarity === 3 ? 4 : r.rarity === 4 ? 3 : 1.2,
   }));
 
   // ---------------------------------------------------------------- 画面
@@ -217,6 +233,14 @@ async function main(): Promise<void> {
   }
 
   async function startRun(biome: BiomeId): Promise<void> {
+    const permit = biome === 'permitzone';
+    if (permit) {
+      if ((data.player.tickets ?? 0) <= 0) {
+        ui.toast('特別許可証が足りない', 'warn');
+        return;
+      }
+      data.player.tickets = (data.player.tickets ?? 0) - 1;
+    }
     runFossils = [];
     /*
      * 潜行した回数は、降りた時点で数える。
@@ -235,7 +259,18 @@ async function main(): Promise<void> {
     boot.classList.remove('hidden');
     await progress(0.35, 'エリアを生成しています…');
     const seed = (Date.now() ^ (data.daily.runs * 7919)) >>> 0;
-    dig.load(biome, seed, speciesPool, dropDecay(data.daily.runs));
+    /*
+     * 特別許可区は逓減しない。1回ぶんの券を切って降りる場所なので、
+     * 「今日もう何周したか」で目減りさせると、券の価値が日によって変わる。
+     * レアの出かたを 1.8 倍に厚くし、さらに毎回かならず ★4 以上を1点埋める
+     * ——抽選の重みは同じレア度の中でしか働かないので、厚さは倍率と
+     * 最低保証の2つで作る。
+     */
+    dig.load(
+      biome, seed, permit ? permitPool : speciesPool,
+      permit ? PERMIT_RARITY_SCALE : dropDecay(data.daily.runs),
+      permit ? PERMIT_FLOOR : 2,
+    );
     await progress(0.85, 'メッシュを構築しています…');
     dig.resize(renderer.aspect);
     renderer.setScene(dig.scene, dig.camera);

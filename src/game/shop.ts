@@ -14,7 +14,7 @@ import type { BiomeId } from '../voxel/palette';
  * 図鑑を金で埋められてしまう。
  */
 
-export type ShopKind = 'rough' | 'permit';
+export type ShopKind = 'rough' | 'permit' | 'ticket';
 
 export interface ShopItem {
   id: string;
@@ -44,6 +44,17 @@ export const SHOP: ShopItem[] = [
   {
     id: 'permit', name: '調査許可証', desc: '本日の効率を 2 周ぶん戻す。1日 3 枚まで',
     price: 450, kind: 'permit', dailyLimit: 3,
+  },
+  {
+    /*
+     * 特別許可区のチケット。
+     *
+     * 高い。コインで買う道は残すが、ここを主な入手経路にはしない——
+     * 毎日の日課で1枚、記録の節目でまとめて配るほうを本筋に置く。
+     * 1日1枚までにして、コインを積んでも回数では追い越せないようにする。
+     */
+    id: 'ticket', name: '特別許可証', desc: '特別許可区へ1回降りられる。1日 1 枚まで',
+    price: 3200, kind: 'ticket', dailyLimit: 1,
   },
 ];
 
@@ -80,6 +91,13 @@ export function buy(d: SaveData, id: string): BuyResult {
   if (stockLeft(d, item) <= 0) return { ok: false, message: '本日の分は売り切れ' };
   if (d.player.coins < item.price) return { ok: false, message: 'コインが足りない' };
 
+  if (item.kind === 'ticket') {
+    d.player.coins -= item.price;
+    d.player.tickets = (d.player.tickets ?? 0) + 1;
+    d.shop.bought[item.id] = (d.shop.bought[item.id] ?? 0) + 1;
+    return { ok: true, message: '特別許可証を1枚 手に入れた' };
+  }
+
   if (item.kind === 'permit') {
     if (d.daily.runs === 0) return { ok: false, message: '今日はまだ効率が落ちていない' };
     d.player.coins -= item.price;
@@ -92,7 +110,7 @@ export function buy(d: SaveData, id: string): BuyResult {
   const biomes = d.unlockedBiomes.length > 0 ? d.unlockedBiomes : (['canyon'] as BiomeId[]);
   // イベント専用の個体は地層に埋まっていない。商店にも並べない
   const pool = REVOS.filter(
-    (r) => !r.eventOnly && r.rarity >= lo && r.rarity <= hi
+    (r) => !r.eventOnly && !r.permitOnly && r.rarity >= lo && r.rarity <= hi
       && r.habitat.some((b) => biomes.includes(b as BiomeId)),
   );
   if (pool.length === 0) return { ok: false, message: 'いまは並べられる原石がない' };

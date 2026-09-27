@@ -65,6 +65,13 @@ export interface TerrainOptions {
   material: THREE.Material;
   /** 当日周回数によるレア出現率の倍率 */
   rarityScale?: number;
+  /**
+   * この区画で必ず1点は出るレア度。特別許可区だけが使う。
+   *
+   * 倍率（rarityScale）を上げるだけでは、運が悪い回に券が空振りになる。
+   * 券を1枚切る場所では、最低限の持ち帰りを約束しておく
+   */
+  floorRarity?: number;
   fossilCount?: number;
   mineralCount?: number;
 }
@@ -186,11 +193,13 @@ export function generateDigSite(opts: TerrainOptions): DigSiteData {
     if (stamp(world, node, heights, sx)) nodes.push(node);
   }
 
-  // レア以上が1点も出なかったら最深の1点を昇格させる（体感の下振れを潰す）
-  if (nodes.length > 0 && !nodes.some((n) => n.rarity >= 2)) {
+  // 約束したレア度が1点も出なかったら最深の1点を昇格させる（体感の下振れを潰す）
+  const floor = Math.max(2, opts.floorRarity ?? 2);
+  if (nodes.length > 0 && !nodes.some((n) => n.rarity >= floor)) {
     const deepest = nodes.slice().sort((a, b) => b.depth - a.depth)[0];
-    deepest.rarity = 2;
-    const alt = pickByRarity(opts.speciesPool, 2, rng);
+    deepest.rarity = floor as 1 | 2 | 3 | 4 | 5;
+    deepest.depth = depthForRarity(floor, rng);
+    const alt = pickByRarity(opts.speciesPool, floor, rng);
     deepest.speciesId = alt.id;
   }
 

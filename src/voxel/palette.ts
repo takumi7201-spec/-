@@ -31,7 +31,7 @@ export const T = {
   ACCENT: 13,
 } as const;
 
-export type BiomeId = 'canyon' | 'frostpeak' | 'emberfield' | 'tidehollow';
+export type BiomeId = 'canyon' | 'frostpeak' | 'emberfield' | 'tidehollow' | 'permitzone';
 
 export interface Biome {
   id: BiomeId;
@@ -84,6 +84,20 @@ const TIDE = buildPalette([
   0x6aa87a, 0x4d8a62, 0x3fb0a0, 0x7a8a88, 0xeafff4,
 ]);
 
+/*
+ * 特別許可区。
+ *
+ * 他の4層が「どこかの土地」なのに対して、ここは立ち入りが管理された区画。
+ * 紫と黄土を混ぜた、どの層にも属さない配色にする——チケットを切って
+ * 降りた先が、見慣れた地層の色だと「特別」の意味が絵に出ない。
+ */
+const PERMIT = buildPalette([
+  0x000000,
+  0x9a8ab0, 0x7d6c96, 0x51436b, 0x6a5a86,
+  0x4a3f5c, 0x332b44, 0xf2e6b8, 0xc8a6ff,
+  0x8a7a52, 0x6b5e3e, 0xd8b04a, 0x6e6480, 0xfaf0d2,
+]);
+
 export const BIOMES: Record<BiomeId, Biome> = {
   canyon: {
     id: 'canyon',
@@ -114,6 +128,16 @@ export const BIOMES: Record<BiomeId, Biome> = {
     sunColor: 0xffb070, sunIntensity: 1.7,
     ambientSky: 0x4a2838, ambientGround: 0xc04418, ambientIntensity: 0.7,
     relief: 1.6, hardness: 0.68, level: [12, 26],
+  },
+  permitzone: {
+    id: 'permitzone',
+    name: '特別許可区',
+    tagline: '立ち入りが管理された区画。チケットを切って降りる',
+    palette: PERMIT,
+    sky: 0x2c2440, horizon: 0x5a4a78, fog: 0x3a3154,
+    sunColor: 0xffe6b0, sunIntensity: 1.85,
+    ambientSky: 0x8a7ab8, ambientGround: 0x4a3f5c, ambientIntensity: 0.72,
+    relief: 1.15, hardness: 0.6, level: [1, 30],
   },
   tidehollow: {
     id: 'tidehollow',

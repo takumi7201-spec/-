@@ -142,6 +142,10 @@ export interface Fighter {
   cast: Cast | null;
   /** この時刻までは自分で動けない（引き寄せ・足止め） */
   rootedUntil: number;
+  /** この時刻までは敵の狙いを自分へ集める（滑空の壁） */
+  tauntUntil: number;
+  /** 直前に下がった時刻。噴射がここを見る */
+  retreatedAt: number;
   /** 「堆積」など戦闘中の永続蓄積 */
   stacks: Record<string, number>;
   /** 累積の与ダメ・被ダメ（リザルト表示用） */

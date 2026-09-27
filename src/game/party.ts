@@ -102,8 +102,12 @@ export interface StagePreview {
 const STAGE_THEMES = ['flame', 'aqua', 'terra', 'gale', 'null'] as const;
 
 export function stagePreview(stage: number): StagePreview {
-  const biome = Object.values(BIOMES).find((b) => stage >= b.level[0] && stage <= b.level[1])
-    ?? Object.values(BIOMES)[0];
+  // 特別許可区は闘技場にしない。チケットを切って降りる発掘専用の区画で、
+  // 段の幅（1〜30）が広いぶん、素で探すと終盤の段が全部ここになる
+  const biome = Object.values(BIOMES)
+    .filter((b) => b.id !== 'permitzone')
+    .find((b) => stage >= b.level[0] && stage <= b.level[1])
+    ?? BIOMES.canyon;
   return {
     biome: biome.id,
     theme: STAGE_THEMES[stage % STAGE_THEMES.length],

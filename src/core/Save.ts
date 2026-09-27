@@ -63,7 +63,8 @@ export interface SaveData {
   version: number;
   createdAt: number;
   updatedAt: number;
-  player: { name: string; level: number; exp: number; coins: number };
+  /** tickets は特別許可区へ降りるための券。古いセーブには無いので 0 で補う */
+  player: { name: string; level: number; exp: number; coins: number; tickets?: number };
   roster: OwnedRevos[];
   /** 出撃する3体。立ち位置と狙いは役職が決めるので、持つのは顔ぶれだけ */
   party: { order: string[] | null };
@@ -206,7 +207,7 @@ export function defaultSave(): SaveData {
     version: SAVE_VERSION,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    player: { name: 'ディガー', level: 1, exp: 0, coins: 300 },
+    player: { name: 'ディガー', level: 1, exp: 0, coins: 300, tickets: 1 },
     roster: [],
     party: { order: null },
     stock: [],
@@ -282,7 +283,7 @@ export function load(): SaveData {
       ...base,
       ...data,
       settings: { ...base.settings, ...(data.settings ?? {}) },
-      player: { ...base.player, ...(data.player ?? {}) },
+      player: { ...base.player, ...(data.player ?? {}), tickets: data.player?.tickets ?? 0 },
       // 陣形・構え・狙いは廃止した。古いセーブに残っていても読み捨てる
       party: { order: data.party?.order ?? null },
       events: { ...base.events, ...(data.events ?? {}) },

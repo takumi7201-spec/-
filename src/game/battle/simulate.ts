@@ -93,6 +93,8 @@ const OD_RECOVERY: Record<string, number> = {
   tyrantrequiem: 0.55, forkjaw: 0.6, gazepierce: 0.5,
   crimsoncharge: 0.55, harvest: 0.55, serpentvenom: 0.5,
   hornrout: 0.8,
+  cambrianjaw: 0.55, straightbore: 0.5, boundfang: 0.5, bonesever: 0.55, falsejaw: 0.8,
+  shellveil: 0.28, heatshare: 0.28, tangledspiral: 0.28, glideguard: 0.28,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28, grindfeed: 0.28,
 };
@@ -114,9 +116,11 @@ const OD_SHAPE: Record<string, OdShape> = {
   abyssalmaw: 'enemies', hatzegwing: 'enemies', hornrout: 'enemies',
   rockaegis: 'allies', tideheal: 'allies', resonantlight: 'allies', stratarecord: 'allies',
   skyreign: 'allies', grindfeed: 'allies',
+  falsejaw: 'enemies',
+  shellveil: 'allies', heatshare: 'allies', tangledspiral: 'allies', glideguard: 'allies',
 };
 /** 通常の間合いより遠くから撃てる単体技 */
-const OD_REACH: Record<string, number> = { faulthaul: 7, leapstrike: 6.5 };
+const OD_REACH: Record<string, number> = { faulthaul: 7, leapstrike: 6.5, cambrianjaw: 6.5, straightbore: 5.4 };
 
 /** 「制空覇道」の持続（秒） */
 const SKYREIGN_DURATION = 10;
@@ -132,6 +136,10 @@ const GRINDFEED_TICK = 0.34;
 const PULL_HOLD = 2.0;
 /** 「断層圧砕」で足を止める秒数 */
 const CRUSH_ROOT = 1.5;
+/** 「カンブリアの顎」で足を止める秒数 */
+const CAMBRIAN_ROOT = 1.8;
+/** 「滑空の壁」で攻撃を集めていられる時間（秒） */
+const GLIDE_DURATION = 6;
 
 /** レベル補正。Lv30 でおよそ 2.6 倍 */
 function levelScale(level: number): number {
@@ -215,6 +223,8 @@ function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
       target: null,
       cast: null,
       rootedUntil: 0,
+      tauntUntil: -99,
+      retreatedAt: -99,
       stacks: {},
       dealt: 0, taken: 0, healed: 0, kills: 0,
     });
@@ -326,7 +336,9 @@ export class BattleSim {
   }
 
   private effSpd(f: Fighter): number {
-    const m = this.modSum(f, 'spd');
+    let m = this.modSum(f, 'spd');
+    // 「群れの走り」: 生きている味方の数だけ足が速くなる。独りになれば消える
+    if (f.passive === 'packrun') m += 0.04 * Math.min(4, this.alive(f.side).length - 1);
     return Math.max(1, f.spd * clamp(1 + m, 0.4, 2.0));
   }
 
@@ -464,6 +476,11 @@ export class BattleSim {
     if (enemies.length === 0) return null;
     const tac = TACTICS[f.role];
 
+    // 「滑空の壁」: 集めている相手が居る間は、そこへ向かう。
+    // 届かない位置から集めても意味がないので、間合いの内側だけ効く
+    const taunt = enemies.filter((e) => this.clockV < e.tauntUntil && gap(f, e) <= tac.range + 3.2);
+    if (taunt.length > 0) return minBy(taunt, (e) => gap(f, e));
+
     let pick: Fighter;
     switch (f.role) {
       case 'Tank': {
@@ -558,6 +575,7 @@ export class BattleSim {
       const dn = gap(f, near);
       if (dn < tac.keepAway) {
         // 寄られた。相手から離れる向きへ下がる
+        f.retreatedAt = this.clockV;
         const k = 1 / Math.max(1e-4, dn);
         gx = f.x + (f.x - near.x) * k;
         gz = f.z + (f.z - near.z) * k;
@@ -806,7 +824,11 @@ export class BattleSim {
     if (dealt > 0) {
       const p = actor.passive;
       this.tickIslandApex(actor, ev);
-      if (p === 'embers' && this.rng.chance(0.32)) this.applyBurn(target, ev, actor.uid);
+      // 「帆の放熱」: 味方に1体でも居れば、火傷が付きやすくなる
+      const sail = this.alive(actor.side).some((a) => a.passive === 'sailheat') ? 0.2 : 0;
+      if (p === 'embers' && this.rng.chance(0.32 + sail)) this.applyBurn(target, ev, actor.uid);
+      // 帆そのものも焼く。支援役だが、自分の一撃で火種を作れないと働き始められない
+      if (p === 'sailheat' && this.rng.chance(0.45)) this.applyBurn(target, ev, actor.uid);
       if (p === 'venomgland' && this.rng.chance(0.45)) this.applyPoison(target, ev, actor.uid);
       if (p === 'shearwind') {
         const st = actor.stacks.shear ?? 0;
@@ -1054,6 +1076,84 @@ export class BattleSim {
         }
         break;
       }
+      case 'cambrianjaw': {
+        // 奥の1体へ。届く相手が居なければ、いま狙っている相手を噛む
+        const back = enemies.filter((e) => isBackliner(e.role) && gap(actor, e) <= OD_REACH.cambrianjaw);
+        const t = back.length > 0 ? minBy(back, (e) => gap(actor, e)) : single();
+        if (!t) break;
+        this.dealDamage(actor, t, power, ev);
+        if (t.alive && !t.anchored) t.rootedUntil = Math.max(t.rootedUntil, this.clockV + CAMBRIAN_ROOT);
+        break;
+      }
+      case 'shellveil': {
+        const amount = Math.round(actor.def * 2.2 * (1 + this.modSum(actor, 'def')));
+        for (const a of allies) {
+          const v = a === actor ? amount * 2 : amount;
+          a.shield = { amount: v, turns: 4 };
+          ev.push({ t: 'shield', uid: a.uid, amount: v });
+        }
+        break;
+      }
+      case 'falsejaw': {
+        for (const e of enemies) {
+          this.dealDamage(actor, e, power, ev);
+          if (e.alive) this.addMod(e, { kind: 'atk', value: -0.20, turns: 4, source: 'falsejaw' }, ev, 'ATK低下');
+        }
+        break;
+      }
+      case 'straightbore': {
+        const t = single(); if (!t) break;
+        this.dealDamage(actor, t, power, ev);
+        // 一直線に貫く。撃った向きの延長でいちばん近い2体目を探す
+        const dx = t.x - actor.x;
+        const dz = t.z - actor.z;
+        const d = Math.max(1e-4, Math.hypot(dx, dz));
+        const behind = this.alive(other(actor.side)).filter((e) => {
+          if (e === t) return false;
+          const ex = e.x - actor.x;
+          const ez = e.z - actor.z;
+          const along = (ex * dx + ez * dz) / d;
+          if (along <= d) return false;
+          // 線からの横ずれ。殻の幅ぶんだけ許す
+          return Math.abs((ex * dz - ez * dx) / d) <= 1.2 + e.radius;
+        });
+        if (behind.length > 0) this.dealDamage(actor, minBy(behind, (e) => gap(actor, e)), power, ev);
+        break;
+      }
+      case 'boundfang': {
+        const t = single(); if (!t) break;
+        for (let i = 0; i < 3 && t.alive; i++) this.dealDamage(actor, t, power, ev);
+        break;
+      }
+      case 'heatshare': {
+        for (const a of allies) {
+          this.addMod(a, { kind: 'atk', value: 0.20, turns: 4, source: 'heatshare' }, ev, 'ATK上昇');
+          const i = a.statuses.findIndex((st) => st.kind === 'burn');
+          if (i >= 0) a.statuses.splice(i, 1);
+        }
+        break;
+      }
+      case 'tangledspiral': {
+        for (const a of allies) {
+          this.heal(actor, a, Math.round(actor.atk * 1.15 * mod), ev);
+          const i = a.mods.findIndex((m) => m.value < 0);
+          if (i >= 0) a.mods.splice(i, 1);
+        }
+        break;
+      }
+      case 'bonesever': {
+        const t = single(); if (!t) break;
+        const p2 = t.hp / t.maxHp < 0.35 ? power * 2 : power;
+        this.dealDamage(actor, t, p2, ev);
+        break;
+      }
+      case 'glideguard': {
+        // 攻撃を自分へ集める。守護役なので、集めきれば後ろが丸ごと守られる
+        actor.tauntUntil = this.clockV + GLIDE_DURATION;
+        this.addMod(actor, { kind: 'def', value: 0.40, turns: 4, source: 'glideguard' }, ev, 'DEF上昇');
+        ev.push({ t: 'passive', uid: actor.uid, label: '滑空の壁' });
+        break;
+      }
       case 'greateruption': {
         for (const e of enemies) {
           this.dealDamage(actor, e, power, ev);
@@ -1098,17 +1198,19 @@ export class BattleSim {
     for (const g of this.fighters) {
       if (!g.alive || g.side !== target.side || g === target || g.role !== 'Guardian') continue;
       if (g.cast || this.clockV < g.rootedUntil) continue;
-      const reach = g.passive === 'platescreen' ? 3.0 : 2.2;
+      const reach = g.passive === 'platescreen' ? 3.0 : g.passive === 'fourwings' ? 3.8 : 2.2;
       const d = dist(g, target);
       if (d <= reach && d < bestD) { best = g; bestD = d; }
     }
     if (!best) return target;
-    const p = best.passive === 'platescreen' ? 0.45 : 0.3;
+    const p = best.passive === 'platescreen' ? 0.45 : best.passive === 'fourwings' ? 0.62 : 0.3;
     if (!this.rng.chance(p)) return target;
     // 身代わりに入った本人を、打たれた味方と攻め手のあいだへ滑り込ませる
     best.x = clamp(target.x + (actor.x - target.x) * 0.35, -ARENA_X, ARENA_X);
     best.z = clamp(target.z + (actor.z - target.z) * 0.35, -ARENA_Z, ARENA_Z);
     ev.push({ t: 'passive', uid: best.uid, label: '身代わり' });
+    // 肩代わりして受けた一撃だと、ダメージ計算の側から分かるようにする
+    best.stacks.covering = 1;
     return best;
   }
 
@@ -1147,11 +1249,18 @@ export class BattleSim {
     buff *= this.rules.elementDealt?.[atk.element] ?? 1;
 
     const pa = atk.passive;
+    // 「噴射」: 下がった直後の一撃だけ重い
+    if (pa === 'jetwake' && this.clockV - atk.retreatedAt < 1.2) buff *= 1.25;
+    // 「甲羅」: 半分を切ってから硬くなる
+    if (def.passive === 'carapace' && def.hp / def.maxHp < 0.5) buff *= 0.78;
+
     // 役職の噛み合わせ。崩し役は壁を割り、特攻役は後衛を刈る
     if (atk.role === 'Breaker' && isWall(def.role)) buff *= BREAKER_VS_WALL;
     if (atk.role === 'Sprinter' && isBackliner(def.role)) buff *= RAIDER_VS_BACK;
 
     if (pa === 'deeppressure' && def.spd >= atk.spd + 20) buff *= 1.14;
+    // 「四枚の翼」: 割って入った一撃は、羽根で殺して受ける
+    if (def.passive === 'fourwings' && def.stacks.covering) buff *= 0.72;
     // 「初手の牙」: まだ一度も噛んでいない相手に強い
     if (pa === 'firstbite' && !atk.stacks[`bit${def.uid}`]) buff *= 1.20;
     // 「駆ける角」: 速度差そのものが威力になる
@@ -1160,6 +1269,19 @@ export class BattleSim {
     }
     // 「鎌爪」: 硬い相手ほど深く入る
     if (pa === 'scytheclaw') buff *= 1 + Math.min(0.24, Math.max(0, defStat - 90) * 0.0020);
+    /*
+     * 「原初の捕食者」: 奥にいる柔らかいものを食う。
+     *
+     * 防御の薄さで測る形も試したが、盤面を +0.6pt しか動かさなかった——
+     * 硬さの幅が狭く、倍率が薄まりすぎる。狙う相手そのものを名指しして、
+     * 特攻役が敵陣の奥へ飛び込む意味を、そのまま威力にする。
+     */
+    if (pa === 'primordial' && isBackliner(def.role)) buff *= 1.35;
+    // 「群れの走り」: 数が力になる。独りになれば、ただの小型獣脚類に戻る
+    if (pa === 'packrun') buff *= 1 + 0.04 * Math.min(4, this.alive(atk.side).length - 1);
+    // 「帆の放熱」: 味方の誰かが帆を広げている間、火傷した敵はよく燃える
+    if (def.statuses.some((st) => st.kind === 'burn')
+      && this.alive(atk.side).some((a) => a.passive === 'sailheat')) buff *= 1.15;
     // 「断層牽引」: 前線に出ていない相手に強い
     if (pa === 'traction' && !this.engaged(def)) buff *= 1.34;
     if (pa === 'overheat') buff *= 1 + 0.25 * (1 - atk.hp / atk.maxHp);
@@ -1189,6 +1311,7 @@ export class BattleSim {
     // 「鎌爪」は常にシールドを無視する
     if (pAtk === 'scytheclaw') pierceShield = true;
     const { amount, crit, eff } = this.computeDamage(atk, target, power, true, force);
+    target.stacks.covering = 0;
 
     let remaining = amount;
     let shielded = 0;
@@ -1210,6 +1333,18 @@ export class BattleSim {
     // 被弾で OD が溜まる（負けている側が巻き返せる仕組み）
     if (remaining > 0) this.gainOd(target, 24 * (remaining / target.maxHp), ev);
     if (eff === 1.5) this.gainOd(atk, 4, ev);
+
+    // 一度でも打たれた相手は覚えておく（原初の捕食者が見る）
+    target.stacks.hit = 1;
+
+    // 「苛立たせる」: 殴ってきた相手の手元を狂わせる
+    if (target.passive === 'irritate' && atk !== target && atk.alive) {
+      const st = target.stacks[`irr${atk.uid}`] ?? 0;
+      if (st < 3) {
+        target.stacks[`irr${atk.uid}`] = st + 1;
+        this.addMod(atk, { kind: 'atk', value: -0.10, turns: 999, source: 'irritate' }, ev, 'ATK低下');
+      }
+    }
 
     if (remaining > 0 || amount > 0) {
       if (pAtk === 'firstbite') atk.stacks[`bit${target.uid}`] = 1;
@@ -1245,6 +1380,15 @@ export class BattleSim {
 
   private heal(src: Fighter, target: Fighter, amount: number, ev: BattleEvent[]): void {
     if (!target.alive) return;
+    /*
+     * 「読めない巻き」: 傷んでいる相手ほど厚く癒す。
+     *
+     * 平らに配る回復は、削られていない相手にこぼれて溢れる。巻きが読めない
+     * ぶん、行き先の決め方も一様ではない——瀕死へ寄せて最大 +60%。
+     */
+    if (src.passive === 'unreadable') {
+      amount = Math.round(amount * (1 + 0.6 * (1 - target.hp / target.maxHp)));
+    }
     // 「大地の伊吹」: 味方が受け取る回復を底上げする。誰が撃った回復でも効く
     const boost = this.alive(target.side).some((a) => a.passive === 'earthbreath') ? 1.15 : 1;
     const before = target.hp;
@@ -1261,6 +1405,12 @@ export class BattleSim {
     if (by !== target) by.kills++;
     ev.push({ t: 'ko', uid: target.uid, by: by.uid });
 
+    // 「同族喰い」: 仕留めるたびに体力を取り戻し、牙が重くなる
+    if (by !== target && by.alive && by.passive === 'cannibal') {
+      ev.push({ t: 'passive', uid: by.uid, label: '同族喰い' });
+      this.heal(by, by, Math.round(by.maxHp * 0.12), ev);
+      this.addMod(by, { kind: 'atk', value: 0.10, turns: 999, source: 'cannibal' }, ev, 'ATK上昇');
+    }
     // 「追い波」: 仕留めた側が、その勢いのまま次の行動に入る
     if (by !== target && by.alive && by.passive === 'pursuit') {
       by.ready += 0.38;

@@ -26,6 +26,8 @@ export interface MissionDef {
   unit: string;
   coins: number;
   exp: number;
+  /** 特別許可区へ降りるチケット。無い（0）ミッションのほうが多い */
+  tickets?: number;
   progress(d: SaveData): number;
 }
 
@@ -45,7 +47,7 @@ export const MISSIONS: MissionDef[] = [
   },
   {
     id: 'd-win', group: 'daily', name: '今日の戦果', desc: 'バトルに 3 回勝つ',
-    goal: 3, unit: '勝', coins: 240, exp: 40,
+    goal: 3, unit: '勝', coins: 240, exp: 40, tickets: 1,
     progress: (d) => d.daily.counts.win ?? 0,
   },
   {
@@ -67,12 +69,12 @@ export const MISSIONS: MissionDef[] = [
   },
   {
     id: 'r-dex12', group: 'record', name: '層を跨ぐ', desc: '図鑑に 12 種 載せる',
-    goal: 12, unit: '種', coins: 800, exp: 140,
+    goal: 12, unit: '種', coins: 800, exp: 140, tickets: 2,
     progress: (d) => d.dex.length,
   },
   {
     id: 'r-dexall', group: 'record', name: '完本', desc: `図鑑を ${dexAll} 種すべて埋める`,
-    goal: dexAll, unit: '種', coins: 2400, exp: 400,
+    goal: dexAll, unit: '種', coins: 2400, exp: 400, tickets: 10,
     progress: (d) => d.dex.length,
   },
   {
@@ -97,7 +99,7 @@ export const MISSIONS: MissionDef[] = [
   },
   {
     id: 'r-stage10', group: 'record', name: '深部へ', desc: 'ステージ 10 を踏破する',
-    goal: 10, unit: '段', coins: 1200, exp: 200,
+    goal: 10, unit: '段', coins: 1200, exp: 200, tickets: 3,
     progress: (d) => d.stageProgress,
   },
   {
@@ -112,7 +114,7 @@ export const MISSIONS: MissionDef[] = [
   },
   {
     id: 'r-ko100', group: 'record', name: '百体', desc: '通算 100 体 撃破する',
-    goal: 100, unit: '体', coins: 900, exp: 150,
+    goal: 100, unit: '体', coins: 900, exp: 150, tickets: 2,
     progress: (d) => d.stats.kos,
   },
 ];
@@ -163,6 +165,7 @@ export function claimMission(d: SaveData, id: string): MissionDef | null {
   if (m.group === 'daily') d.missions.daily.claimed.push(m.id);
   else d.missions.claimed.push(m.id);
   d.player.coins += m.coins;
+  if (m.tickets) d.player.tickets = (d.player.tickets ?? 0) + m.tickets;
   addPlayerExp(d, m.exp);
   return m;
 }

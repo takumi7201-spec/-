@@ -3,8 +3,9 @@ import { h, button, clear } from '../dom';
 import type { SaveData } from '../../core/Save';
 import { dropDecay } from '../../core/Save';
 import { BIOMES, type BiomeId } from '../../voxel/palette';
-import { RARITY_NAMES, getRevos } from '../../game/data/revos';
+import { RARITY_NAMES, REVOS, getRevos } from '../../game/data/revos';
 import { revosIcon } from '../revosIcon';
+import { spriteUrl } from '../../fx/SpriteUnit';
 import { screenHead, plate, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
@@ -23,6 +24,7 @@ const MAX_HEARTS = 5;
 export class DigSelectScreen extends Screen {
   private data!: SaveData;
   private goEl!: HTMLElement;
+  private permitEl!: HTMLElement;
   private cleanEl!: HTMLElement;
   private stockPlate = plate('未精錬', { tone: 'amber' });
 
@@ -41,8 +43,9 @@ export class DigSelectScreen extends Screen {
       right: this.stockPlate.el,
     });
     this.goEl = h('div', { class: 'digsel-slot' });
+    this.permitEl = h('div', { class: 'digsel-slot digsel-slot--permit' });
     this.cleanEl = h('div', { class: 'digsel-slot' });
-    this.el.append(head, h('div', { class: 'digsel-body' }, this.goEl, this.cleanEl));
+    this.el.append(head, h('div', { class: 'digsel-body' }, this.goEl, this.permitEl, this.cleanEl));
   }
 
   enter(): void { this.render(); }
@@ -79,6 +82,47 @@ export class DigSelectScreen extends Screen {
       h('span', { class: 'digsel-go', text: '潜る' }),
     );
     this.goEl.appendChild(go);
+
+    // ---- 特別許可区 ----
+    // 券を持っているかどうかで、押せるかと文面が変わる。
+    // ここにしか居ない個体の姿を札に出す——降りる理由は数字ではなく顔で示す
+    clear(this.permitEl);
+    const tickets = this.data.player.tickets ?? 0;
+    const pz = BIOMES.permitzone;
+    const only = REVOS.filter((r) => r.permitOnly);
+    const permit = button('', () => {
+      if (tickets <= 0) {
+        audio.uiError();
+        this.ui.toast('特別許可証が要る。ミッションの報酬か、商店で手に入る', 'warn', 2600);
+        return;
+      }
+      audio.uiConfirm();
+      this.onGo?.('permitzone');
+    }, { class: `digsel-card digsel-card--permit ${tickets <= 0 ? 'is-empty' : ''}` });
+    const onlyFaces = h('span', { class: 'digsel-faces' });
+    for (const r of only.slice(0, 3)) onlyFaces.appendChild(revosIcon(r.id, 'digsel-face'));
+    permit.append(
+      h('span', { class: 'digsel-mark digsel-mark--ticket' },
+        h('img', { class: 'digsel-ticket-img', src: spriteUrl('ticket'), alt: '' }),
+      ),
+      h('span', { class: 'digsel-main' },
+        h('span', { class: 'digsel-eyebrow', text: spaced('特別発掘') }),
+        h('span', { class: 'digsel-title', text: pz.name }),
+        h('span', {
+          class: 'digsel-note',
+          text: tickets > 0 ? '効率は落ちない。かならず ★4 以上が1点' : '許可証が無いと降りられない',
+        }),
+        h('span', { class: 'digsel-meta' },
+          onlyFaces,
+          h('span', { class: 'digsel-names', text: `${only.map((r) => r.name).join(' / ')} はここだけ` }),
+        ),
+      ),
+      h('span', { class: 'digsel-go digsel-go--ticket' },
+        h('span', { class: 'num', text: String(tickets) }),
+        h('span', { class: 'digsel-go-sub', text: '枚' }),
+      ),
+    );
+    this.permitEl.appendChild(permit);
 
     // ---- 精錬 ----
     clear(this.cleanEl);

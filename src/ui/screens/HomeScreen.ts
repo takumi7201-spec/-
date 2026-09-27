@@ -193,8 +193,12 @@ export class HomeScreen extends Screen {
     // ---- 次の目標 ----
     // 発掘地は、いまの到達段が入る層を出す。行き先の名前が無いと目標にならない
     const stage = this.data.stageProgress + 1;
-    const biome = Object.values(BIOMES).find((b) => stage >= b.level[0] && stage <= b.level[1])
-      ?? Object.values(BIOMES)[0];
+    // 特別許可区は闘技場にしない。チケットを切って降りる発掘専用の区画で、
+    // 段の幅（1〜30）が広いぶん、素で探すと終盤の段が全部ここになる
+    const biome = Object.values(BIOMES)
+      .filter((b) => b.id !== 'permitzone')
+      .find((b) => stage >= b.level[0] && stage <= b.level[1])
+      ?? BIOMES.canyon;
     this.goalPlate.set(`ステージ ${stage}`, biome.name);
 
     // ---- ミッション ----
