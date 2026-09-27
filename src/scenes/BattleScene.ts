@@ -94,10 +94,6 @@ export class BattleScene {
   private tmp = new THREE.Vector3();
   /** 揺らぎの時計。ヒットストップ中は止まる */
   private time = 0;
-  /** 必殺の寄り。撃った本人と相手を、残り時間のあいだだけ大きく映す */
-  private spotA: string | null = null;
-  private spotB: string | null = null;
-  private spotLeft = 0;
   private shots: Shot[] = [];
   private shotPool: THREE.Mesh[] = [];
   private shotGeo = new THREE.SphereGeometry(0.16, 10, 8);
@@ -241,7 +237,6 @@ export class BattleScene {
       view.anim.play('idle');
       this.units.set(f.uid, view);
     }
-    this.wideShot();
   }
 
   private clearUnits(): void {
@@ -411,39 +406,15 @@ export class BattleScene {
     this.shake = Math.min(1.1, this.shake + v);
   }
 
-  /** 必殺の寄り。seconds のあいだだけ、撃った本人（と相手）に寄る */
-  spotlight(actorUid: string, targetUid: string | undefined, seconds: number): void {
-    if (!this.units.has(actorUid)) return;
-    this.spotA = actorUid;
-    this.spotB = targetUid && this.units.has(targetUid) ? targetUid : null;
-    this.spotLeft = seconds;
-  }
-
-  wideShot(): void {
-    this.spotA = null;
-    this.spotB = null;
-    this.spotLeft = 0;
-  }
-
   /**
-   * 構図。全員が同時に動くので、誰か1体を追うのではなく、生きている全員を
-   * 収める。広がったら引き、寄り集まったら寄る。必殺の間だけ撃った本人へ寄る。
+   * 構図。全員が同時に動くので、誰か1体を追わず、生きている全員を収める。
+   * 広がったら引き、寄り集まったら寄る。
+   *
+   * 必殺のときも寄らない。5体が同時に動いている最中に1体へ寄ると、
+   * そのあいだ他の9体で何が起きたのかが分からなくなる——撃った本人は
+   * 咆哮・光・揺れで示す。カメラは戦場全体を見ている側に固定する。
    */
   private frame(): void {
-    const a = this.spotA ? this.units.get(this.spotA) : undefined;
-    if (a && this.spotLeft > 0) {
-      const t = this.spotB ? this.units.get(this.spotB) : undefined;
-      const mid = this.tmp.copy(a.base);
-      let spread = 0;
-      if (t) {
-        spread = a.base.distanceTo(t.base);
-        mid.add(t.base).multiplyScalar(0.5);
-      }
-      const back = Math.min(3.6, Math.max(0, spread - 3) * 0.55);
-      this.camGoal.set(mid.x * 0.3, 7.0 + back * 0.25, mid.z + 11.2 + back);
-      this.lookGoal.set(mid.x * 0.5, 1.1, mid.z - 0.2);
-      return;
-    }
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, n = 0;
     for (const u of this.units.values()) {
       if (!u.alive) continue;
@@ -476,7 +447,6 @@ export class BattleScene {
     }
     const sdt = dt * scale;
     this.time += sdt;
-    if (this.spotLeft > 0) this.spotLeft -= dt;
 
     // 向きの基準。狙いが無いときは敵陣の重心を見る
     const centre = [0, 0];

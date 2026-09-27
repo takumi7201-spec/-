@@ -124,7 +124,6 @@ export class BattlePlayer {
     this.finished = true;
     if (winner === 0) audio.victory();
     else audio.defeat();
-    this.scene.wideShot();
     this.events.onEnd?.(winner);
   }
 
@@ -145,7 +144,6 @@ export class BattlePlayer {
           this.odFired = true;
           this.scene.play(e.uid, 'roar');
           this.scene.addShake(0.3);
-          this.scene.spotlight(e.uid, e.targets.length === 1 ? e.targets[0] : undefined, 1.1 / rate);
           audio.odFire();
         }
         break;
