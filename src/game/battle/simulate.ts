@@ -97,6 +97,8 @@ const OD_RECOVERY: Record<string, number> = {
   shellveil: 0.28, heatshare: 0.28, tangledspiral: 0.28, glideguard: 0.28,
   throatbite: 0.55, nervejam: 0.8,
   nestguard: 0.28, trilobeshield: 0.28,
+  // 自分を構え直すだけの技。ここで止まると、二重咬みに入る前に隙を突かれる
+  twinsever: 0.2,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28, grindfeed: 0.28,
 };
@@ -121,7 +123,7 @@ const OD_SHAPE: Record<string, OdShape> = {
   falsejaw: 'enemies',
   shellveil: 'allies', heatshare: 'allies', tangledspiral: 'allies', glideguard: 'allies',
   nervejam: 'enemies',
-  nestguard: 'allies', trilobeshield: 'allies',
+  nestguard: 'allies', trilobeshield: 'allies', twinsever: 'allies',
 };
 /** 通常の間合いより遠くから撃てる単体技 */
 const OD_REACH: Record<string, number> = { faulthaul: 7, leapstrike: 6.5, cambrianjaw: 6.5, straightbore: 5.4 };
@@ -142,6 +144,11 @@ const PULL_HOLD = 2.0;
 const CRUSH_ROOT = 1.5;
 /** 「カンブリアの顎」で足を止める秒数 */
 const CAMBRIAN_ROOT = 1.8;
+/** 「二重捕咬」が噛んで離さない秒数と、その確率 */
+const TWINBITE_ROOT = 1.0;
+const TWINBITE_CHANCE = 0.35;
+/** 「二重絶咬・内腔呑滅」で2ヒットになる通常攻撃の回数 */
+const TWINSEVER_HITS = 5;
 /** 「滑空の壁」で攻撃を集めていられる時間（秒） */
 const GLIDE_DURATION = 6;
 
@@ -841,6 +848,20 @@ export class BattleSim {
     }
   }
 
+  /**
+   * 「二重捕咬」: 噛んだ相手をその場に縫い止める。
+   *
+   * 顎の天井にもう一列の歯がある、という形をそのまま効果にした。
+   * 乱数は当たったときだけ引く——引く回数が分岐で変わると、
+   * 同じシードで同じ戦闘にならなくなる。
+   */
+  private tickTwinbite(actor: Fighter, target: Fighter, dealt: number, ev: BattleEvent[]): void {
+    if (actor.passive !== 'twinbite' || dealt <= 0 || !target.alive || target.anchored) return;
+    if (!this.rng.chance(TWINBITE_CHANCE)) return;
+    target.rootedUntil = Math.max(target.rootedUntil, this.clockV + TWINBITE_ROOT);
+    ev.push({ t: 'passive', uid: actor.uid, label: '二重捕咬' });
+  }
+
   private performBasic(actor: Fighter, picked: Fighter, ev: BattleEvent[]): void {
     if (picked.side === actor.side) {
       // 回復役の手当て。攻撃ではないので、攻撃に反応する特性は回さない
@@ -850,6 +871,20 @@ export class BattleSim {
     }
     const target = this.coverFor(actor, picked, ev);
     const dealt = this.dealDamage(actor, target, this.basicPowerOf(actor), ev);
+    this.tickTwinbite(actor, target, dealt, ev);
+    /*
+     * 「二重絶咬・内腔呑滅」: 構えた回数ぶん、1回の攻撃が2度入る。
+     *
+     * 1発ずつ別に判定する（外れも会心も独立）。噛み付きの束縛も
+     * 2度目のぶん転がるので、咬んでいる間は相手が動けなくなりやすい。
+     */
+    if ((actor.stacks.twin ?? 0) > 0) {
+      actor.stacks.twin = (actor.stacks.twin ?? 0) - 1;
+      if (target.alive) {
+        const second = this.dealDamage(actor, target, this.basicPowerOf(actor), ev);
+        this.tickTwinbite(actor, target, second, ev);
+      }
+    }
     this.gainOd(actor, 12, ev);
     this.tickSkygrasp(actor, ev);
 
@@ -1216,6 +1251,11 @@ export class BattleSim {
         for (const a of allies) {
           this.addMod(a, { kind: 'taken', value: -0.22, turns: 4, source: 'trilobeshield' }, ev, '被ダメ低下');
         }
+        break;
+      }
+      case 'twinsever': {
+        actor.stacks.twin = TWINSEVER_HITS;
+        ev.push({ t: 'passive', uid: actor.uid, label: '二重絶咬・内腔呑滅' });
         break;
       }
       case 'greateruption': {

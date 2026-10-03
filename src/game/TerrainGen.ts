@@ -66,6 +66,13 @@ export interface TerrainOptions {
   /** 当日周回数によるレア出現率の倍率 */
   rarityScale?: number;
   /**
+   * ホロタイプ（★5）だけに追加で掛かる倍率。特別許可区だけが使う。
+   *
+   * ★5 の産出をこの区画1か所に寄せたので、通常と同じ 0.2% のままだと
+   * 券を何十枚切っても1体も出ない。上の段だけを別に厚くする
+   */
+  holotypeScale?: number;
+  /**
    * この区画で必ず1点は出るレア度。特別許可区だけが使う。
    *
    * 倍率（rarityScale）を上げるだけでは、運が悪い回に券が空振りになる。
@@ -180,10 +187,21 @@ export function generateDigSite(opts: TerrainOptions): DigSiteData {
     return null;
   };
 
+  /*
+   * この区画に実在する最高のレア度。
+   *
+   * ★5 を特別許可区だけの産出にしたので、通常の層では ★5 を引いても
+   * その段の種が1つも無い。pickByRarity は下の段へ落として種を選ぶが、
+   * 節点に書かれるレア度は引いた値のままなので、「★5 の埋蔵物を掘ったら
+   * ★1 だった」が起きる（深さ・制限時間・最高レア度の記録も全部ずれる）。
+   * 引いた値を、その区画に居る上限で頭打ちにする。
+   */
+  const poolCap = opts.speciesPool.reduce((m, p) => Math.max(m, p.rarity), 1);
+
   for (let i = 0; i < fossilCount; i++) {
     const pos = placeAt();
     if (!pos) break;
-    const rarity = rollRarity(rng, rarityScale);
+    const rarity = Math.min(poolCap, rollRarity(rng, rarityScale, opts.holotypeScale ?? 1)) as 1 | 2 | 3 | 4 | 5;
     const species = pickByRarity(opts.speciesPool, rarity, rng);
     // 深いほどレア。深度は掘るまで見せないので「もう一掘り」の動機になる
     const depthM = depthForRarity(rarity, rng);
@@ -194,7 +212,7 @@ export function generateDigSite(opts: TerrainOptions): DigSiteData {
   }
 
   // 約束したレア度が1点も出なかったら最深の1点を昇格させる（体感の下振れを潰す）
-  const floor = Math.max(2, opts.floorRarity ?? 2);
+  const floor = Math.min(poolCap, Math.max(2, opts.floorRarity ?? 2));
   if (nodes.length > 0 && !nodes.some((n) => n.rarity >= floor)) {
     const deepest = nodes.slice().sort((a, b) => b.depth - a.depth)[0];
     deepest.rarity = floor as 1 | 2 | 3 | 4 | 5;
@@ -275,9 +293,9 @@ function stamp(world: VoxelWorld, node: BuriedNode, heights: Int16Array, sx: num
  * ★5 は「たまたま出る」であってはいけない一方、絶対に出ないのも困る。
  * 200回に1回＝数日遊べば当たる、くらいに置く。
  */
-function rollRarity(rng: Rng, scale: number): 1 | 2 | 3 | 4 | 5 {
+function rollRarity(rng: Rng, scale: number, topScale = 1): 1 | 2 | 3 | 4 | 5 {
   const r = rng.next();
-  const holotype = 0.002 * scale;
+  const holotype = 0.002 * scale * topScale;
   const legend = 0.008 * scale;
   const epic = 0.09 * scale;
   const rare = 0.3 * scale;

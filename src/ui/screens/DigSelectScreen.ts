@@ -89,6 +89,7 @@ export class DigSelectScreen extends Screen {
     clear(this.permitEl);
     const tickets = this.data.player.tickets ?? 0;
     const pz = BIOMES.permitzone;
+    // ここだけの個体。★5 は全部ここなので、札には代表を3体だけ出す
     const only = REVOS.filter((r) => r.permitOnly);
     const permit = button('', () => {
       if (tickets <= 0) {
@@ -110,11 +111,14 @@ export class DigSelectScreen extends Screen {
         h('span', { class: 'digsel-title', text: pz.name }),
         h('span', {
           class: 'digsel-note',
-          text: tickets > 0 ? '効率は落ちない。かならず ★4 以上が1点' : '許可証が無いと降りられない',
+          text: tickets > 0 ? 'ホロタイプはここだけ。かならず ★4 以上が1点' : '許可証が無いと降りられない',
         }),
         h('span', { class: 'digsel-meta' },
           onlyFaces,
-          h('span', { class: 'digsel-names', text: `${only.map((r) => r.name).join(' / ')} はここだけ` }),
+          h('span', {
+            class: 'digsel-names',
+            text: `ホロタイプ ${only.filter((r) => r.rarity === 5).length} 種ほか、ここだけの個体`,
+          }),
         ),
       ),
       h('span', { class: 'digsel-go digsel-go--ticket' },

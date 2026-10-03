@@ -150,11 +150,18 @@ async function main(): Promise<void> {
    */
   const PERMIT_RARITY_SCALE = 1.8;
   const PERMIT_FLOOR = 4;
+  /**
+   * ホロタイプ（★5）はこの区画でしか出ない。通常と同じ確率のままだと
+   * 券を数十枚切っても1体も掘れないので、上の段だけ別に厚くする
+   */
+  const PERMIT_HOLOTYPE_SCALE = 3.5;
   const permitPool = REVOS.filter((r) => !r.eventOnly).map((r) => ({
     id: r.id,
     rarity: r.rarity,
-    weight: r.permitOnly ? 5
-      : r.rarity === 1 ? 2 : r.rarity === 2 ? 3 : r.rarity === 3 ? 4 : r.rarity === 4 ? 3 : 1.2,
+    // ★5 は同じ段の中では等しく。★4 の中ではニッポニテス（ここだけの個体）を厚く
+    weight: r.rarity === 5 ? 1
+      : r.permitOnly ? 5
+      : r.rarity === 1 ? 2 : r.rarity === 2 ? 3 : r.rarity === 3 ? 4 : 3,
   }));
 
   // ---------------------------------------------------------------- 画面
@@ -270,6 +277,7 @@ async function main(): Promise<void> {
       biome, seed, permit ? permitPool : speciesPool,
       permit ? PERMIT_RARITY_SCALE : dropDecay(data.daily.runs),
       permit ? PERMIT_FLOOR : 2,
+      permit ? PERMIT_HOLOTYPE_SCALE : 1,
     );
     await progress(0.85, 'メッシュを構築しています…');
     dig.resize(renderer.aspect);
