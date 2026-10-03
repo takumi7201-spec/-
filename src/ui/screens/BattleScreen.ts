@@ -36,14 +36,22 @@ interface UnitCard {
  * 属性チップの隣に置く。名前ではなく絵で出すのは、カードが視野の端でしか
  * 読まれないから——端で読めるのは色と形だけで、2文字の熟語は読めない。
  */
-function statusIcon(kind: 'burn' | 'poison'): HTMLElement {
+type StatusIcon = 'burn' | 'poison' | 'dizzy' | 'bleed';
+const STATUS_SPRITE: Record<StatusIcon, string> = {
+  burn: 'fx-burn', poison: 'fx-poison', dizzy: 'fx-dizzy', bleed: 'fx-bleed',
+};
+const STATUS_NAME: Record<StatusIcon, string> = {
+  burn: '火傷', poison: '毒', dizzy: '目眩', bleed: '出血',
+};
+
+function statusIcon(kind: StatusIcon): HTMLElement {
   // 画像は CSS の url() ではなく img で置く。public/ の絶対パスは
   // サイトの根から解決されるので、下の階層に載せたときに全部落ちる——
   // スプライトの在処は spriteUrl() 1か所に寄せる
   const img = document.createElement('img');
   img.className = 'card-status-img';
-  img.src = spriteUrl(kind === 'burn' ? 'fx-burn' : 'fx-poison');
-  img.alt = kind === 'burn' ? '火傷' : '毒';
+  img.src = spriteUrl(STATUS_SPRITE[kind]);
+  img.alt = STATUS_NAME[kind];
   img.decoding = 'async';
   return h('span', { class: `card-status-icon card-status-icon--${kind}` }, img);
 }
@@ -263,6 +271,16 @@ export class BattleScreen extends Screen {
         }
         break;
       }
+      case 'miss':
+        this.pushLog(`${this.nameOf(e.from)} の攻撃は外れた`);
+        break;
+      case 'burst': {
+        const c = this.card(e.uid);
+        if (c) { c.hp.set(e.hp / c.maxHp); c.hpText.textContent = `${e.hp}`; }
+        this.updateEnemyTotal();
+        this.pushLog(`${this.nameOf(e.uid)} 出血が弾けた ${e.amount}（${e.tokens}）`);
+        break;
+      }
       case 'pull':
         this.pushLog(`${this.nameOf(e.by)} が ${this.nameOf(e.uid)} を引きずり出した`);
         break;
@@ -421,18 +439,26 @@ export class BattleScreen extends Screen {
     const on = f.alive ? f.statuses : [];
     const burn = on.some((s) => s.kind === 'burn');
     const poison = on.find((s) => s.kind === 'poison');
+    const dizzy = on.find((s) => s.kind === 'dizzy');
+    const bleed = on.find((s) => s.kind === 'bleed');
     const stack = poison ? Math.max(1, Math.round(poison.value / 0.03)) : 0;
-    const key = `${burn ? 'b' : ''}${stack ? `p${stack}` : ''}`;
+    const dz = dizzy ? Math.max(1, Math.round(dizzy.value / 0.14)) : 0;
+    // 出血は溜まった札の数そのもの。あと何枚で弾けるかを読ませる
+    const bl = bleed?.tokens ?? 0;
+    const key = `${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}`;
     if (key === c.statusKey) return;
     c.statusKey = key;
 
     clear(c.status);
-    if (burn) c.status.appendChild(statusIcon('burn'));
-    if (stack > 0) {
-      const el = statusIcon('poison');
-      if (stack > 1) el.appendChild(h('i', { class: 'card-status-n num', text: String(stack) }));
+    const put = (kind: StatusIcon, n: number): void => {
+      const el = statusIcon(kind);
+      if (n > 1) el.appendChild(h('i', { class: 'card-status-n num', text: String(n) }));
       c.status.appendChild(el);
-    }
+    };
+    if (burn) put('burn', 1);
+    if (stack > 0) put('poison', stack);
+    if (dz > 0) put('dizzy', dz);
+    if (bl > 0) put('bleed', bl);
   }
 
 

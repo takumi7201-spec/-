@@ -202,10 +202,28 @@ export class BattlePlayer {
         this.events.onOdReady?.(e.uid);
         break;
 
+      case 'miss': {
+        // 外した一撃。数字ではなく言葉で出す——0 を出すと「硬くて通らない」に見える
+        const at = this.scene.worldOf(e.uid, this.tmpVec);
+        if (at) this.scene.numbers.spawn(at.clone(), 'MISS', { color: '#cdbfa8', scale: 0.8 });
+        break;
+      }
+
+      case 'burst': {
+        // 溜まった血が一度に出る。数字は赤く、画面も揺らす
+        const at = this.scene.worldOf(e.uid, this.tmpVec);
+        if (at) this.scene.numbers.spawn(at.clone(), `${e.amount}`, { color: '#d6263a', crit: true, scale: 1.05 });
+        this.scene.play(e.uid, 'hurt');
+        this.scene.addShake(0.3);
+        audio.hit(0.9, true);
+        break;
+      }
+
       case 'statusTick': {
         const at = this.scene.worldOf(e.uid, this.tmpVec);
         // 火傷は橙、毒は紫。同じ色で出すと、どちらが切れたのか読めない
         const color = e.kind === 'poison' ? '#9d6bd8' : '#ff9c3c';
+        if (e.amount <= 0) break;
         if (at) this.scene.numbers.spawn(at.clone(), `${e.amount}`, { color, scale: 0.8 });
         break;
       }

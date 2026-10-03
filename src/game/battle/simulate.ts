@@ -95,6 +95,8 @@ const OD_RECOVERY: Record<string, number> = {
   hornrout: 0.8,
   cambrianjaw: 0.55, straightbore: 0.5, boundfang: 0.5, bonesever: 0.55, falsejaw: 0.8,
   shellveil: 0.28, heatshare: 0.28, tangledspiral: 0.28, glideguard: 0.28,
+  throatbite: 0.55, nervejam: 0.8,
+  nestguard: 0.28, trilobeshield: 0.28,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28, grindfeed: 0.28,
 };
@@ -118,6 +120,8 @@ const OD_SHAPE: Record<string, OdShape> = {
   skyreign: 'allies', grindfeed: 'allies',
   falsejaw: 'enemies',
   shellveil: 'allies', heatshare: 'allies', tangledspiral: 'allies', glideguard: 'allies',
+  nervejam: 'enemies',
+  nestguard: 'allies', trilobeshield: 'allies',
 };
 /** 通常の間合いより遠くから撃てる単体技 */
 const OD_REACH: Record<string, number> = { faulthaul: 7, leapstrike: 6.5, cambrianjaw: 6.5, straightbore: 5.4 };
@@ -163,6 +167,34 @@ export function cleanRank(clean: number): 'S' | 'A' | 'B' | 'C' | 'D' {
 const POISON_PER_STACK = 0.03;
 const POISON_MAX_STACK = 3;
 const POISON_TURNS = 5;
+
+/**
+ * 目眩。
+ *
+ * この戦闘で唯一「攻撃が外れる」仕組み。素の命中は 100% で、目眩が
+ * 付いている間だけ下がる——外れるのが常態だと、何を見ても運のせいに
+ * 見える。重ねられるが、半分より下がらないようにする。
+ */
+const DIZZY_PER_STACK = 0.14;
+const DIZZY_MAX_STACK = 3;
+const DIZZY_TURNS = 4;
+const MIN_HIT = 0.5;
+
+/**
+ * 出血。
+ *
+ * 火傷や毒のように毎回少し削るのではなく、札を溜めて一度に出す。
+ * 札が BLEED_BURST 枚に届いた瞬間に弾け、1枚につき 最大体力の
+ * BLEED_PER_TOKEN を、防御も相性も通さずに持っていく。
+ *
+ * 溜めている間は何も起きないので、相手は「あと何枚か」を見て、
+ * 弾ける前に倒すか、回復で耐えるかを選べる。シールドは吸収する——
+ * 板で押さえれば血は止まる、という読みにしておく。
+ */
+const BLEED_BURST = 4;
+const BLEED_PER_TOKEN = 0.035;
+/** 札はこの秒数ごとに1枚ずつ乾いて落ちる */
+const BLEED_DECAY_TURNS = 6;
 
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
 const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };
@@ -830,6 +862,10 @@ export class BattleSim {
       // 帆そのものも焼く。支援役だが、自分の一撃で火種を作れないと働き始められない
       if (p === 'sailheat' && this.rng.chance(0.45)) this.applyBurn(target, ev, actor.uid);
       if (p === 'venomgland' && this.rng.chance(0.45)) this.applyPoison(target, ev, actor.uid);
+      // 「原始の神経」: 当てた相手の平衡を狂わせる
+      if (p === 'firstnerve' && this.rng.chance(0.5)) this.applyDizzy(target, ev, actor.uid);
+      // 「断牙」: 牙が通った傷は塞がらない。自分で血を流させ、自分でそこを衝く
+      if (p === 'sabertooth') this.applyBleed(target, ev, actor.uid);
       if (p === 'shearwind') {
         const st = actor.stacks.shear ?? 0;
         if (st < 3) {
@@ -1154,6 +1190,34 @@ export class BattleSim {
         ev.push({ t: 'passive', uid: actor.uid, label: '滑空の壁' });
         break;
       }
+      case 'throatbite': {
+        const t = single(); if (!t) break;
+        this.dealDamage(actor, t, power, ev);
+        if (t.alive) this.applyBleed(t, ev, actor.uid, 3);
+        break;
+      }
+      case 'nervejam': {
+        for (const e of enemies) {
+          this.dealDamage(actor, e, power, ev);
+          if (!e.alive) continue;
+          this.applyDizzy(e, ev, actor.uid);
+          this.addMod(e, { kind: 'spd', value: -0.20, turns: 4, source: 'nervejam' }, ev, 'SPD低下');
+        }
+        break;
+      }
+      case 'nestguard': {
+        for (const a of allies) {
+          this.heal(actor, a, Math.round(actor.atk * 1.25 * mod), ev);
+          this.addMod(a, { kind: 'def', value: 0.25, turns: 4, source: 'nestguard' }, ev, 'DEF上昇');
+        }
+        break;
+      }
+      case 'trilobeshield': {
+        for (const a of allies) {
+          this.addMod(a, { kind: 'taken', value: -0.22, turns: 4, source: 'trilobeshield' }, ev, '被ダメ低下');
+        }
+        break;
+      }
       case 'greateruption': {
         for (const e of enemies) {
           this.dealDamage(actor, e, power, ev);
@@ -1277,6 +1341,11 @@ export class BattleSim {
      * 特攻役が敵陣の奥へ飛び込む意味を、そのまま威力にする。
      */
     if (pa === 'primordial' && isBackliner(def.role)) buff *= 1.35;
+    // 「断牙」: 弱っている相手——焼かれ、毒され、眩み、血を流している相手に深く入る
+    if (pa === 'sabertooth' && def.statuses.some((st) => st.kind !== 'regen')) buff *= 1.40;
+    // 「原始の複眼」: 眩んだ相手の隙は、味方全員に見えている
+    if (def.statuses.some((st) => st.kind === 'dizzy')
+      && this.alive(atk.side).some((a) => a.passive === 'compoundeye')) buff *= 1.15;
     // 「群れの走り」: 数が力になる。独りになれば、ただの小型獣脚類に戻る
     if (pa === 'packrun') buff *= 1 + 0.04 * Math.min(4, this.alive(atk.side).length - 1);
     // 「帆の放熱」: 味方の誰かが帆を広げている間、火傷した敵はよく燃える
@@ -1302,11 +1371,30 @@ export class BattleSim {
     return { amount: Math.max(1, Math.round(base)), crit, eff };
   }
 
+  /**
+   * 命中率。目眩が無ければ 1（必ず当たる）。
+   *
+   * 素で外す仕組みを置かないのは、オートバトルで見ているだけの側に
+   * 「なぜ負けたか」を運へ逃がさないため。外れるのは、外させた側が
+   * 居るときだけにする。
+   */
+  private hitChance(f: Fighter): number {
+    const d = f.statuses.find((x) => x.kind === 'dizzy');
+    return d ? Math.max(MIN_HIT, 1 - d.value) : 1;
+  }
+
   private dealDamage(
     atk: Fighter, target: Fighter, power: number, ev: BattleEvent[],
     pierceShield = false, force?: 'crit',
   ): number {
     if (!target.alive || !atk.alive) return 0;
+    // 目眩。乱数を引くのは目眩が付いているときだけ——引く回数が
+    // 分岐で変わると、同じシードで同じ戦闘にならなくなる
+    const hit = this.hitChance(atk);
+    if (hit < 1 && !this.rng.chance(hit)) {
+      ev.push({ t: 'miss', uid: target.uid, from: atk.uid });
+      return 0;
+    }
     const pAtk = atk.passive;
     // 「鎌爪」は常にシールドを無視する
     if (pAtk === 'scytheclaw') pierceShield = true;
@@ -1395,6 +1483,20 @@ export class BattleSim {
     target.hp = Math.min(target.maxHp, target.hp + Math.round(amount * boost));
     src.healed += target.hp - before;
     ev.push({ t: 'heal', uid: target.uid, from: src.uid, amount: target.hp - before, hp: target.hp });
+    /*
+     * 「良い母」: 渡した回復に、同じぶんの盾を少し添える。
+     *
+     * 満タンの相手には回復がこぼれるが、盾は渡した量で決まるので無駄にならない
+     * ——削られる前に備える側の回復役、という形になる。
+     */
+    if (src.passive === 'goodmother' && amount > 0) {
+      const add = Math.round(amount * 0.3);
+      if (add > 0) {
+        const cur = target.shield?.amount ?? 0;
+        target.shield = { amount: cur + add, turns: 4 };
+        ev.push({ t: 'shield', uid: target.uid, amount: cur + add });
+      }
+    }
   }
 
   private kill(target: Fighter, by: Fighter, ev: BattleEvent[]): void {
@@ -1500,6 +1602,60 @@ export class BattleSim {
     ev.push({ t: 'status', uid: target.uid, kind: 'poison', applied: true });
   }
 
+  /** 目眩。重ねるほど外れるが、半分までしか落ちない */
+  private applyDizzy(target: Fighter, ev: BattleEvent[], source: string): void {
+    // 「原始の複眼」: 見るための器官そのものなので、眩まない
+    if (target.passive === 'compoundeye') return;
+    const existing = target.statuses.find((s) => s.kind === 'dizzy');
+    if (existing) {
+      existing.value = Math.min(DIZZY_MAX_STACK * DIZZY_PER_STACK, existing.value + DIZZY_PER_STACK);
+      existing.turns = DIZZY_TURNS;
+    } else {
+      target.statuses.push({ kind: 'dizzy', turns: DIZZY_TURNS, value: DIZZY_PER_STACK, source });
+    }
+    ev.push({ t: 'status', uid: target.uid, kind: 'dizzy', applied: true });
+  }
+
+  /** 出血。札を積み、BLEED_BURST 枚で弾ける */
+  private applyBleed(target: Fighter, ev: BattleEvent[], source: string, n = 1): void {
+    let st = target.statuses.find((s) => s.kind === 'bleed');
+    if (!st) {
+      st = { kind: 'bleed', turns: BLEED_DECAY_TURNS, value: 0, tokens: 0, source };
+      target.statuses.push(st);
+    }
+    st.tokens = (st.tokens ?? 0) + n;
+    st.turns = BLEED_DECAY_TURNS;
+    ev.push({ t: 'status', uid: target.uid, kind: 'bleed', applied: true });
+    if ((st.tokens ?? 0) >= BLEED_BURST) this.burstBleed(target, ev);
+  }
+
+  /**
+   * 溜まった札を一度に出す。
+   *
+   * 防御も相性もバフも通さない固定ダメージ。硬さで止められないぶん、
+   * 盾（吸収の板）だけは効く——押さえる手段を1つ残しておく。
+   */
+  private burstBleed(target: Fighter, ev: BattleEvent[]): void {
+    const st = target.statuses.find((s) => s.kind === 'bleed');
+    const tokens = st?.tokens ?? 0;
+    if (!st || tokens <= 0) return;
+    target.statuses = target.statuses.filter((x) => x !== st);
+    let dmg = Math.max(1, Math.round(target.maxHp * BLEED_PER_TOKEN * tokens));
+    if (target.shield) {
+      const absorbed = Math.min(target.shield.amount, dmg);
+      target.shield.amount -= absorbed;
+      dmg -= absorbed;
+      if (target.shield.amount <= 0) target.shield = null;
+    }
+    target.hp = Math.max(0, target.hp - dmg);
+    target.taken += dmg;
+    ev.push({ t: 'burst', uid: target.uid, amount: dmg, tokens, hp: target.hp });
+    if (target.hp === 0) {
+      const src = this.byUid.get(st.source) ?? target;
+      this.kill(target, src, ev);
+    }
+  }
+
   private applyBurn(target: Fighter, ev: BattleEvent[], source: string): void {
     const existing = target.statuses.find((s) => s.kind === 'burn');
     if (existing) existing.turns = Math.max(existing.turns, 3);
@@ -1530,6 +1686,18 @@ export class BattleSim {
     if (now >= (this.statusAt.get(f.uid) ?? Infinity)) {
       this.statusAt.set(f.uid, now + STATUS_TICK);
       for (const s of f.statuses) {
+        // 目眩は削らない。時間で薄れるだけ
+        if (s.kind === 'dizzy') { s.turns--; continue; }
+        // 出血の札は、弾けないまま置かれると1枚ずつ乾いて落ちる
+        if (s.kind === 'bleed') {
+          s.turns--;
+          if (s.turns <= 0) {
+            s.tokens = (s.tokens ?? 0) - 1;
+            s.turns = BLEED_DECAY_TURNS;
+            if ((s.tokens ?? 0) <= 0) s.turns = 0;
+          }
+          continue;
+        }
         if (s.kind !== 'burn' && s.kind !== 'poison') continue;
         const dmg = Math.max(1, Math.round(f.maxHp * s.value));
         f.hp = Math.max(0, f.hp - dmg);

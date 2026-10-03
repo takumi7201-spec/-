@@ -20,9 +20,19 @@ export interface Mod {
   source: string;
 }
 
+/**
+ * 状態異常の種類。
+ *   burn   … 毎刻み 最大体力の割合で焼ける
+ *   poison … 同じく削るが、重ねられる
+ *   regen  … 1秒ごとに回復を配る
+ *   dizzy  … 攻撃が外れるようになる（命中率を下げる）
+ *   bleed  … 札が溜まり、一定数でバーストして固定ダメージ
+ */
+export type StatusKind = 'burn' | 'regen' | 'poison' | 'dizzy' | 'bleed';
+
 export interface StatusEffect {
-  kind: 'burn' | 'regen' | 'poison';
-  /** 残りの刻み数。火傷・毒は STATUS_TICK 秒ごと、再生は 1 秒ごとに 1 減る */
+  kind: StatusKind;
+  /** 残りの刻み数。火傷・毒・目眩は STATUS_TICK 秒ごと、再生は 1 秒ごとに 1 減る */
   turns: number;
   /**
    * burn / poison: 1行動あたりに削る最大体力の割合 / regen: 1回あたりの回復量（実数）
@@ -40,9 +50,17 @@ export interface StatusEffect {
   pool?: number;
   /** 時間で切れるものの失効時刻（Mod.until と同じ単位） */
   until?: number;
+  /** bleed だけが使う、溜まった札の数 */
+  tokens?: number;
   source: string;
 }
 
+/**
+ * 出血だけが持つ、溜まった札の数。
+ *
+ * 火傷や毒のように毎回少しずつ削るのではなく、溜めて一度に出す。
+ * 「いま何枚か」をカードに出すので、value に混ぜず別に持つ。
+ */
 export interface Shield {
   amount: number;
   turns: number;
@@ -170,8 +188,12 @@ export type BattleEvent =
   | { t: 'heal'; uid: string; from: string; amount: number; hp: number }
   | { t: 'shield'; uid: string; amount: number }
   | { t: 'mod'; uid: string; kind: ModKind; value: number; turns: number; label: string }
-  | { t: 'status'; uid: string; kind: 'burn' | 'poison'; applied: boolean }
-  | { t: 'statusTick'; uid: string; kind: 'burn' | 'regen' | 'poison'; amount: number; hp: number }
+  | { t: 'status'; uid: string; kind: 'burn' | 'poison' | 'dizzy' | 'bleed'; applied: boolean }
+  | { t: 'statusTick'; uid: string; kind: StatusKind; amount: number; hp: number }
+  /** 外した一撃。目眩が無ければ起きない */
+  | { t: 'miss'; uid: string; from: string }
+  /** 溜まった出血が弾けた。amount は防御も相性も通さない固定ダメージ */
+  | { t: 'burst'; uid: string; amount: number; tokens: number; hp: number }
   | { t: 'od'; uid: string; value: number }
   | { t: 'odReady'; uid: string }
   | { t: 'ko'; uid: string; by: string }
