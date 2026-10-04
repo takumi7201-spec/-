@@ -3,6 +3,8 @@ import { h, button, clear } from '../dom';
 import { todayKey, type SaveData } from '../../core/Save';
 import { EVENTS, type EventDef } from '../../game/data/events';
 import { stagePreview } from '../../game/party';
+import { STAGE_COUNT } from '../../game/data/stages';
+import { revosIcon } from '../revosIcon';
 import { ELEMENT_NAMES, BIOMES } from '../../voxel/palette';
 import { screenHead, plate, spaced } from '../chrome';
 import { eventCard } from '../eventCard';
@@ -67,8 +69,8 @@ export class BattleSelectScreen extends Screen {
 
   private render(): void {
     if (!this.data || !this.bodyEl) return;
-    const frontier = this.data.stageProgress + 1;
-    this.progPlate.set(`ステージ ${this.data.stageProgress}`);
+    const frontier = Math.min(STAGE_COUNT, this.data.stageProgress + 1);
+    this.progPlate.set(`${this.data.stageProgress} / ${STAGE_COUNT}`);
 
     const open = EVENTS.filter(
       (e) => this.data.stageProgress >= e.requires && !this.data.events.cleared.includes(e.id),
@@ -110,9 +112,12 @@ export class BattleSelectScreen extends Screen {
   }
 
   private renderStages(frontier: number): void {
+    if (this.data.stageProgress >= STAGE_COUNT) {
+      this.bodyEl.appendChild(h('div', { class: 'sel-note', text: `全 ${STAGE_COUNT} 段を踏破した。どの段にも戻って挑める` }));
+    }
     // 未踏の段は1つだけ出す。10段先まで並べても、挑めないものが増えるだけ
     for (let stage = frontier; stage >= 1; stage--) {
-      const isNext = stage === frontier;
+      const isNext = stage === frontier && stage > this.data.stageProgress;
       const pv = stagePreview(stage);
 
       const card = button('', () => { audio.uiConfirm(); this.onNormal?.(stage); }, {
@@ -124,14 +129,22 @@ export class BattleSelectScreen extends Screen {
           h('span', { class: 'stage-no-num num', text: String(stage) }),
         ),
         h('span', { class: 'stage-main' },
-          h('span', { class: 'stage-biome', text: BIOMES[pv.biome].name }),
+          h('span', { class: 'stage-biome', text: pv.name }),
           h('span', { class: 'stage-traits' },
+            h('span', { class: 'stage-trait', text: BIOMES[pv.biome].name }),
             h('span', { class: 'stage-trait' },
               h('i', { class: `dot dot--${pv.theme}` }),
               `${ELEMENT_NAMES[pv.theme]}寄り`,
             ),
-            h('span', { class: 'stage-trait', text: `★${pv.rarityCap} まで` }),
+            h('span', { class: 'stage-trait', text: `★${pv.rarityCap}` }),
+            h('span', { class: 'stage-trait num', text: `Lv${pv.level}` }),
           ),
+          // 相手は段で固定。誰が来るかを札の上で全部見せる——
+          // 「勝てない段」を前に、編成を組み替える判断ができるように
+          h('span', { class: 'stage-foes' },
+            ...pv.foes.map((id) => revosIcon(id, 'stage-foe-icon')),
+          ),
+          isNext ? h('span', { class: 'stage-hint', text: pv.hint }) : null,
         ),
         h('span', { class: 'stage-right' },
           h('span', { class: 'stage-tag', text: isNext ? spaced('未踏') : spaced('踏破') }),

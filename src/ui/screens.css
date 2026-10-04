@@ -1985,9 +1985,17 @@ body[data-layout='wide'] .det-body { left: 16vw; right: 16vw; }
 .rot-tier.is-got .rot-tier-reward { color: var(--ink-faint); text-decoration: line-through; }
 
 /* 段の札。左に番号、中に予告、右に状態と報酬 */
+/*
+ * 札は中身で伸びる。固定の顔ぶれ5体と勝ち筋の一文が入ったので、
+ * 78px のままだと下の2行が切れていた（button は中身があふれても
+ * 自分から伸びないので、高さは auto を明示して渡す）
+ */
 .stage-card {
   display: flex; align-items: center; gap: 12px;
-  min-height: 78px; padding: 10px 13px;
+  min-height: 78px; padding: 11px 13px;
+  /* 縦に積む箱の中で縮ませない。既定の flex-shrink のままだと、
+     顔ぶれと勝ち筋を足したぶんが 78px に押し戻されて下2行が切れる */
+  flex: none;
   border: 0; border-radius: 15px;
   background: rgba(255, 253, 248, 0.84); color: var(--ink);
   box-shadow: 0 5px 14px rgba(72, 58, 36, 0.14);
@@ -2021,6 +2029,18 @@ body[data-layout='wide'] .det-body { left: 16vw; right: 16vw; }
 }
 .stage-card.is-next .stage-tag { background: var(--hl-amber-deep); }
 .stage-coin { font-size: 13px; color: var(--pen-brown); }
+/* 固定の顔ぶれ。段に挑む前に、誰が5体で出てくるかをここで読み切らせる */
+.stage-foes { display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+.stage-foe-icon { width: 30px; height: 30px; }
+.stage-hint {
+  font-size: 10px; font-weight: 700; color: var(--pen-brown);
+  margin-top: 2px; line-height: 1.35;
+}
+.sel-note {
+  padding: 10px 14px; border-radius: 13px;
+  background: rgba(255, 253, 248, 0.7); color: var(--ink-soft);
+  font-size: 11px; font-weight: 700; text-align: center;
+}
 
 body[data-layout='wide'] .sel-body,
 body[data-layout='wide'] .sel-tabs { left: 18vw; right: 18vw; }

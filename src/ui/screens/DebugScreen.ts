@@ -5,6 +5,7 @@ import { makeUid } from '../../core/Save';
 import { REVOS, getRevos } from '../../game/data/revos';
 import { EVENTS } from '../../game/data/events';
 import { ELEMENT_NAMES } from '../../voxel/palette';
+import { STAGE_COUNT } from '../../game/data/stages';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
 import { revosDetailBody } from '../revosDetail';
@@ -172,7 +173,7 @@ export class DebugScreen extends Screen {
       h('div', { class: 'dbg-section' },
         h('div', { class: 'dbg-head', text: '進行' }),
         h('div', { class: 'dbg-stat num' },
-          h('span', { text: `ステージ ${d.stageProgress}` }),
+          h('span', { text: `ステージ ${d.stageProgress} / ${STAGE_COUNT}` }),
           h('span', { class: 'dim', text: `◈ ${d.player.coins}` }),
         ),
         h('div', { class: 'dbg-row' },
@@ -183,12 +184,12 @@ export class DebugScreen extends Screen {
           }, { class: 'btn--sm btn--ghost' }),
           button('＋1', () => {
             audio.uiTap();
-            d.stageProgress++;
+            d.stageProgress = Math.min(STAGE_COUNT, d.stageProgress + 1);
             this.onChanged?.(); this.render();
           }, { class: 'btn--sm btn--ghost' }),
           button('＋5', () => {
             audio.uiTap();
-            d.stageProgress += 5;
+            d.stageProgress = Math.min(STAGE_COUNT, d.stageProgress + 5);
             this.onChanged?.(); this.render();
           }, { class: 'btn--sm btn--ghost' }),
         ),
@@ -196,7 +197,7 @@ export class DebugScreen extends Screen {
           'イベントを全部開ける',
           `ステージ ${Math.max(...EVENTS.map((e) => e.requires), 0)} まで進める`,
           () => {
-            d.stageProgress = Math.max(d.stageProgress, ...EVENTS.map((e) => e.requires));
+            d.stageProgress = Math.min(STAGE_COUNT, Math.max(d.stageProgress, ...EVENTS.map((e) => e.requires)));
             return `ステージ ${d.stageProgress} にした`;
           },
         ),

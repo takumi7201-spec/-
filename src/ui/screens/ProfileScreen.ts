@@ -2,6 +2,7 @@ import { Screen } from '../UIRoot';
 import { h, bar, clear, fmtNum } from '../dom';
 import type { SaveData } from '../../core/Save';
 import { expToNext } from '../../core/Save';
+import { STAGE_COUNT } from '../../game/data/stages';
 import { REVOS, getRevos } from '../../game/data/revos';
 import { EVENTS } from '../../game/data/events';
 import { revosIcon } from '../revosIcon';
@@ -143,7 +144,7 @@ export class ProfileScreen extends Screen {
       h('div', { class: 'prof-tiles' },
         ...([
           ['図鑑', `${d.dex.length} / ${REVOS.length}`],
-          ['ステージ', `${d.stageProgress}`],
+          ['ステージ', `${d.stageProgress} / ${STAGE_COUNT}`],
           ['勝率', st.battles > 0 ? `${winRate}%` : '—'],
           ['所持', `${d.roster.length} 体`],
         ] as const).map(([k, v]) => h('div', { class: 'prof-tile' },

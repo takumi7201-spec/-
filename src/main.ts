@@ -21,6 +21,7 @@ import {
   buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, mergeFossil,
   teamAnchor, stagePreview, effectiveParty, PARTY_SIZE,
 } from './game/party';
+import { STAGE_COUNT } from './game/data/stages';
 import { tabBar } from './ui/chrome';
 import { unclaimedCount } from './game/mail';
 import { readyCount } from './game/missions';
@@ -309,7 +310,7 @@ async function main(): Promise<void> {
     lastEvent = ev;
     activeSpecial = special;
     lastSpecial = special;
-    activeStage = Math.max(1, stage);
+    activeStage = Math.max(1, Math.min(STAGE_COUNT, stage));
     lastStage = activeStage;
     boot.classList.remove('hidden');
     await progress(0.4, ev ? '記録を読み出しています…' : special?.kind === 'boss' ? '巨獣の気配を探っています…' : '闘技場を生成しています…');
@@ -321,7 +322,7 @@ async function main(): Promise<void> {
     const foes = ev ? buildEventTeam(ev, mine.members.length)
       : daily ? buildDailyTeam(special!.date, data.stageProgress, teamAnchor(mine))
       : boss ? buildBossTeam(boss, teamAnchor(mine))
-      : buildEnemyTeam(activeStage, seed, teamAnchor(mine));
+      : buildEnemyTeam(activeStage);
     const rules = daily ? daily.rules : boss ? { timeLimit: BOSS_TIME } : {};
     player = new BattlePlayer(seed, mine, foes, battle, rules);
     battleScreen.setPlayer(player);
@@ -730,7 +731,7 @@ async function main(): Promise<void> {
         // 到達済みの段へ戻れるようにしたので、勝っても進むとは限らない。
         // 進むのは未踏の段（＝いまの進行度の1つ先）を抜いたときだけ
         const advanced = activeStage > data.stageProgress;
-        if (advanced) data.stageProgress = activeStage;
+        if (advanced) data.stageProgress = Math.min(STAGE_COUNT, activeStage);
         coins = stageCoins(activeStage, !advanced);
         if (!advanced) rows.push({ label: '再挑戦', value: `ステージ ${activeStage}` });
       }
@@ -762,10 +763,15 @@ async function main(): Promise<void> {
      * 配分も前列0.5/後列0.25をやめた。同じ戦いに出た3体なので同額。
      * 半分しか入らない後列は、いつまでも前列の半分のレベルで固定され、
      * 編成を組み替えた瞬間に壊れる。
+     *
+     * 額は 900 → 1800 に上げた。段が30で固定になり、相手のレベルも
+     * 段ごとに決まったので、こちらの伸びが遅いと「段は進むのに自分の
+     * 数字が動かない」状態になる。必要EXPは level^1.55 で伸びるので、
+     * 1段あたり1〜2戦で1つ上がり、30段を抜ける頃に上限の Lv30 へ届く。
      */
     const setup = buildTeamSetup(data.roster, data.party.order);
     const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
-    const base = winner === 0 || bossFrac >= 0.55 ? 900 : 340;
+    const base = winner === 0 || bossFrac >= 0.55 ? 1800 : 680;
     setup?.members.forEach((m) => {
       const unit = data.roster.find((r) => r.uid === m.uid);
       if (!unit) return;
@@ -780,7 +786,7 @@ async function main(): Promise<void> {
         kind: 'exp',
       });
     });
-    if (winner === 0 && !ev && !sp) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress}` });
+    if (winner === 0 && !ev && !sp) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress} / ${STAGE_COUNT}` });
     writeSave(data);
     const secs = Math.round(player?.sim.clock ?? 0);
     const isBoss = sp?.kind === 'boss';

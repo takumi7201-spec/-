@@ -1,6 +1,7 @@
 import type { QualityTier } from './Quality';
 import type { BiomeId } from '../voxel/palette';
 import type { Engraving } from '../game/engraving';
+import { STAGE_COUNT } from '../game/data/stages';
 
 /**
  * セーブデータ。
@@ -282,6 +283,9 @@ export function load(): SaveData {
     return {
       ...base,
       ...data,
+      // 段を30で打ち止めにしたので、それ以上まで進んでいた古いセーブは詰める。
+      // 存在しない段を「到達済み」として持つと、選択画面が空の段を出す
+      stageProgress: Math.min(STAGE_COUNT, Math.max(0, data.stageProgress ?? 0)),
       settings: { ...base.settings, ...(data.settings ?? {}) },
       player: { ...base.player, ...(data.player ?? {}), tickets: data.player?.tickets ?? 0 },
       // 陣形・構え・狙いは廃止した。古いセーブに残っていても読み捨てる

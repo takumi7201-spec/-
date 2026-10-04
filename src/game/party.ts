@@ -1,11 +1,11 @@
-import { REVOS, getRevos } from './data/revos';
+import { getRevos } from './data/revos';
 import type { OwnedRevos, SaveData } from '../core/Save';
 import { makeUid } from '../core/Save';
 import type { TeamSetup } from './battle/types';
-import { Rng } from '../voxel/VoxelPainter';
-import { BIOMES, type BiomeId } from '../voxel/palette';
+import type { BiomeId, ElementId } from '../voxel/palette';
 import { cleanMultiplier } from './battle/simulate';
 import { ENGRAVE_PATTERNS, buildEngraving, type Engraving } from './engraving';
+import { stageDef, stageEngravePattern, stageRarityCap, stageTheme } from './data/stages';
 
 /** 出撃する枠の数 */
 export const PARTY_SIZE = 5;
@@ -71,98 +71,71 @@ export function teamAnchor(setup: TeamSetup): TeamAnchor {
 export interface TeamAnchor { level: number; clean: number; size: number }
 
 /**
- * 敵編成。
- *
- * レベルは「出撃した編成の平均」に合わせる。以前は 3 + stage*2 という
- * 絶対の階段だったが、敵が1ステージで +2 上がるのに対して、こちらは
- * 1勝でおよそ +1、しかも必要EXPが level^1.55 で伸びるので、進むほど
- * 差が開く一方だった。レベル差はHP・ATK・DEFの三方向に同時に効くので、
- * 実測で +2 差 → 勝率39%、+4 差 → 10%、+6 差 → 0%。つまり数戦で
- * 数学的に追いつけなくなる階段を登らされていた。
- *
- * ステージが担うのは「誰と当たるか」——レア度の上限・属性の寄せ方——
- * であって、素のステータス差ではない。レベルの上乗せは 0 にしてある。
- * 実測でこの置き方の勝率は 61〜81%、終盤ほど低いが、それは相手の
- * レア度が上がるからで、編成を組み替えれば戻せる範囲に収まる。
- */
-/**
  * ステージが決めるもの。
  *
- * レベルではなく「誰と当たるか」。選択画面もここから読む——
- * 表示用に別の表を持つと、片方だけ直したときに嘘の予告になる。
+ * 30段すべて固定表（stages.ts）から読む。表示も実際の相手も同じ1か所から
+ * 引く——選択画面用に別の表を持つと、片方だけ直したときに嘘の予告になる。
  */
 export interface StagePreview {
-  theme: 'flame' | 'aqua' | 'terra' | 'gale' | 'null';
+  name: string;
+  theme: ElementId;
   rarityCap: number;
-  cleanBonus: number;
-  /** 闘技場の地層。選択画面の表示と実際の舞台を同じ1か所から引く */
   biome: BiomeId;
+  /** 相手のレベル。こちらの編成は見ない */
+  level: number;
+  /** 相手の数。段が進むと 2 → 5 に増える */
+  size: number;
+  hint: string;
+  /** 席順そのままの顔ぶれ */
+  foes: string[];
 }
-
-const STAGE_THEMES = ['flame', 'aqua', 'terra', 'gale', 'null'] as const;
 
 export function stagePreview(stage: number): StagePreview {
-  // 特別許可区は闘技場にしない。チケットを切って降りる発掘専用の区画で、
-  // 段の幅（1〜30）が広いぶん、素で探すと終盤の段が全部ここになる
-  const biome = Object.values(BIOMES)
-    .filter((b) => b.id !== 'permitzone')
-    .find((b) => stage >= b.level[0] && stage <= b.level[1])
-    ?? BIOMES.canyon;
+  const s = stageDef(stage);
   return {
-    biome: biome.id,
-    theme: STAGE_THEMES[stage % STAGE_THEMES.length],
-    // ★5 は終盤まで敵にも出さない。初見で「これは別格」と分かる位置に置く
-    rarityCap: stage < 3 ? 2 : stage < 6 ? 3 : stage < 10 ? 4 : 5,
-    cleanBonus: Math.min(10, stage * 2),
+    name: s.name,
+    biome: s.biome,
+    theme: stageTheme(s),
+    rarityCap: stageRarityCap(s),
+    level: s.level,
+    size: s.foes.length,
+    hint: s.hint,
+    foes: s.foes,
   };
 }
 
-export function buildEnemyTeam(stage: number, seed: number, anchor: TeamAnchor): TeamSetup {
-  const rng = new Rng(seed ^ 0x9e3779b9);
-  const level = Math.max(1, anchor.level);
-  const pv = stagePreview(stage);
-  const theme = pv.theme;
-
-  // イベント個体は通常戦には出さない——出会う場所を1か所に限る
-  const pool = REVOS.filter((r) => !r.eventOnly && r.rarity <= pv.rarityCap);
-  const themed = pool.filter((r) => r.element === theme);
-  const pick = (): string => {
-    const list = rng.chance(0.55) && themed.length > 0 ? themed : pool;
-    return list[Math.floor(rng.next() * list.length)].id;
-  };
-
-  const want = Math.max(1, Math.min(PARTY_SIZE, anchor.size));
-  const ids: string[] = [];
-  let guard = 0;
-  while (ids.length < want) {
-    const id = pick();
-    // 候補が少ない段では重複を許す（uid は席ごとに別なので、同じ種が2体いてもよい）
-    if (!ids.includes(id) || ++guard > 24) ids.push(id);
-  }
-
+/**
+ * 敵編成。固定表をそのまま組み立てる。
+ *
+ * 以前はこちらの編成の平均レベルに合わせていた。勝ってレベルが上がれば
+ * 相手も上がるので、育てても掘っても相手がぴったり並んでくる——段を
+ * 進めた実感が残らないうえ、育てない側も不利にならなかった。
+ *
+ * 今は段の番号だけで決まる。乱数も種も使わない。第11段の相手は誰が
+ * 何度挑んでも同じ4体・同じレベル・同じ刻印で、勝てないなら掘って
+ * 削って育てるしかない——そのための掘りが、ここでようやく意味を持つ。
+ */
+export function buildEnemyTeam(stage: number): TeamSetup {
+  const s = stageDef(stage);
   return {
-    members: ids.map((defId, i) => ({
+    members: s.foes.map((defId, i) => ({
       uid: `foe${i}`,
       defId,
-      level,
-      // クリーン度も同じ理由で味方基準。素の育成差で殴らない
-      clean: Math.max(45, Math.min(95, anchor.clean + pv.cleanBonus)),
+      level: s.level,
+      clean: s.clean,
       skillLevel: 1,
-      /*
-       * 刻印は敵にも乗せる。
-       *
-       * 味方だけが別枠の加算を積めると、段が進むほど差が開く一方になる——
-       * 刻印は「掘って削る」の報酬であって、難度を素通りさせる道具ではない。
-       * 等級は段から決め、銘は席ごとに固定する（同じ段は同じ相手になる）。
-       */
-      engraving: stage >= 4
+      // 段ごとの手応えを平らにする倍率。顔ぶれの噛み合いの差を吸う
+      boost: s.power !== 1 ? { hp: s.power, atk: s.power, def: s.power } : undefined,
+      // 刻印は敵にも乗せる。味方だけが別枠の加算を積めると、段が進むほど
+      // 差が開く一方になる。銘は役職から引くので、同じ段は必ず同じ相手
+      engraving: s.grade > 0
         ? buildEngraving(
-          ENGRAVE_PATTERNS[(stage * 3 + i) % ENGRAVE_PATTERNS.length],
-          Math.max(1, Math.min(4, Math.floor(stage / 4))),
+          ENGRAVE_PATTERNS.find((p) => p.id === stageEngravePattern(defId)) ?? ENGRAVE_PATTERNS[0],
+          s.grade,
         )
         : undefined,
     })),
-    order: ids.map((_, i) => i),
+    order: s.foes.map((_, i) => i),
   };
 }
 

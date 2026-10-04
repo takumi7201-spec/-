@@ -5,6 +5,8 @@ import type { SaveData } from '../../core/Save';
 import { expToNext, dropDecay } from '../../core/Save';
 import { revosIcon } from '../revosIcon';
 import { BIOMES } from '../../voxel/palette';
+import { stagePreview } from '../../game/party';
+import { STAGE_COUNT } from '../../game/data/stages';
 import { EVENTS } from '../../game/data/events';
 import { unclaimedCount } from '../../game/mail';
 import { missionRatio, nearestMission, readyCount } from '../../game/missions';
@@ -192,14 +194,11 @@ export class HomeScreen extends Screen {
 
     // ---- 次の目標 ----
     // 発掘地は、いまの到達段が入る層を出す。行き先の名前が無いと目標にならない
-    const stage = this.data.stageProgress + 1;
-    // 特別許可区は闘技場にしない。チケットを切って降りる発掘専用の区画で、
-    // 段の幅（1〜30）が広いぶん、素で探すと終盤の段が全部ここになる
-    const biome = Object.values(BIOMES)
-      .filter((b) => b.id !== 'permitzone')
-      .find((b) => stage >= b.level[0] && stage <= b.level[1])
-      ?? BIOMES.canyon;
-    this.goalPlate.set(`ステージ ${stage}`, biome.name);
+    const stage = Math.min(STAGE_COUNT, this.data.stageProgress + 1);
+    // 段の舞台は固定表から引く。ホームの予告と選択画面と実際の闘技場で、
+    // 読む場所を1つにしておく——別に持つと、片方だけ直したときに嘘になる
+    const pv = stagePreview(stage);
+    this.goalPlate.set(`ステージ ${stage} / ${STAGE_COUNT}`, BIOMES[pv.biome].name);
 
     // ---- ミッション ----
     const near = nearestMission(this.data);

@@ -10,6 +10,8 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "balance": "esbuild tools/balance.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/balance.mjs --log-level=error && node node_modules/.cache/balance.mjs",
+    "stagecurve": "esbuild tools/stagecurve.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/stagecurve.mjs --log-level=error && node node_modules/.cache/stagecurve.mjs",
+    "stagetune": "esbuild tools/stagetune.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/stagetune.mjs --log-level=error && node node_modules/.cache/stagetune.mjs",
     "artifact": "npm run build && node tools/make-artifact.mjs"
   },
   "devDependencies": {
