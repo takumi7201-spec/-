@@ -115,6 +115,22 @@ async function main(): Promise<void> {
 
   let player: BattlePlayer | null = null;
   let runFossils: { defId: string; rarity: number }[] = [];
+  /**
+   * いま潜っている層。持ち帰った化石にどこで掘ったかを書くのに使う。
+   * 以前は解放済みの先頭の層を書いていたので、どこで掘っても
+   * 「ソルト・キャニオン」になっていた
+   */
+  let runBiome: BiomeId = 'canyon';
+  /**
+   * この周回の締めをもう走らせたか。
+   *
+   * 引き上げは3か所から起きる——最後の化石を掘った（1.6秒後）、
+   * スタミナが尽きた（1.2秒後）、自分で戻るを押した（即時）。
+   * どれも同じ締めを呼ぶので、最後の1点を掘った直後に戻るを押すと、
+   * 予約済みのタイマーと手押しの2回ぶんが走り、持ち帰った化石が
+   * ストックに二重に積まれていた（周回数とEXPも二重）。
+   */
+  let runClosed = false;
   /** 挑戦中のイベント。通常バトルなら null */
   let activeEvent: EventDef | null = null;
   /** 直前に挑んだイベント。リザルトの「もう一度」で同じ相手へ戻す */
@@ -250,6 +266,8 @@ async function main(): Promise<void> {
       data.player.tickets = (data.player.tickets ?? 0) - 1;
     }
     runFossils = [];
+    runClosed = false;
+    runBiome = biome;
     /*
      * 潜行した回数は、降りた時点で数える。
      *
@@ -543,6 +561,9 @@ async function main(): Promise<void> {
     goHome();
   };
   digScreen.onFinish = () => {
+    // 締めは1周に1回。2回目以降は、同じ化石をもう一度ストックへ積むだけ
+    if (runClosed) return;
+    runClosed = true;
     data.daily.runs++;
     addPlayerExp(data, 40 + runFossils.length * 20);
     if (runFossils.length === 0) {
@@ -553,8 +574,10 @@ async function main(): Promise<void> {
     }
     // 持ち帰ったぶんはすべてストックへ。どれから削るかは一覧で選ぶ
     for (const f of runFossils) {
-      data.stock.push({ defId: f.defId, rarity: f.rarity, biome: data.unlockedBiomes[0] ?? 'canyon' });
+      data.stock.push({ defId: f.defId, rarity: f.rarity, biome: runBiome });
     }
+    // 積み終えたら控えを空にする。万一もう一度ここへ来ても積むものが無い
+    runFossils = [];
     writeSave(data);
     stockScreen.setData(data);
     ui.show('stock');

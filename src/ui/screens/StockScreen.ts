@@ -2,7 +2,7 @@ import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
 import type { SaveData } from '../../core/Save';
 import { RARITY_NAMES, getRevos } from '../../game/data/revos';
-import { ELEMENT_NAMES, type BiomeId } from '../../voxel/palette';
+import { BIOMES, ELEMENT_NAMES, type BiomeId } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
 import { revosDetailBody } from '../revosDetail';
@@ -17,13 +17,6 @@ import { screenHead } from '../chrome';
  *
  * 並びはレア度順。持ち物が増えたときに探すのは、たいてい上位のほうなので。
  */
-
-const BIOME_NAMES: Record<string, string> = {
-  canyon: 'ソルト・キャニオン',
-  frostpeak: 'フロストピーク',
-  emberfield: 'エンバーフィールド',
-  tidehollow: 'タイドホロウ',
-};
 
 export interface StockEntry {
   defId: string;
@@ -93,7 +86,9 @@ export class StockScreen extends Screen {
           ),
           h('div', { class: 'stock-sub' },
             h('span', { class: 'stock-rarity', text: `${'★'.repeat(row.rarity)} ${RARITY_NAMES[row.rarity] ?? ''}` }),
-            h('span', { class: 'dim', text: BIOME_NAMES[row.biome] ?? row.biome }),
+            // 層の名前は palette の1か所から引く。手で写すと、層を足したときに
+            // 書き忘れた分だけ id がそのまま出る（特別許可区がそうなっていた）
+            h('span', { class: 'dim', text: BIOMES[row.biome]?.name ?? row.biome }),
           ),
         ),
         h('span', { class: 'stock-go', text: '削る' }),

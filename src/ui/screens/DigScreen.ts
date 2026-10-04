@@ -47,6 +47,14 @@ export class DigScreen extends Screen {
   onExit?: () => void;
   onFinish?: () => void;
   /**
+   * 引き上げの予約が走っているか。
+   *
+   * 最後の化石を掘った・スタミナが尽きた、のどちらも「少し見せてから
+   * 引き上げる」ので、締めはタイマー越しに呼ばれる。その待ち時間に
+   * 自分で戻るを押されると、手押しと予約の2回ぶんが走る
+   */
+  private finishing = false;
+  /**
    * 回収した埋蔵物をゲーム側へ渡す。
    * DigScene.events は単一ハンドラなので、画面とゲームの両方が
    * 直接代入すると後勝ちで一方が消える。所有は画面側に統一し、
@@ -144,6 +152,7 @@ export class DigScreen extends Screen {
   }
 
   enter(): void {
+    this.finishing = false;
     this.siteEl.textContent = BIOMES[this.scene.biomeId]?.name ?? '発掘現場';
     // 初期値はイベント待ちにしない。最初の1回が来るまで 0/0 が出てしまう
     this.staminaBar.set(this.scene.stamina / Math.max(1, this.scene.staminaMax));
@@ -153,7 +162,8 @@ export class DigScreen extends Screen {
     this.scene.events.onStaminaChange = (v, max) => {
       this.staminaBar.set(v / max);
       this.staminaNumEl.textContent = `${Math.ceil(v)} / ${Math.round(max)}`;
-      if (v === 0) {
+      if (v === 0 && !this.finishing) {
+        this.finishing = true;
         this.ui.toast('スタミナ切れ。引き上げます', 'warn');
         setTimeout(() => this.onFinish?.(), 1200);
       }
@@ -220,7 +230,8 @@ export class DigScreen extends Screen {
     }
     this.ui.flash('#ffffff', 0.22);
     // 鉱石の取りこぼしで足止めしない。化石が尽きたら引き上げる
-    if (this.scene.remainingFossils === 0) {
+    if (this.scene.remainingFossils === 0 && !this.finishing) {
+      this.finishing = true;
       this.ui.toast('化石をすべて掘り出した', 'info', 2000);
       setTimeout(() => this.onFinish?.(), 1600);
     }
