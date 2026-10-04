@@ -101,6 +101,7 @@ const OD_RECOVERY: Record<string, number> = {
   twinsever: 0.2,
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28, grindfeed: 0.28,
+  unknownancestor: 0.28,
 };
 
 /**
@@ -124,6 +125,7 @@ const OD_SHAPE: Record<string, OdShape> = {
   shellveil: 'allies', heatshare: 'allies', tangledspiral: 'allies', glideguard: 'allies',
   nervejam: 'enemies',
   nestguard: 'allies', trilobeshield: 'allies', twinsever: 'allies',
+  unknownancestor: 'allies',
 };
 /** 通常の間合いより遠くから撃てる単体技 */
 const OD_REACH: Record<string, number> = { faulthaul: 7, leapstrike: 6.5, cambrianjaw: 6.5, straightbore: 5.4 };
@@ -287,6 +289,39 @@ function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
   return out;
 }
 
+/**
+ * 分身。
+ *
+ * 「二分されし身体」は開戦と同時に、自分と同じ体をもう1つ立てる。
+ * 数値は本体と同じで、落ちても本体は残り、本体が落ちても分身は残る——
+ * 1体ぶんの数字を低く置いてあるのは、常に2体で戦う前提だから。
+ *
+ * 分身からは分身を呼ばない（passive を 'none' に落とす）。呼べるのは
+ * 開戦の1回きりで、倒されても戻らない。
+ */
+function spawnClones(team: Fighter[]): Fighter[] {
+  const out: Fighter[] = [];
+  for (const f of team) {
+    if (f.passive !== 'vetulibody') continue;
+    const back = f.side === 0 ? 1 : -1;
+    out.push({
+      ...f,
+      uid: `${f.uid}~c`,
+      cloneOf: f.uid,
+      passive: 'none',
+      // 本体の斜め後ろに立てる。同じ点から始めると、1刻み目の押し合いで弾かれる
+      x: f.x + (f.slot % 2 === 0 ? 1.0 : -1.0),
+      z: f.z + back * 0.8,
+      px: f.x, pz: f.z,
+      mods: [], statuses: [], shield: null,
+      target: null, cast: null,
+      dealt: 0, taken: 0, healed: 0, kills: 0,
+      stacks: {},
+    });
+  }
+  return out;
+}
+
 function snapshot(f: Fighter): FighterSnapshot {
   return {
     uid: f.uid, defId: f.defId, name: f.name, element: f.element,
@@ -334,7 +369,11 @@ export class BattleSim {
     this.rng = new Prng(seed);
     this.rules = rules;
     this.timeLimit = rules.timeLimit ?? MAX_TIME;
-    this.fighters = [...buildFighters(teamA, 0), ...buildFighters(teamB, 1)];
+    const a = buildFighters(teamA, 0);
+    const b = buildFighters(teamB, 1);
+    // 分身は本隊のすぐ後ろに並べる。並び順はカードの並びでもあるので、
+    // 呼んだ本体の隣に来るようにしておく
+    this.fighters = [...a, ...spawnClones(a), ...b, ...spawnClones(b)];
     this.fighters.forEach((f, i) => {
       this.byUid.set(f.uid, f);
       // 選び直しの時刻をずらす。全員が同じ刻みで選ぶと、狙いが一斉に動いて見える
@@ -1273,6 +1312,27 @@ export class BattleSim {
         for (const a of allies) {
           this.addMod(a, { kind: 'taken', value: -0.22, turns: 4, source: 'trilobeshield' }, ev, '被ダメ低下');
         }
+        break;
+      }
+      case 'unknownancestor': {
+        /*
+         * 未知なる祖。
+         *
+         * 出ている分身を押し上げ、本体は自分の現在体力の2割を取り戻す。
+         * 回復が最大体力ではなく現在体力の割合なのは、削られるほど
+         * 戻る量も落ちる形にするため——粘れば粘るほど効く技にすると、
+         * 2体で場に居座るこの種が落ちなくなる。
+         *
+         * 掛かりは積む。4行動で切れる他の支援と違い、分身は呼び直せない
+         * ので、撃つたびに厚くなる形で「育てていく」側に寄せた。
+         */
+        const clones = this.alive(actor.side).filter((f) => f.cloneOf === actor.uid);
+        for (const c of clones) {
+          this.addMod(c, { kind: 'atk', value: 0.10, turns: 999, source: 'unknownancestor' }, ev, 'ATK上昇');
+          this.addMod(c, { kind: 'def', value: 0.10, turns: 999, source: 'unknownancestor' }, ev, 'DEF上昇');
+          this.addMod(c, { kind: 'spd', value: 0.10, turns: 999, source: 'unknownancestor' }, ev, 'SPD上昇');
+        }
+        this.heal(actor, actor, Math.round(actor.hp * 0.20), ev);
         break;
       }
       case 'twinsever': {

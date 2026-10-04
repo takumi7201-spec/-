@@ -45,6 +45,9 @@ export const TACTICS: Record<Role, Tactic> = {
   // 支援。最後列から離れない
   Healer: { range: 5.5, move: 0.95, depth: 2, held: false, behindWall: false, keepAway: 3.6 },
   Buffer: { range: 5.5, move: 0.95, depth: 2, held: false, behindWall: false, keepAway: 3.6 },
+  // 特殊。分身を呼んで数で戦う。本体は後ろに置く——本体が落ちても分身は残るが、
+  // 呼べるのは開戦の1回きりなので、前に出す理由がない
+  Special: { range: 4.2, move: 0.95, depth: 2, held: false, behindWall: false, keepAway: 2.6 },
 };
 
 /** 前に立って味方を守る役 */
@@ -54,7 +57,8 @@ export function isWall(role: Role): boolean {
 
 /** 後ろから支える役。特攻役がまず狙う相手 */
 export function isBackliner(role: Role): boolean {
-  return role === 'Healer' || role === 'Buffer' || role === 'Debuffer' || role === 'Technical';
+  return role === 'Healer' || role === 'Buffer' || role === 'Debuffer'
+    || role === 'Technical' || role === 'Special';
 }
 
 export function isRanged(role: Role): boolean {
@@ -82,4 +86,5 @@ export const ROLE_MOVES: Record<Role, string> = {
   Debuffer: '攻撃の強い敵を撃って削ぐ。寄られたら下がる',
   Healer: '最後列から、傷んだ味方を癒す',
   Buffer: '最後列から撃ちつつ、技で味方を押し上げる',
+  Special: '開戦と同時に分身を呼び、後ろから2体で撃つ',
 };

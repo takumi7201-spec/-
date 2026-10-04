@@ -27,7 +27,7 @@ export const BUFF_NAME: Record<BuffKind, string> = {
   def: '防御上昇',
   spd: '速度上昇',
   dealt: '与ダメージ上昇',
-  surge: '奔流（会心率上昇）',
+  surge: '会心率上昇',
 };
 
 export function buffIcon(kind: BuffKind, className = ''): HTMLElement {
@@ -54,13 +54,20 @@ export function buffChip(kind: BuffKind): HTMLElement {
  * ときだけ古いままになる——文が唯一の出どころなら、ずれようがない。
  * 拾うのは「上がる」側だけ。下がる側（−）は読み飛ばす。
  */
+/**
+ * 「攻撃・防御・速度 +10%」のように、まとめて書かれた並びも拾う。
+ * 名前の直後に + が来る形だけを見ていると、並びの最後の1つしか拾えない
+ */
+const LIST = '(?:・(?:攻撃|防御|速度|体力|与ダメージ|会心率))*';
+const upFor = (name: string): RegExp => new RegExp(`${name}${LIST}\\s*[+＋]`);
+
 const PATTERNS: { kind: BuffKind; re: RegExp }[] = [
-  { kind: 'atk', re: /攻撃\s*\+/ },
-  { kind: 'def', re: /防御\s*\+/ },
-  { kind: 'spd', re: /速度\s*\+/ },
-  { kind: 'dealt', re: /与ダメージ\s*\+/ },
+  { kind: 'atk', re: upFor('攻撃') },
+  { kind: 'def', re: upFor('防御') },
+  { kind: 'spd', re: upFor('速度') },
+  { kind: 'dealt', re: upFor('与ダメージ') },
   // 奔流は率そのものが名前になっている掛かり。名前で拾う
-  { kind: 'surge', re: /奔流|会心率\s*\+/ },
+  { kind: 'surge', re: /奔流|会心率\s*[+＋]/ },
 ];
 
 export function buffsInText(text: string): BuffKind[] {

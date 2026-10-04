@@ -46,7 +46,7 @@ const ROLE_ENGRAVE: Record<Role, string> = {
   Tank: 'wall', Guardian: 'wall',
   Striker: 'edge', Breaker: 'blade', Apex: 'drum', 'All-round': 'whole',
   Finisher: 'fang', Sprinter: 'gale',
-  Technical: 'edge', Debuffer: 'flow', Healer: 'core', Buffer: 'core',
+  Technical: 'edge', Debuffer: 'flow', Healer: 'core', Buffer: 'core', Special: 'core',
 };
 
 export const STAGES: StageDef[] = [

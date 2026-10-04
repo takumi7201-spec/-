@@ -12,7 +12,7 @@ import type { Archetype } from '../../voxel/CreatureBuilder';
 export type Role =
   | 'Tank' | 'Striker' | 'Breaker' | 'Sprinter' | 'Guardian'
   | 'Healer' | 'Debuffer' | 'All-round' | 'Buffer' | 'Technical' | 'Finisher'
-  | 'Apex';
+  | 'Apex' | 'Special';
 
 export type PassiveId =
   | 'subsidence' | 'embers' | 'deeppressure' | 'vanguard' | 'sediment'
@@ -24,7 +24,8 @@ export type PassiveId =
   | 'firstbite' | 'greateye' | 'twinhorn' | 'runningcharge' | 'scytheclaw' | 'venomgland'
   | 'primordial' | 'carapace' | 'irritate' | 'jetwake' | 'packrun'
   | 'sailheat' | 'unreadable' | 'cannibal' | 'fourwings'
-  | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite';
+  | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite'
+  | 'vetulibody';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
@@ -36,7 +37,8 @@ export type OdId =
   | 'forkjaw' | 'gazepierce' | 'hornrout' | 'crimsoncharge' | 'harvest' | 'serpentvenom'
   | 'cambrianjaw' | 'shellveil' | 'falsejaw' | 'straightbore' | 'boundfang'
   | 'heatshare' | 'tangledspiral' | 'bonesever' | 'glideguard'
-  | 'throatbite' | 'nestguard' | 'nervejam' | 'trilobeshield' | 'twinsever';
+  | 'throatbite' | 'nestguard' | 'nervejam' | 'trilobeshield' | 'twinsever'
+  | 'unknownancestor';
 
 export interface RevosDef {
   id: string;
@@ -140,6 +142,23 @@ export const REVOS: RevosDef[] = [
     build: { archetype: 'sauropod', seed: 6207, bulk: 1.12, scale: 1.05, crest: true },
     habitat: ['canyon', 'frostpeak'], rarity: 3,
     flavor: '「良い母トカゲ」。巣に卵と幼体が揃って見つかり、恐竜が子を世話したことが分かった。',
+  },
+  {
+    id: 'xidazoon', name: 'シダズーン', en: 'Xidazoon', element: 'flame', role: 'Special',
+    // 2体ぶんの体で戦うので、1体ぶんの数字は他の★1より低い
+    hp: 910, atk: 104, def: 87, spd: 104, basicPower: 72,
+    passive: {
+      id: 'vetulibody', name: '二分されし身体',
+      desc: '開戦と同時に自分の分身を1体呼ぶ。2体で戦うぶん、1体ぶんの数値は低い。',
+    },
+    od: {
+      id: 'unknownancestor', name: '未知なる祖',
+      desc: '出ている分身の 攻撃・防御・速度 +10%（累積）＋ 自分の現在体力の 20% を回復。', power: 0,
+    },
+    sprite: 'xidazoon',
+    build: { archetype: 'aquatic', seed: 6521, bulk: 0.72, scale: 0.8 },
+    habitat: ['emberfield', 'canyon'], rarity: 1,
+    flavor: '前を向いた口と、後ろへ続く節の列。体の前半と後半が別の生き物のように分かれていて、どちらが本体なのかは今も決まっていない。',
   },
   {
     id: 'pikaia', name: 'ピカイア', en: 'Pikaia', element: 'aqua', role: 'Debuffer',
@@ -738,5 +757,6 @@ export const ROLE_NAMES: Record<Role, string> = {
   Technical: '搦め手',
   Finisher: '仕留め役',
   Apex: '頂点種',
+  Special: '特殊役',
 };
 export const RARITY_COLORS = ['', '#c8c2b4', '#6fc8e8', '#c898f0', '#ffc84a', '#e8623c'] as const;

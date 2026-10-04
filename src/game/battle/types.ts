@@ -127,6 +127,13 @@ export interface Fighter {
   odId: string;
   side: Side;
   slot: number;
+  /**
+   * 分身なら、呼んだ本体の uid。
+   *
+   * 分身は本体と同じ数値で立つ別の体で、落ちても本体は残るし、
+   * 本体が落ちても分身は残る。再召喚は無い——呼べるのは開戦の1回だけ。
+   */
+  cloneOf?: string;
   level: number;
   clean: number;
   skillLevel: number;

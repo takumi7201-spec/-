@@ -37,17 +37,18 @@ interface UnitCard {
  * 属性チップの隣に置く。名前ではなく絵で出すのは、カードが視野の端でしか
  * 読まれないから——端で読めるのは色と形だけで、2文字の熟語は読めない。
  */
-type StatusIcon = 'burn' | 'poison' | 'dizzy' | 'bleed' | 'surge';
+type StatusIcon = 'burn' | 'poison' | 'dizzy' | 'bleed' | 'surge' | 'clone';
 const STATUS_SPRITE: Record<StatusIcon, string> = {
   // 奔流は「上がる掛かり」なので、他のバフと同じ動く札を使う——
   // 止まった星と動く星の2枚があると、同じ掛かりが2つに見える
   burn: 'fx-burn', poison: 'fx-poison', dizzy: 'fx-dizzy', bleed: 'fx-bleed', surge: 'buff-surge.gif',
+  clone: 'fx-clone.gif',
 };
 /** カードに出す掛かりの順。左から 攻撃・防御・速度・与ダメージ */
 const BUFF_KINDS: BuffKind[] = ['atk', 'def', 'spd', 'dealt'];
 
 const STATUS_NAME: Record<StatusIcon, string> = {
-  burn: '火傷', poison: '毒', dizzy: '目眩', bleed: '出血', surge: '奔流',
+  burn: '火傷', poison: '毒', dizzy: '目眩', bleed: '出血', surge: '奔流', clone: '分身',
 };
 
 function statusIcon(kind: StatusIcon): HTMLElement {
@@ -462,7 +463,7 @@ export class BattleScreen extends Screen {
     const buffs = f.alive
       ? BUFF_KINDS.filter((k) => f.mods.some((m) => m.kind === k && m.value > 0))
       : [];
-    const key = `${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}${surge ? 's' : ''}`
+    const key = `${f.cloneOf ? 'c' : ''}${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}${surge ? 's' : ''}`
       + (buffs.length > 0 ? `+${buffs.join('')}` : '');
     if (key === c.statusKey) return;
     c.statusKey = key;
@@ -473,6 +474,8 @@ export class BattleScreen extends Screen {
       if (n > 1) el.appendChild(h('i', { class: 'card-status-n num', text: String(n) }));
       c.status.appendChild(el);
     };
+    // 分身は本体と同じ名前・同じ絵で立つ。どちらが呼ばれた側かを札で分ける
+    if (f.cloneOf) put('clone', 1);
     if (burn) put('burn', 1);
     if (stack > 0) put('poison', stack);
     if (dz > 0) put('dizzy', dz);
