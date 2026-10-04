@@ -7,6 +7,7 @@ import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
 import { spriteUrl } from '../../fx/SpriteUnit';
+import { buffIcon, type BuffKind } from '../buffIcons';
 
 interface UnitCard {
   uid: string;
@@ -40,6 +41,9 @@ type StatusIcon = 'burn' | 'poison' | 'dizzy' | 'bleed' | 'surge';
 const STATUS_SPRITE: Record<StatusIcon, string> = {
   burn: 'fx-burn', poison: 'fx-poison', dizzy: 'fx-dizzy', bleed: 'fx-bleed', surge: 'fx-surge',
 };
+/** カードに出す掛かりの順。左から 攻撃・防御・速度・与ダメージ */
+const BUFF_KINDS: BuffKind[] = ['atk', 'def', 'spd', 'dealt'];
+
 const STATUS_NAME: Record<StatusIcon, string> = {
   burn: '火傷', poison: '毒', dizzy: '目眩', bleed: '出血', surge: '奔流',
 };
@@ -446,7 +450,18 @@ export class BattleScreen extends Screen {
     const dz = dizzy ? Math.max(1, Math.round(dizzy.value / 0.14)) : 0;
     // 出血は溜まった札の数そのもの。あと何枚で弾けるかを読ませる
     const bl = bleed?.tokens ?? 0;
-    const key = `${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}${surge ? 's' : ''}`;
+    /*
+     * 上がっている掛かり。
+     *
+     * これまで戦場では、攻撃が上がっているのか下がっているのかが
+     * ユニットの足元に出る小さな光でしか分からなかった。上がっている
+     * ものは札で出す——下がっているほうは矢印が上向きの絵なので出さない。
+     */
+    const buffs = f.alive
+      ? BUFF_KINDS.filter((k) => f.mods.some((m) => m.kind === k && m.value > 0))
+      : [];
+    const key = `${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}${surge ? 's' : ''}`
+      + (buffs.length > 0 ? `+${buffs.join('')}` : '');
     if (key === c.statusKey) return;
     c.statusKey = key;
 
@@ -462,6 +477,9 @@ export class BattleScreen extends Screen {
     if (bl > 0) put('bleed', bl);
     // 掛かりは最後に置く。左から「されたこと」、右端に「されたいいこと」
     if (surge) put('surge', 1);
+    for (const b of buffs) {
+      c.status.appendChild(h('span', { class: `card-status-icon card-status-icon--buff` }, buffIcon(b, 'card-status-img')));
+    }
   }
 
 

@@ -28,8 +28,12 @@ export function spriteTexture(name: string): THREE.Texture {
   return tex;
 }
 
+/**
+ * スプライトの在処。拡張子込みの名前を渡せばそのまま使う——
+ * バフの札だけ動く絵（gif）なので、png 固定にはできない
+ */
 export function spriteUrl(name: string): string {
-  return `sprites/${name}.png`;
+  return name.includes('.') ? `sprites/${name}` : `sprites/${name}.png`;
 }
 
 /* =========================================================================

@@ -1,5 +1,6 @@
 import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
+import { buffRow } from '../buffIcons';
 import type { OwnedRevos } from '../../core/Save';
 import { RARITY_NAMES, ROLE_NAMES, getRevos } from '../../game/data/revos';
 import { ELEMENT_NAMES, BIOMES } from '../../voxel/palette';
@@ -193,6 +194,9 @@ export class DetailScreen extends Screen {
       ),
       h('div', { class: 'det-skill-desc', text: r.passive.desc }),
     );
+    // 上がるものは絵でも出す。説明文と同じ出どころから引く
+    const pBuffs = buffRow(r.passive.desc);
+    if (pBuffs) this.passiveEl.appendChild(pBuffs);
     clear(this.odEl);
     this.odEl.append(
       h('div', { class: 'det-skill-head' },
@@ -201,6 +205,8 @@ export class DetailScreen extends Screen {
       ),
       h('div', { class: 'det-skill-desc', text: r.od.desc }),
     );
+    const oBuffs = buffRow(r.od.desc);
+    if (oBuffs) this.odEl.appendChild(oBuffs);
 
     // 産出。手元に居るなら、居る事実のほうが先に要る
     clear(this.habitatEl);

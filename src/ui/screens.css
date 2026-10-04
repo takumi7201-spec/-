@@ -1370,6 +1370,21 @@ body[data-layout='wide'] .dbg-grid { grid-template-columns: repeat(5, 1fr); }
   padding: 1px 9px; border-radius: var(--r-sm);
   background: linear-gradient(180deg, var(--hl-amber-lift), var(--hl-amber));
 }
+/*
+ * 上がるものの札。説明文の下に、絵と名前で並べる——
+ * 文章は読み比べないと「何が上がる技か」が出てこない
+ */
+.buff-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.buff-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px 2px 4px; border-radius: 999px;
+  background: rgba(214, 38, 58, 0.09);
+  font-size: 11px; font-weight: 700; color: var(--pen-brown);
+}
+.buff-icon { width: 18px; height: 18px; display: block; image-rendering: pixelated; }
+.buff-chip-name { white-space: nowrap; }
+.det-skill-desc + .buff-row { margin-top: 6px; }
+
 .dex-owned, .dex-habitat { font-size: 12px; color: var(--ink-soft); display: flex; gap: 8px; align-items: center; }
 
 /* ---- リザルト ---- */
@@ -2946,3 +2961,5 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 }
 /* 敵のカードは詰まっているので一回り小さく */
 .enemy-card .card-status-icon { width: 16px; height: 16px; }
+/* 掛かりの札は動く絵。状態異常と同じ寸法で、同じ列に並べる */
+.card-status-icon--buff .card-status-img { image-rendering: pixelated; }
