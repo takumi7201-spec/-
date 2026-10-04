@@ -7,7 +7,7 @@ import { ELEMENT_NAMES } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
 import { spriteUrl } from '../../fx/SpriteUnit';
-import { buffIcon, type BuffKind } from '../buffIcons';
+import { buffIcon, type BuffKind } from '../effectIcons';
 
 interface UnitCard {
   uid: string;

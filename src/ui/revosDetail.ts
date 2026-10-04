@@ -4,7 +4,7 @@ import { RARITY_NAMES, ROLE_NAMES, getRevos } from '../game/data/revos';
 import { ELEMENT_NAMES } from '../voxel/palette';
 import { cleanRank } from '../game/battle/simulate';
 import { revosIcon } from './revosIcon';
-import { buffRow } from './buffIcons';
+import { effectRow } from './effectIcons';
 
 /**
  * リヴォス1体ぶんの詳細。図鑑と編成の両方から同じものを開く。
@@ -60,12 +60,12 @@ export function revosDetailBody(defId: string, opts: RevosDetailOpts = {}): HTML
       h('span', { text: r.passive.desc }),
       // 上がるものは文の下に絵で添える。文章だけだと、何が上がる技なのかを
       // 読み比べないと分からない
-      buffRow(r.passive.desc),
+      effectRow(r.passive.desc),
     ),
     h('div', { class: 'dex-skill' },
       h('b', { class: 'od', text: `必殺 · ${r.od.name}` }),
       h('span', { text: r.od.desc }),
-      buffRow(r.od.desc),
+      effectRow(r.od.desc),
     ),
     owned
       ? h('div', { class: 'dex-owned' },
