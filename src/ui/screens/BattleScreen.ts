@@ -39,7 +39,9 @@ interface UnitCard {
  */
 type StatusIcon = 'burn' | 'poison' | 'dizzy' | 'bleed' | 'surge';
 const STATUS_SPRITE: Record<StatusIcon, string> = {
-  burn: 'fx-burn', poison: 'fx-poison', dizzy: 'fx-dizzy', bleed: 'fx-bleed', surge: 'fx-surge',
+  // 奔流は「上がる掛かり」なので、他のバフと同じ動く札を使う——
+  // 止まった星と動く星の2枚があると、同じ掛かりが2つに見える
+  burn: 'fx-burn', poison: 'fx-poison', dizzy: 'fx-dizzy', bleed: 'fx-bleed', surge: 'buff-surge.gif',
 };
 /** カードに出す掛かりの順。左から 攻撃・防御・速度・与ダメージ */
 const BUFF_KINDS: BuffKind[] = ['atk', 'def', 'spd', 'dealt'];

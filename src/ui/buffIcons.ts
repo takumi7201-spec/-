@@ -12,13 +12,14 @@ import { spriteUrl } from '../fx/SpriteUnit';
  * 下がるほう（デバフ）はここでは扱わない。札は矢印が上向きの絵なので、
  * 同じ絵で「下がった」を表すと、見た瞬間に逆の意味を読んでしまう。
  */
-export type BuffKind = 'atk' | 'def' | 'spd' | 'dealt';
+export type BuffKind = 'atk' | 'def' | 'spd' | 'dealt' | 'surge';
 
 export const BUFF_SPRITE: Record<BuffKind, string> = {
   atk: 'buff-atk.gif',
   def: 'buff-def.gif',
   spd: 'buff-spd.gif',
   dealt: 'buff-dealt.gif',
+  surge: 'buff-surge.gif',
 };
 
 export const BUFF_NAME: Record<BuffKind, string> = {
@@ -26,6 +27,7 @@ export const BUFF_NAME: Record<BuffKind, string> = {
   def: '防御上昇',
   spd: '速度上昇',
   dealt: '与ダメージ上昇',
+  surge: '奔流（会心率上昇）',
 };
 
 export function buffIcon(kind: BuffKind, className = ''): HTMLElement {
@@ -57,6 +59,8 @@ const PATTERNS: { kind: BuffKind; re: RegExp }[] = [
   { kind: 'def', re: /防御\s*\+/ },
   { kind: 'spd', re: /速度\s*\+/ },
   { kind: 'dealt', re: /与ダメージ\s*\+/ },
+  // 奔流は率そのものが名前になっている掛かり。名前で拾う
+  { kind: 'surge', re: /奔流|会心率\s*\+/ },
 ];
 
 export function buffsInText(text: string): BuffKind[] {
