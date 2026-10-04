@@ -171,8 +171,16 @@ export class BattleScreen extends Screen {
     clear(this.enemyRow);
     this.allyCards = [];
     this.enemyCards = [];
-    const foes = this.player.sim.fighters.filter((f) => f.side === 1).length;
-    const mine = this.player.sim.fighters.filter((f) => f.side === 0).length;
+    /*
+     * 分身は札を持たない。
+     *
+     * 分身は本体と同じ名前・同じ絵で立つので、札を並べると同じ顔が2枚になり、
+     * どちらを押せば必殺が出るのかが読めない。出撃した編成の数と札の数も
+     * 合わなくなる——場には居るが、札は出撃した体のぶんだけにする。
+     */
+    const cards = this.player.sim.fighters.filter((f) => !f.cloneOf);
+    const foes = cards.filter((f) => f.side === 1).length;
+    const mine = cards.filter((f) => f.side === 0).length;
     this.enemyRow.classList.toggle('is-solo', foes === 1);
     // 4体以上は札を詰める。名前と帯を残し、飾りの文字を落とす
     this.enemyRow.classList.toggle('is-many', foes > 3);
@@ -180,7 +188,7 @@ export class BattleScreen extends Screen {
     this.enemyRow.style.setProperty('--cols', String(Math.max(1, foes)));
     this.allyRow.style.setProperty('--cols', String(Math.max(1, mine)));
 
-    for (const f of this.player.sim.fighters) {
+    for (const f of cards) {
       const def = getRevos(f.defId);
       const hp = bar('bar--hp', 1);
       const od = bar('bar--od bar--slim', f.od / 100);
@@ -463,7 +471,10 @@ export class BattleScreen extends Screen {
     const buffs = f.alive
       ? BUFF_KINDS.filter((k) => f.mods.some((m) => m.kind === k && m.value > 0))
       : [];
-    const key = `${f.cloneOf ? 'c' : ''}${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}${surge ? 's' : ''}`
+    // 分身が出ているあいだは本体の札に印を出す。札を持たない体が場に
+    // 増えているので、印が無いと「2体居るのに札が5枚」の理由が読めない
+    const hasClone = this.player.sim.fighters.some((x) => x.cloneOf === f.uid && x.alive);
+    const key = `${hasClone ? 'c' : ''}${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}${surge ? 's' : ''}`
       + (buffs.length > 0 ? `+${buffs.join('')}` : '');
     if (key === c.statusKey) return;
     c.statusKey = key;
@@ -474,8 +485,8 @@ export class BattleScreen extends Screen {
       if (n > 1) el.appendChild(h('i', { class: 'card-status-n num', text: String(n) }));
       c.status.appendChild(el);
     };
-    // 分身は本体と同じ名前・同じ絵で立つ。どちらが呼ばれた側かを札で分ける
-    if (f.cloneOf) put('clone', 1);
+    // 分身は本体と同じ名前・同じ絵で立つ。場に出ているあいだ、本体の札で示す
+    if (hasClone) put('clone', 1);
     if (burn) put('burn', 1);
     if (stack > 0) put('poison', stack);
     if (dz > 0) put('dizzy', dz);
