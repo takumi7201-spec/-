@@ -4,7 +4,7 @@ import type { SaveData } from '../../core/Save';
 import { SHOP, buy, canBuy, stockLeft, type ShopItem } from '../../game/shop';
 import { getRevos } from '../../game/data/revos';
 import { revosIcon } from '../revosIcon';
-import { screenHead, plate, spaced } from '../chrome';
+import { screenHead, plate, spaced, coinMark } from '../chrome';
 import { audio } from '../../core/Audio';
 
 /**
@@ -69,7 +69,7 @@ export class ShopScreen extends Screen {
       ),
       h('div', { class: 'shop-buy' },
         h('div', { class: `shop-price num ${poor ? 'is-poor' : ''}` },
-          h('i', { class: 'wallet-dot wallet-dot--coin' }),
+          coinMark(),
           fmtNum(item.price),
         ),
         button('買う', () => this.purchase(item), { class: 'btn--sm shop-go', disabled: !ok }),

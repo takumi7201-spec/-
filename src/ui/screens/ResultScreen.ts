@@ -2,7 +2,7 @@ import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
-import { spaced } from '../chrome';
+import { spaced, coinMark } from '../chrome';
 
 export interface ResultRow {
   label: string;
@@ -92,9 +92,14 @@ export class ResultScreen extends Screen {
     clear(this.rowsEl);
 
     d.rows.forEach((r, i) => {
+      // 金額は絵で出す。文字の ◈ は編成タブや鉱石の印にも使っていて、
+      // 同じ形が「お金」と「それ以外」の両方を指していた
+      const coin = r.value.startsWith('◈ ');
       const row = h('div', { class: `result-row result-row--${r.kind ?? 'plain'}` },
         h('span', { class: 'result-label', text: r.label }),
-        h('span', { class: 'result-value num', text: r.value }),
+        coin
+          ? h('span', { class: 'result-value num' }, coinMark(), h('span', { text: r.value.slice(2) }))
+          : h('span', { class: 'result-value num', text: r.value }),
       );
       row.style.opacity = '0';
       this.rowsEl.appendChild(row);

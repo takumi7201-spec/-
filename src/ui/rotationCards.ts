@@ -9,7 +9,7 @@ import { buildTeamSetup, teamAnchor } from '../game/party';
 import { getRevos, revosShortName, ROLE_NAMES } from '../game/data/revos';
 import { ELEMENT_NAMES } from '../voxel/palette';
 import { revosIcon } from './revosIcon';
-import { spaced } from './chrome';
+import { coinAmount, spaced } from './chrome';
 import { audio } from '../core/Audio';
 
 /**
@@ -63,10 +63,13 @@ export function dailyCard(data: SaveData, onGo: () => void): HTMLElement {
     h('div', { class: 'label event-sub', text: spaced('ほうしゅう') }),
     h('div', { class: 'rot-rewards' },
       st.won
-        ? h('div', { class: 'rot-reward is-done', text: `きょうの初勝利は受け取り済み — 再戦は ◈ ${DAILY_REPLAY_COINS}` })
+        ? h('div', { class: 'rot-reward is-done' },
+          h('span', { text: 'きょうの初勝利は受け取り済み — 再戦は' }),
+          coinAmount(DAILY_REPLAY_COINS),
+        )
         : h('div', { class: 'rot-reward' },
           h('span', { class: 'rot-reward-tag', text: '初勝利' }),
-          h('span', { class: 'num', text: `◈ ${reward.coins}` }),
+          coinAmount(reward.coins),
           h('span', { text: `＋ ${'★'.repeat(reward.rarity)} の化石${el}` }),
         ),
     ),
@@ -125,7 +128,7 @@ export function bossCard(data: SaveData, onGo: () => void): HTMLElement {
         return h('div', { class: `rot-tier ${got ? 'is-got' : ''}` },
           h('span', { class: `rot-tier-name rot-tier-name--${i}`, text: t.name }),
           h('span', { class: 'rot-tier-at num', text: t.at >= 1 ? '討伐' : `${Math.round(t.at * 100)}%` }),
-          h('span', { class: 'rot-tier-reward', text: `◈ ${t.coins} ${fossil}` }),
+          h('span', { class: 'rot-tier-reward' }, coinAmount(t.coins), h('span', { text: ` ${fossil}` })),
           h('span', { class: 'rot-tier-mark', text: got ? '受取済' : '' }),
         );
       }),

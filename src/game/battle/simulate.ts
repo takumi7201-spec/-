@@ -203,6 +203,22 @@ const BLEED_PER_TOKEN = 0.035;
 /** 札はこの秒数ごとに1枚ずつ乾いて落ちる */
 const BLEED_DECAY_TURNS = 6;
 
+/**
+ * 奔流。
+ *
+ * 会心率を底上げする掛かり。火傷や毒と同じ枠で持つが、削るのではなく
+ * 「当たりの目が増える」方向に働く——支援役が味方へ配る唯一の攻めの掛かり。
+ *
+ * 素の会心率は速度差で 2〜35% しか動かず、支援役の技はどれも攻撃力か
+ * 与ダメージの倍率を積む形に寄っていた。倍率は何枚重ねても同じ曲線を
+ * なぞるだけなので、別の軸を1つ置く。奔流中は会心が +22pt、上限も
+ * 一緒に押し上げる（押し上げないと、速い個体では上限で頭打ちになって
+ * 掛かりが無かったことになる）。
+ */
+const SURGE_CRIT = 0.22;
+const SURGE_CAP = 0.62;
+const SURGE_TURNS = 5;
+
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
 const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };
 
@@ -986,8 +1002,14 @@ export class BattleSim {
         break;
       }
       case 'resonantlight': {
+        /*
+         * 共鳴光は味方全体の攻撃力を 18% 上げていたが、それは帆の
+         * 「熱を配る帆」（+20%）とほぼ同じ技で、2体を並べる理由が無かった。
+         * 攻撃力ではなく会心率を配る——奔流。倍率を積む支援と、
+         * 当たりの目を増やす支援に分かれる。
+         */
         for (const a of allies) {
-          this.addMod(a, { kind: 'atk', value: 0.18, turns: 4, source: 'resonantlight' }, ev, 'ATK上昇');
+          this.applySurge(a, ev);
           this.gainOd(a, 15, ev);
         }
         break;
@@ -1404,6 +1426,9 @@ export class BattleSim {
     let critRate = clamp(0.05 + (atk.spd - def.spd) * 0.0015, 0.02, 0.35);
     // 「巨眼」: 見えている相手の継ぎ目を突く
     if (pa === 'greateye') critRate = clamp(critRate + 0.12, 0.02, 0.4);
+    // 奔流。上限ごと押し上げる——上限を据え置くと、速い個体には掛からない
+    const surge = atk.statuses.find((st) => st.kind === 'surge');
+    if (surge) critRate = clamp(critRate + surge.value, 0.02, SURGE_CAP);
     const crit = force === 'crit' ? true : roll ? this.rng.chance(critRate) : false;
     const rnd = roll ? this.rng.range(0.92, 1.08) : 1;
 
@@ -1656,6 +1681,15 @@ export class BattleSim {
     ev.push({ t: 'status', uid: target.uid, kind: 'dizzy', applied: true });
   }
 
+  /** 奔流。会心率の底上げを掛け直す（重ねず、持続だけ延びる） */
+  private applySurge(target: Fighter, ev: BattleEvent[], source = 'surge'): void {
+    const st = target.statuses.find((s) => s.kind === 'surge');
+    if (st) { st.turns = SURGE_TURNS; st.value = SURGE_CRIT; } else {
+      target.statuses.push({ kind: 'surge', turns: SURGE_TURNS, value: SURGE_CRIT, source });
+    }
+    ev.push({ t: 'status', uid: target.uid, kind: 'surge', applied: true });
+  }
+
   /** 出血。札を積み、BLEED_BURST 枚で弾ける */
   private applyBleed(target: Fighter, ev: BattleEvent[], source: string, n = 1): void {
     let st = target.statuses.find((s) => s.kind === 'bleed');
@@ -1726,8 +1760,8 @@ export class BattleSim {
     if (now >= (this.statusAt.get(f.uid) ?? Infinity)) {
       this.statusAt.set(f.uid, now + STATUS_TICK);
       for (const s of f.statuses) {
-        // 目眩は削らない。時間で薄れるだけ
-        if (s.kind === 'dizzy') { s.turns--; continue; }
+        // 目眩と奔流は体力を削らない。時間で薄れるだけ
+        if (s.kind === 'dizzy' || s.kind === 'surge') { s.turns--; continue; }
         // 出血の札は、弾けないまま置かれると1枚ずつ乾いて落ちる
         if (s.kind === 'bleed') {
           s.turns--;

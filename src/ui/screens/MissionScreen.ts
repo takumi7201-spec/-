@@ -5,7 +5,7 @@ import {
   MISSIONS, claimMission, missionRatio, missionState, readyCount,
   type MissionDef, type MissionGroup,
 } from '../../game/missions';
-import { screenHead, plate, spaced } from '../chrome';
+import { screenHead, plate, spaced, coinAmount } from '../chrome';
 import { audio } from '../../core/Audio';
 
 /**
@@ -101,10 +101,7 @@ export class MissionScreen extends Screen {
       h('div', { class: 'mis-head' },
         h('span', { class: `mis-tag mis-tag--${m.group}`, text: spaced(m.group === 'daily' ? '日課' : '記録') }),
         h('span', { class: 'mis-name', text: m.name }),
-        h('span', { class: 'mis-coin num' },
-          h('i', { class: 'wallet-dot wallet-dot--coin' }),
-          fmtNum(m.coins),
-        ),
+        coinAmount(fmtNum(m.coins), 'mis-coin'),
       ),
       h('div', { class: 'mis-desc', text: m.desc }),
       h('div', { class: 'mis-gauge' },

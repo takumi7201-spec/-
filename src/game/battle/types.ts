@@ -28,11 +28,11 @@ export interface Mod {
  *   dizzy  … 攻撃が外れるようになる（命中率を下げる）
  *   bleed  … 札が溜まり、一定数でバーストして固定ダメージ
  */
-export type StatusKind = 'burn' | 'regen' | 'poison' | 'dizzy' | 'bleed';
+export type StatusKind = 'burn' | 'regen' | 'poison' | 'dizzy' | 'bleed' | 'surge';
 
 export interface StatusEffect {
   kind: StatusKind;
-  /** 残りの刻み数。火傷・毒・目眩は STATUS_TICK 秒ごと、再生は 1 秒ごとに 1 減る */
+  /** 残りの刻み数。火傷・毒・目眩・奔流は STATUS_TICK 秒ごと、再生は 1 秒ごとに 1 減る */
   turns: number;
   /**
    * burn / poison: 1行動あたりに削る最大体力の割合 / regen: 1回あたりの回復量（実数）
@@ -188,7 +188,7 @@ export type BattleEvent =
   | { t: 'heal'; uid: string; from: string; amount: number; hp: number }
   | { t: 'shield'; uid: string; amount: number }
   | { t: 'mod'; uid: string; kind: ModKind; value: number; turns: number; label: string }
-  | { t: 'status'; uid: string; kind: 'burn' | 'poison' | 'dizzy' | 'bleed'; applied: boolean }
+  | { t: 'status'; uid: string; kind: 'burn' | 'poison' | 'dizzy' | 'bleed' | 'surge'; applied: boolean }
   | { t: 'statusTick'; uid: string; kind: StatusKind; amount: number; hp: number }
   /** 外した一撃。目眩が無ければ起きない */
   | { t: 'miss'; uid: string; from: string }

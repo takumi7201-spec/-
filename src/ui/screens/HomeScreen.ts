@@ -1,6 +1,6 @@
 import { Screen } from '../UIRoot';
 import { h, bar, button, clear, fmtNum } from '../dom';
-import { banner, cardButton, identity, plate, railButton, spaced } from '../chrome';
+import { banner, cardButton, coinMark, identity, plate, railButton, spaced } from '../chrome';
 import type { SaveData } from '../../core/Save';
 import { expToNext, dropDecay } from '../../core/Save';
 import { revosIcon } from '../revosIcon';
@@ -68,7 +68,7 @@ export class HomeScreen extends Screen {
         h('div', { class: 'home-wallet' },
           h('div', { class: 'wallet-plate' },
             h('div', { class: 'wallet-inner' },
-              h('i', { class: 'wallet-dot wallet-dot--coin' }),
+              coinMark(),
               this.coinEl,
             ),
           ),

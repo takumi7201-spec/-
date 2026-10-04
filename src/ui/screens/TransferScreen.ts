@@ -7,7 +7,7 @@ import {
   TRANSFER_MIN_CLEAN, applyTransfer, canBeTarget, coresFor, quoteTransfer,
 } from '../../game/transfer';
 import { revosIcon } from '../revosIcon';
-import { screenHead, plate, spaced } from '../chrome';
+import { screenHead, plate, spaced, coinMark } from '../chrome';
 import { audio } from '../../core/Audio';
 
 /**
@@ -106,7 +106,7 @@ export class TransferScreen extends Screen {
           ),
           h('div', { class: 'tr-result-row' },
             h('span', { class: 'tr-result-label', text: '費用' }),
-            h('i', { class: 'wallet-dot wallet-dot--coin' }),
+            coinMark(),
             h('span', { class: 'num tr-cost', text: fmtNum(q.cost) }),
             h('span', { class: 'tr-lose', text: core ? `${revosShortName(core.defId)} を失う` : '' }),
           ),

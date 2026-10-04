@@ -419,7 +419,7 @@ export const REVOS: RevosDef[] = [
     id: 'pachycephalosaurus', name: 'パキケファロサウルス', short: 'パキケファロ', en: 'Pachycephalosaurus', element: 'null', role: 'Buffer',
     hp: 1081, atk: 111, def: 112, spd: 116, basicPower: 88,
     passive: { id: 'resonance', name: '共鳴', desc: '自分の行動時、味方全体の 必殺 +6。' },
-    od: { id: 'resonantlight', name: '共鳴光', desc: '味方全体の 攻撃 +18%（4行動）＋ 全体の 必殺 +15。', power: 0 },
+    od: { id: 'resonantlight', name: '共鳴光', desc: '味方全体に 奔流（会心率 +22%）＋ 全体の 必殺 +15。', power: 0 },
     sprite: 'pachycephalosaurus',
     build: { archetype: 'ceratopsian', seed: 10110, bulk: 0.9, scale: 1.0, horns: 3 },
     habitat: ['frostpeak', 'canyon'], rarity: 3,

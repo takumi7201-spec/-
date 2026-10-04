@@ -1,5 +1,30 @@
 import { h, button } from './dom';
 import { audio } from '../core/Audio';
+import { spriteUrl } from '../fx/SpriteUnit';
+
+/**
+ * コインの絵。
+ *
+ * 以前は ◈ の文字と、色を塗っただけの四角を場所ごとに使い分けていた。
+ * ◈ は編成タブや鉱石の印にも使っている記号なので、同じ形が「お金」と
+ * 「それ以外」の両方を指していた。お金はドット絵のコイン1種に寄せる。
+ */
+export function coinMark(className = ''): HTMLElement {
+  const img = document.createElement('img');
+  img.className = `coin-mark${className ? ` ${className}` : ''}`;
+  img.src = spriteUrl('coin');
+  img.alt = 'コイン';
+  img.decoding = 'async';
+  return img;
+}
+
+/** コインの絵＋枚数。札の上で金額を出すところはすべてこれ1つから引く */
+export function coinAmount(n: number | string, className = ''): HTMLElement {
+  return h('span', { class: `coin-amt ${className}` },
+    coinMark(),
+    h('span', { class: 'num', text: typeof n === 'number' ? n.toLocaleString('ja-JP') : n }),
+  );
+}
 
 /**
  * 画面の外枠。

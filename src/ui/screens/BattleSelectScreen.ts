@@ -6,7 +6,7 @@ import { stagePreview } from '../../game/party';
 import { STAGE_COUNT } from '../../game/data/stages';
 import { revosIcon } from '../revosIcon';
 import { ELEMENT_NAMES, BIOMES } from '../../voxel/palette';
-import { screenHead, plate, spaced } from '../chrome';
+import { screenHead, plate, spaced, coinAmount } from '../chrome';
 import { eventCard } from '../eventCard';
 import { dailyCard, bossCard } from '../rotationCards';
 import { rotationBadge } from '../../game/data/rotation';
@@ -148,7 +148,7 @@ export class BattleSelectScreen extends Screen {
         ),
         h('span', { class: 'stage-right' },
           h('span', { class: 'stage-tag', text: isNext ? spaced('未踏') : spaced('踏破') }),
-          h('span', { class: 'stage-coin num', text: `◈ ${stageCoins(stage, !isNext)}` }),
+          coinAmount(stageCoins(stage, !isNext), 'stage-coin'),
         ),
       );
       this.bodyEl.appendChild(card);

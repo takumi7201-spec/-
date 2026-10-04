@@ -4,7 +4,7 @@ import type { EventDef } from '../game/data/events';
 import { getRevos, revosShortName } from '../game/data/revos';
 import { ELEMENT_NAMES } from '../voxel/palette';
 import { revosIcon } from './revosIcon';
-import { spaced } from './chrome';
+import { spaced, coinAmount } from './chrome';
 import { audio } from '../core/Audio';
 
 /**
@@ -49,12 +49,11 @@ export function eventCard(
       revosIcon(reward.id, 'event-reward-icon'),
       h('div', { class: 'event-reward-main' },
         h('div', { class: 'event-reward-name', text: `${reward.name}　${'★'.repeat(reward.rarity)}` }),
-        h('div', {
-          class: 'event-reward-sub',
-          text: cleared
-            ? `再挑戦は ◈ ${Math.round(ev.coins / 4)} のみ`
-            : `Lv${ev.reward.level} で加入 ＋ ◈ ${ev.coins}`,
-        }),
+        cleared
+          ? h('div', { class: 'event-reward-sub' },
+            h('span', { text: '再挑戦は' }), coinAmount(Math.round(ev.coins / 4)), h('span', { text: 'のみ' }))
+          : h('div', { class: 'event-reward-sub' },
+            h('span', { text: `Lv${ev.reward.level} で加入 ＋` }), coinAmount(ev.coins)),
       ),
     ),
 

@@ -36,12 +36,12 @@ interface UnitCard {
  * 属性チップの隣に置く。名前ではなく絵で出すのは、カードが視野の端でしか
  * 読まれないから——端で読めるのは色と形だけで、2文字の熟語は読めない。
  */
-type StatusIcon = 'burn' | 'poison' | 'dizzy' | 'bleed';
+type StatusIcon = 'burn' | 'poison' | 'dizzy' | 'bleed' | 'surge';
 const STATUS_SPRITE: Record<StatusIcon, string> = {
-  burn: 'fx-burn', poison: 'fx-poison', dizzy: 'fx-dizzy', bleed: 'fx-bleed',
+  burn: 'fx-burn', poison: 'fx-poison', dizzy: 'fx-dizzy', bleed: 'fx-bleed', surge: 'fx-surge',
 };
 const STATUS_NAME: Record<StatusIcon, string> = {
-  burn: '火傷', poison: '毒', dizzy: '目眩', bleed: '出血',
+  burn: '火傷', poison: '毒', dizzy: '目眩', bleed: '出血', surge: '奔流',
 };
 
 function statusIcon(kind: StatusIcon): HTMLElement {
@@ -441,11 +441,12 @@ export class BattleScreen extends Screen {
     const poison = on.find((s) => s.kind === 'poison');
     const dizzy = on.find((s) => s.kind === 'dizzy');
     const bleed = on.find((s) => s.kind === 'bleed');
+    const surge = on.some((s) => s.kind === 'surge');
     const stack = poison ? Math.max(1, Math.round(poison.value / 0.03)) : 0;
     const dz = dizzy ? Math.max(1, Math.round(dizzy.value / 0.14)) : 0;
     // 出血は溜まった札の数そのもの。あと何枚で弾けるかを読ませる
     const bl = bleed?.tokens ?? 0;
-    const key = `${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}`;
+    const key = `${burn ? 'b' : ''}${stack ? `p${stack}` : ''}${dz ? `d${dz}` : ''}${bl ? `l${bl}` : ''}${surge ? 's' : ''}`;
     if (key === c.statusKey) return;
     c.statusKey = key;
 
@@ -459,6 +460,8 @@ export class BattleScreen extends Screen {
     if (stack > 0) put('poison', stack);
     if (dz > 0) put('dizzy', dz);
     if (bl > 0) put('bleed', bl);
+    // 掛かりは最後に置く。左から「されたこと」、右端に「されたいいこと」
+    if (surge) put('surge', 1);
   }
 
 
