@@ -1007,6 +1007,29 @@ body[data-layout='wide'] .event-body { left: 18vw; right: 18vw; }
   font-size: 12px; font-weight: 900; letter-spacing: 0.1em;
   color: var(--hl-amber-deep);
 }
+/*
+ * おまかせ。札（＝削るボタン）の外に並べる——札の中に入れると、
+ * ボタンの中のボタンになって、どちらを押したのか判定が割れる
+ */
+.stock-row { display: flex; align-items: stretch; gap: 8px; }
+.stock-row .stock-card { flex: 1; min-width: 0; }
+.stock-auto {
+  /* 「おまかせ」を1行に収める幅。折り返すと「おまか／せ」で読めなくなる */
+  flex: none; width: 74px; white-space: nowrap;
+  border: 0; border-radius: var(--r-lg);
+  background: rgba(60, 48, 30, 0.08); color: var(--pen-brown);
+  font-size: 11px; font-weight: 900; letter-spacing: 0.06em;
+}
+.stock-auto:active { background: rgba(60, 48, 30, 0.16); }
+/* 腕前の帯。いま任せたらどのくらいで上がるかを、札の上に出す */
+.stock-auto-strip {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  padding: 9px 12px; border-radius: var(--r-lg);
+  background: rgba(255, 253, 248, 0.72);
+  font-size: 11px; color: var(--ink-soft);
+}
+.stock-auto-strip.is-locked { color: var(--ink-faint); }
+.stock-auto-lv { font-size: 14px; color: var(--hl-amber-deep); }
 .stock-empty { padding: 24px 6px; }
 .stock-empty-line { font-size: 13px; line-height: 2; }
 

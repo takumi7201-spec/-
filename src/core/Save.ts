@@ -64,8 +64,14 @@ export interface SaveData {
   version: number;
   createdAt: number;
   updatedAt: number;
-  /** tickets は特別許可区へ降りるための券。古いセーブには無いので 0 で補う */
-  player: { name: string; level: number; exp: number; coins: number; tickets?: number };
+  /**
+   * tickets は特別許可区へ降りるための券。古いセーブには無いので 0 で補う。
+   * autoCleanUses は精錬を任せた回数。任せるほど腕が上がる（＝仕上がりが良くなる）
+   */
+  player: {
+    name: string; level: number; exp: number; coins: number;
+    tickets?: number; autoCleanUses?: number;
+  };
   roster: OwnedRevos[];
   /** 出撃する3体。立ち位置と狙いは役職が決めるので、持つのは顔ぶれだけ */
   party: { order: string[] | null };
@@ -208,7 +214,7 @@ export function defaultSave(): SaveData {
     version: SAVE_VERSION,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    player: { name: 'ディガー', level: 1, exp: 0, coins: 300, tickets: 1 },
+    player: { name: 'ディガー', level: 1, exp: 0, coins: 300, tickets: 1, autoCleanUses: 0 },
     roster: [],
     party: { order: null },
     stock: [],
@@ -287,7 +293,11 @@ export function load(): SaveData {
       // 存在しない段を「到達済み」として持つと、選択画面が空の段を出す
       stageProgress: Math.min(STAGE_COUNT, Math.max(0, data.stageProgress ?? 0)),
       settings: { ...base.settings, ...(data.settings ?? {}) },
-      player: { ...base.player, ...(data.player ?? {}), tickets: data.player?.tickets ?? 0 },
+      player: {
+        ...base.player, ...(data.player ?? {}),
+        tickets: data.player?.tickets ?? 0,
+        autoCleanUses: data.player?.autoCleanUses ?? 0,
+      },
       // 陣形・構え・狙いは廃止した。古いセーブに残っていても読み捨てる
       party: { order: data.party?.order ?? null },
       events: { ...base.events, ...(data.events ?? {}) },

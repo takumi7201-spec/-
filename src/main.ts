@@ -23,6 +23,9 @@ import {
 } from './game/party';
 import { STAGE_COUNT } from './game/data/stages';
 import { tabBar } from './ui/chrome';
+import {
+  AUTO_UNLOCK_STAGE, autoCleanLevel, autoCleanScore, autoCleanUnlocked, autoCleanUses,
+} from './game/autoClean';
 import { unclaimedCount } from './game/mail';
 import { readyCount } from './game/missions';
 import { rollEngraving, engraveName, engraveText } from './game/engraving';
@@ -842,6 +845,24 @@ async function main(): Promise<void> {
     if (!s) { ui.toast('その化石はもう無い', 'warn'); stockScreen.setData(data); return; }
     writeSave(data);
     void startClean(s.defId, s.rarity);
+  };
+  /*
+   * おまかせ精錬。
+   *
+   * 削りの画面には入らず、その場で仕上げて、手で削り終えたときと同じ
+   * 出口（cleanScreen.onFinish）へ渡す——刻印の抽選も、重ねるか迎えるかの
+   * 選択も、結果の見せ方も1か所にしておく。
+   */
+  stockScreen.onAuto = (entry) => {
+    if (!autoCleanUnlocked(data)) { ui.toast(`ステージ ${AUTO_UNLOCK_STAGE} 到達で開く`, 'warn'); return; }
+    const [s] = data.stock.splice(entry.index, 1);
+    if (!s) { ui.toast('その化石はもう無い', 'warn'); stockScreen.setData(data); return; }
+    const level = autoCleanLevel(autoCleanUses(data));
+    const score = autoCleanScore(level, new Rng((Date.now() ^ 0x9e37) >>> 0));
+    // 任せた回数は仕上げる前に数える。腕が上がるのは「やった」ことの結果
+    data.player.autoCleanUses = autoCleanUses(data) + 1;
+    audio.reward(s.rarity);
+    cleanScreen.onFinish?.(score, s.defId);
   };
 
   digSelectScreen.onBack = () => goHome();

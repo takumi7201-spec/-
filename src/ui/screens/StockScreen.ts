@@ -6,7 +6,11 @@ import { BIOMES, ELEMENT_NAMES, type BiomeId } from '../../voxel/palette';
 import { audio } from '../../core/Audio';
 import { revosIcon } from '../revosIcon';
 import { revosDetailBody } from '../revosDetail';
-import { screenHead } from '../chrome';
+import { screenHead, spaced } from '../chrome';
+import {
+  AUTO_UNLOCK_STAGE, autoCleanExpected, autoCleanLevel, autoCleanToNext,
+  autoCleanUnlocked, autoCleanUses, AUTO_MAX_LEVEL,
+} from '../../game/autoClean';
 
 /**
  * 未精錬の化石の一覧。
@@ -33,6 +37,8 @@ export class StockScreen extends Screen {
 
   onBack?: () => void;
   onClean?: (entry: StockEntry) => void;
+  /** おまかせで削る。削りの画面には入らず、その場で仕上げる */
+  onAuto?: (entry: StockEntry) => void;
 
   constructor() { super('stock', 'dig'); }
 
@@ -69,8 +75,10 @@ export class StockScreen extends Screen {
       return;
     }
 
+    this.listEl.appendChild(this.autoStrip());
     this.listEl.appendChild(h('div', { class: 'party-hint', text: '長押しで詳細' }));
 
+    const auto = autoCleanUnlocked(this.data);
     for (const row of rows) {
       const def = getRevos(row.defId);
       const card = button('', () => { audio.uiConfirm(); this.onClean?.(row); }, {
@@ -93,8 +101,43 @@ export class StockScreen extends Screen {
         ),
         h('span', { class: 'stock-go', text: '削る' }),
       );
-      this.listEl.appendChild(card);
+      /*
+       * おまかせは札の外に出す。札そのものが「削る」ボタンなので、
+       * 中にもう1つボタンを入れると、どちらを押したのか判定が割れる
+       */
+      this.listEl.appendChild(
+        auto
+          ? h('div', { class: 'stock-row' }, card,
+            button('おまかせ', () => { audio.uiConfirm(); this.onAuto?.(row); }, { class: 'stock-auto' }),
+          )
+          : card,
+      );
     }
+  }
+
+  /**
+   * おまかせの腕前。
+   *
+   * 「いま任せたらどのくらいで上がるか」を数で出す。見込みが出ていないと、
+   * 手で削るのと任せるのを比べられない——比べられないなら、良い石まで
+   * 任せてしまう。
+   */
+  private autoStrip(): HTMLElement {
+    if (!autoCleanUnlocked(this.data)) {
+      return h('div', { class: 'stock-auto-strip is-locked' },
+        h('span', { class: 'label', text: spaced('おまかせ精錬') }),
+        h('span', { text: `ステージ ${AUTO_UNLOCK_STAGE} 到達で開く（現在 ${this.data.stageProgress}）` }),
+      );
+    }
+    const uses = autoCleanUses(this.data);
+    const lv = autoCleanLevel(uses);
+    const next = autoCleanToNext(uses);
+    return h('div', { class: 'stock-auto-strip' },
+      h('span', { class: 'label', text: spaced('おまかせ精錬') }),
+      h('span', { class: 'num stock-auto-lv', text: `Lv${lv} / ${AUTO_MAX_LEVEL}` }),
+      h('span', { text: `仕上がり およそ クリーン度 ${autoCleanExpected(lv)}` }),
+      h('span', { class: 'dim', text: next > 0 ? `あと ${next} 回で Lv${lv + 1}` : '腕は上がりきった' }),
+    );
   }
 
   private openDetail(defId: string): void {
