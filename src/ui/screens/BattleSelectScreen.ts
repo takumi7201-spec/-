@@ -9,11 +9,10 @@ import { ELEMENT_NAMES, BIOMES } from '../../voxel/palette';
 import { screenHead, plate, spaced, coinAmount } from '../chrome';
 import { eventCard } from '../eventCard';
 import { dailyCard, bossCard } from '../rotationCards';
-import { colosseumCard } from '../colosseumCard';
 import { rotationBadge } from '../../game/data/rotation';
 import { audio } from '../../core/Audio';
 
-export type BattleMode = 'normal' | 'event' | 'colosseum';
+export type BattleMode = 'normal' | 'event';
 
 /** 通常戦の報酬。初踏破と再挑戦で分ける——同じ額だと最弱の段を回すのが最適解になる */
 export function stageCoins(stage: number, replay: boolean): number {
@@ -92,13 +91,15 @@ export class BattleSelectScreen extends Screen {
     };
     tab('normal', '通常', 0);
     tab('event', 'イベント', open);
-    tab('colosseum', '闘技', 0);
+    // 闘技は別の面。ここで中身を出さず、札を押したら特設の画面へ送る——
+    // レートは1本きりの長い数字で、段やイベントとは数え方が違う
+    const colo = button('闘技', () => { audio.uiTap(); this.onColosseum?.(); }, { class: 'sel-tab btn--opt sel-tab--col' });
+    this.tabsEl.appendChild(colo);
 
     // ---- 中身 ----
     clear(this.bodyEl);
     this.bodyEl.classList.toggle('sel-body--stages', this.mode === 'normal');
     if (this.mode === 'normal') this.renderStages(frontier);
-    else if (this.mode === 'colosseum') this.bodyEl.appendChild(colosseumCard(this.data, () => this.onColosseum?.()));
     else this.renderEvents();
   }
 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { VoxelGrid } from '../voxel/VoxelGrid';
 import { VoxelPainter, Rng } from '../voxel/VoxelPainter';
 import { greedyMesh } from '../voxel/greedyMesher';
-import { ELEMENT_COLORS, BIOMES, type BiomeId, type ElementId } from '../voxel/palette';
+import { ELEMENT_COLORS, BIOMES, type Biome, type BiomeId, type ElementId } from '../voxel/palette';
 import { createVoxelMaterial, type VoxelMaterial } from '../shaders/VoxelMaterial';
 import { SpriteUnit, SpriteAnimator, type SpriteState } from '../fx/SpriteUnit';
 import { Environment } from '../fx/Environment';
@@ -105,6 +105,11 @@ export class BattleScene {
    * 手前の味方が枠外に落ちる。
    */
   private camOffset = new THREE.Vector3();
+  /**
+   * 構図を引く量。闘技場だけ、組んだ建物が画面に入るところまで下がる——
+   * 露頭と同じ寄りだと、床の砂しか映らず「特設の舞台」が見えない
+   */
+  private camPull = 0;
   private lookOffset = new THREE.Vector3();
   private goalTmp = new THREE.Vector3();
 
@@ -139,6 +144,7 @@ export class BattleScene {
       this.scene.remove(this.arena);
       this.arena.geometry.dispose();
     }
+    this.camPull = 0;
     const biome = BIOMES[biomeId];
     this.env.applyBiome(biome, this.scene);
     this.env.fitShadowToArea(new THREE.Vector3(0, 0, 0), 13);
@@ -184,9 +190,111 @@ export class BattleScene {
       p.ellipsoid(x, top + 1, z, rng.range(1, 2.4), rng.range(1, 2.2), rng.range(1, 2.4), rng.chance(0.3) ? 6 : 5);
     }
 
+    this.mountArena(grid, biome, H, S, D);
+  }
+
+  /**
+   * コロシアム。闘技だけが使う舞台。
+   *
+   * 露頭を削った台地ではなく、人の手で組んだ闘技場にする——レートを賭けて
+   * 戦う場所が、掘りに行く崖と同じ絵では「特設」に見えない。
+   * 作りは4つだけ：平らな円の床、それを囲う壁、段になった観客席、柱。
+   *
+   * 色は階級の地層から採る。形は共通のまま、上がるほど石の色が変わる——
+   * 階級が変わったことを、数字ではなく画面の色で先に気付かせる。
+   */
+  buildColosseum(biomeId: BiomeId, seed: number): void {
+    if (this.arena) {
+      this.scene.remove(this.arena);
+      this.arena.geometry.dispose();
+    }
+    /*
+     * 光と空は階級で変えない。石の色だけを階級の地層から採る。
+     *
+     * 地層の空をそのまま使うと、エンバーフィールドの階級だけ夜の闘技場に
+     * なって、床の円も段も見えなくなる。ここは「同じ場所の、別の石」に
+     * したい——空が毎回変わると、別の場所に見えてしまう。
+     */
+    // 建物を見せるぶんだけ構図を引く
+    this.camPull = 5.4;
+    const stone = BIOMES[biomeId];
+    const biome: Biome = { ...BIOMES.canyon, palette: stone.palette };
+    this.env.applyBiome(biome, this.scene);
+    this.env.fitShadowToArea(new THREE.Vector3(0, 0, 0), 13);
+    this.scene.fog = new THREE.FogExp2(biome.fog, 0.010);
+
+    const S = 112, H = 26, D = 144;
+    const grid = new VoxelGrid(S, H, D);
+    const p = new VoxelPainter(grid);
+    const rng = new Rng(seed);
+    const cx = S / 2, cz = D / 2;
+    /*
+     * 戦場は x ±4.2 / z ±7.2（m）の四角。楕円の床がその四隅まで含むように
+     * 半径を取る——(4.2/rx)² + (7.2/rz)² < 1 を満たさないと、隅に立った
+     * ユニットが床の外に浮く
+     */
+    const rxIn = 26, rzIn = 46;
+    // 床の上に 10 ボクセルぶん積めるよう、天井までの高さを残す
+    const floorTop = H - 10;
+
+    // 席の段。内側から外へ、高さを持つ輪として積む
+    // 外へ行くほど高くする。内から外へ下がると、奥から見たときに
+    // 段が潰れて1枚の輪に見える
+    const TIERS = [
+      { to: 1.05, top: floorTop + 5, slot: 12 },
+      { to: 1.14, top: floorTop + 8, slot: 5 },
+      { to: 1.24, top: floorTop + 11, slot: 6 },
+      { to: 1.36, top: floorTop + 14, slot: 5 },
+    ];
+
+    for (let z = 0; z < D; z++) {
+      for (let x = 0; x < S; x++) {
+        const nx = (x - cx) / rxIn, nz = (z - cz) / rzIn;
+        const d = Math.hypot(nx, nz);
+        if (d > 1.36) continue;
+
+        if (d <= 1) {
+          for (let y = 0; y <= floorTop; y++) {
+            const depth = floorTop - y;
+            let slot: number;
+            if (depth === 0) {
+              // 砂の床。等間隔の輪を2本引いて、円であることを床にも出す。
+              // どの地層の色でも明るい段（13・12）で組む
+              const ring = Math.abs(d - 0.52) < 0.03 || Math.abs(d - 0.88) < 0.028;
+              slot = ring ? 12 : rng.chance(0.12) ? 1 : 13;
+            } else if (depth < 3) slot = 1;
+            else slot = rng.chance(0.25) ? 6 : 5;
+            grid.set(x, y, z, slot);
+          }
+          continue;
+        }
+
+        const tier = TIERS.find((t) => d <= t.to);
+        if (!tier) continue;
+        for (let y = 0; y <= tier.top; y++) {
+          const depth = tier.top - y;
+          grid.set(x, y, z, depth === 0 ? 13 : depth < 2 ? tier.slot : rng.chance(0.3) ? 6 : 5);
+        }
+      }
+    }
+
+    // 柱。外周の等間隔に立てる。段だけだと輪郭が平らで、囲われて見えない
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const px = Math.round(cx + Math.cos(a) * rxIn * 1.44);
+      const pz = Math.round(cz + Math.sin(a) * rzIn * 1.44);
+      p.box(px - 1, floorTop + 14, pz - 1, 3, 8, 3, 13);
+      p.box(px - 2, floorTop + 21, pz - 2, 5, 2, 5, 12);
+    }
+
+    this.mountArena(grid, biome, H, S, D);
+  }
+
+  /** 組んだ格子を1枚のメッシュにして舞台へ置く。露頭と闘技場で同じ出口を通す */
+  private mountArena(grid: VoxelGrid, biome: Biome, H: number, S: number, D: number): void {
     const data = greedyMesh(grid, biome.palette, {
       voxelSize: 0.25,
-      origin: [(-cx) * 0.25, -H * 0.25 + 0.25, (-cz) * 0.25],
+      origin: [(-S / 2) * 0.25, -H * 0.25 + 0.25, (-D / 2) * 0.25],
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
@@ -429,7 +537,11 @@ export class BattleScene {
     const spanZ = maxZ - minZ;
     // 上から覗き込む角度にする。浅いと奥行きが画面の縦に潰れて、
     // 手前の味方と奥の敵が1列に重なって見える
-    this.camGoal.set(cx * 0.35, 8.8 + spanZ * 0.42 + spanX * 0.3, cz + 5.6 + spanZ * 0.34 + spanX * 0.75);
+    this.camGoal.set(
+      cx * 0.35,
+      8.8 + spanZ * 0.42 + spanX * 0.3 + this.camPull * 0.62,
+      cz + 5.6 + spanZ * 0.34 + spanX * 0.75 + this.camPull,
+    );
     this.lookGoal.set(cx * 0.5, 0.6, cz - 0.9);
   }
 

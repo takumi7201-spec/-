@@ -49,6 +49,7 @@ import { CleanChoiceScreen } from './ui/screens/CleanChoiceScreen';
 import { grantLogin, grantStaffMail } from './game/mail';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
+import { ColosseumScreen } from './ui/screens/ColosseumScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { DetailScreen } from './ui/screens/DetailScreen';
 import { REVOS, getRevos } from './game/data/revos';
@@ -212,10 +213,11 @@ async function main(): Promise<void> {
   const cleanChoiceScreen = new CleanChoiceScreen();
   const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
+  const colosseumScreen = new ColosseumScreen();
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
   const detailScreen = new DetailScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, cleanChoiceScreen, stockScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, cleanChoiceScreen, stockScreen, colosseumScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -337,7 +339,7 @@ async function main(): Promise<void> {
   function nextColosseumSpecial(): Special {
     const setup = buildTeamSetup(data.roster, data.party.order);
     const anchor = setup ? teamAnchor(setup) : { level: 1, clean: 60, size: 1 };
-    const r = buildRival(data.colosseum, anchor);
+    const r = buildRival(data.colosseum, anchor, effectiveParty(data).map((u) => u.defId));
     return { kind: 'colosseum', rival: r.name, rivalRate: r.rate };
   }
 
@@ -362,16 +364,18 @@ async function main(): Promise<void> {
     const daily = special?.kind === 'daily' ? dailyRuleFor(special.date) : null;
     const boss = special?.kind === 'boss' ? bossFor(special.date) : null;
     // コロシアムの相手は、札が予告したものと同じ種から組む
-    const colo = special?.kind === 'colosseum' ? buildRival(data.colosseum, teamAnchor(mine)) : null;
+    const colo = special?.kind === 'colosseum'
+      ? buildRival(data.colosseum, teamAnchor(mine), effectiveParty(data).map((u) => u.defId))
+      : null;
     const coloTier = tierOf(data.colosseum.rate);
-    battle.buildArena(
-      ev ? ev.biome
-        : daily ? daily.biome
-          : boss ? boss.biome
-            : colo ? coloTier.biome
-              : stagePreview(activeStage).biome,
-      seed,
-    );
+    // コロシアムだけ舞台の作りが違う。円の床と観客席で囲った特設の闘技場
+    if (colo) battle.buildColosseum(coloTier.biome, seed);
+    else {
+      battle.buildArena(
+        ev ? ev.biome : daily ? daily.biome : boss ? boss.biome : stagePreview(activeStage).biome,
+        seed,
+      );
+    }
     const foes = ev ? buildEventTeam(ev, mine.members.length)
       : daily && special?.kind === 'daily' ? buildDailyTeam(special.date, data.stageProgress, teamAnchor(mine))
       : boss ? buildBossTeam(boss, teamAnchor(mine))
@@ -964,7 +968,9 @@ async function main(): Promise<void> {
   selectScreen.onEvent = (ev) => { void startBattle(ev); };
   selectScreen.onDaily = () => { void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() }); };
   selectScreen.onBoss = () => { void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() }); };
-  selectScreen.onColosseum = () => { void startBattle(null, data.stageProgress + 1, nextColosseumSpecial()); };
+  selectScreen.onColosseum = () => { colosseumScreen.setData(data); ui.show('colosseum'); };
+  colosseumScreen.onBack = () => { selectScreen.setData(data); ui.show('battleSelect'); };
+  colosseumScreen.onGo = () => { void startBattle(null, data.stageProgress + 1, nextColosseumSpecial()); };
 
   /**
    * デバッグモードを開く。
@@ -1045,7 +1051,7 @@ async function main(): Promise<void> {
     else if (jump === 'event') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'event' }); }
     else if (jump === 'daily') void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() });
     else if (jump === 'boss') void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() });
-    else if (jump === 'colosseum') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'colosseum' }); }
+    else if (jump === 'colosseum') { colosseumScreen.setData(data); ui.show('colosseum'); }
     else if (jump === 'select') { selectScreen.setData(data); ui.show('battleSelect'); }
     else if (jump === 'mail') { deliverMail(false); mailScreen.setData(data); ui.show('mail'); }
     else if (jump === 'digSelect') { digSelectScreen.setData(data); ui.show('digSelect'); }

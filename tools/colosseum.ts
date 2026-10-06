@@ -49,7 +49,7 @@ for (const b of BUILDS) {
   let wins = 0, draws = 0;
   const tail: number[] = [];
   for (let i = 0; i < N; i++) {
-    const rival = buildRival(st, { level: b.level, clean: b.clean, size: 5 });
+    const rival = buildRival(st, { level: b.level, clean: b.clean, size: 5 }, b.ids);
     const sim = new BattleSim(i * 7919 + 13, mine, rival.team);
     sim.runToEnd();
     const w = sim.result().winner;
@@ -67,4 +67,7 @@ for (const b of BUILDS) {
     `${b.name.padEnd(22)} 落ち着き ${String(avg).padStart(4)}（最高 ${st.best}）`
     + `  勝率 ${(wins / N * 100).toFixed(1)}%  引分 ${draws}  階級 ${tierOf(avg).name}  最高連勝 ${st.bestStreak}`,
   );
+  // 最後に組まれた相手。レートが上がったあと、何を連れてきているか
+  const last = buildRival(st, { level: b.level, clean: b.clean, size: 5 }, b.ids);
+  console.log(`   └ 最後の相手 ${last.team.members.map((m) => m.defId).join(' / ')}  — ${last.tactic}`);
 }
