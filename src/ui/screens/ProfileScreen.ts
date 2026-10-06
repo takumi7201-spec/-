@@ -5,6 +5,7 @@ import { expToNext } from '../../core/Save';
 import { STAGE_COUNT } from '../../game/data/stages';
 import { REVOS, getRevos } from '../../game/data/revos';
 import { EVENTS } from '../../game/data/events';
+import { tierOf } from '../../game/data/colosseum';
 import { revosIcon } from '../revosIcon';
 import { screenHead } from '../chrome';
 
@@ -180,6 +181,13 @@ export class ProfileScreen extends Screen {
         // バトル欄は、記録票ではなく未達表になる
         d.events.cleared.length > 0
           ? this.row('イベント踏破', `${d.events.cleared.length} / ${EVENTS.length}`)
+          : null,
+        // コロシアムは挑んだ人にだけ出す。1戦もしていない欄に 1200 が
+        // 載っていると、戦っていないのに記録があるように読める
+        d.colosseum.wins + d.colosseum.losses > 0
+          ? this.row('コロシアム', `${d.colosseum.rate}（最高 ${d.colosseum.best}）`, {
+            note: `${tierOf(d.colosseum.rate).name} · ${d.colosseum.wins}勝 ${d.colosseum.losses}敗`,
+          })
           : null,
       ),
 

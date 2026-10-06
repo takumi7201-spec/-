@@ -1917,13 +1917,16 @@ body[data-layout='wide'] .det-body { left: 16vw; right: 16vw; }
   top: calc(var(--safe-t) + var(--head-h) + 6px);
   left: calc(var(--gutter) + var(--safe-l));
   right: calc(var(--gutter) + var(--safe-r));
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+  /* 3つになったので列数を固定しない。2つに戻しても同じ幅で並ぶ */
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px;
   pointer-events: auto;
 }
 .sel-tab {
   position: relative;
   min-height: 42px; border-radius: 12px;
-  font-size: 14px; font-weight: 900; letter-spacing: 0.1em;
+  /* 3列になると「イベント」が入らない。字と字の間を詰める */
+  font-size: 13px; font-weight: 900; letter-spacing: 0.04em;
+  padding: 0 4px;
 }
 .sel-badge {
   position: absolute; right: 8px; top: 7px;
@@ -2090,6 +2093,53 @@ body[data-layout='wide'] .det-body { left: 16vw; right: 16vw; }
   background: rgba(255, 253, 248, 0.7); color: var(--ink-soft);
   font-size: 11px; font-weight: 700; text-align: center;
 }
+
+/* =========================================================================
+   コロシアム
+   1本の数字（レート）が主役。階級・相手・動く幅を、その下に小さく添える
+   ========================================================================= */
+.rot-card--col { border-top: 3px solid var(--hl-amber-deep); }
+.col-rate { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.col-rate-main { display: flex; align-items: baseline; gap: 10px; }
+.col-tier {
+  font-size: 13px; font-weight: 900; letter-spacing: 0.1em;
+  color: #fff6e8; background: var(--pen-brown);
+  padding: 2px 10px; border-radius: 6px;
+}
+.col-rate-num { font-size: 34px; line-height: 1.05; color: var(--ink); }
+.col-rate-sub { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--ink-soft); }
+.col-streak { color: var(--hl-amber-deep); font-weight: 900; }
+.col-track {
+  position: relative; height: 7px; border-radius: 4px; margin-top: 7px;
+  background: rgba(72, 58, 36, 0.14); overflow: hidden;
+}
+.col-track-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; display: block;
+  background: linear-gradient(90deg, var(--hl-amber), var(--hl-amber-deep));
+}
+.col-next { font-size: 10px; color: var(--ink-faint); margin-top: 4px; }
+.col-rival { display: flex; align-items: baseline; gap: 10px; }
+.col-rival-name { font-size: 15px; font-weight: 900; }
+.col-rival-rate { font-size: 11px; color: var(--ink-soft); }
+.col-foe-role { font-size: 9px; color: var(--ink-faint); }
+.col-stakes { display: flex; gap: 8px; }
+.col-stake {
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; border-radius: 11px;
+  background: rgba(255, 253, 248, 0.7);
+  font-size: 13px;
+}
+.col-stake-tag {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.14em;
+  color: #fff6f4; background: var(--pencil);
+  padding: 2px 7px; border-radius: 5px;
+}
+.col-stake--win .col-stake-tag { background: var(--pen-green); }
+.col-stake--win .num { color: var(--pen-green); font-weight: 900; }
+.col-stake--lose .col-stake-tag { background: var(--hl-rose); }
+.col-stake--lose .num { color: var(--hl-rose); font-weight: 900; }
+.col-stake .coin-amt { margin-left: auto; font-size: 12px; color: var(--pen-brown); }
+.col-floor { font-size: 10px; color: var(--ink-faint); margin-top: -2px; }
 
 body[data-layout='wide'] .sel-body,
 body[data-layout='wide'] .sel-tabs { left: 18vw; right: 18vw; }

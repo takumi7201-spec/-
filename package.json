@@ -12,6 +12,7 @@
     "balance": "esbuild tools/balance.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/balance.mjs --log-level=error && node node_modules/.cache/balance.mjs",
     "stagecurve": "esbuild tools/stagecurve.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/stagecurve.mjs --log-level=error && node node_modules/.cache/stagecurve.mjs",
     "stagetune": "esbuild tools/stagetune.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/stagetune.mjs --log-level=error && node node_modules/.cache/stagetune.mjs",
+    "colosseum": "esbuild tools/colosseum.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/colosseum.mjs --log-level=error && node node_modules/.cache/colosseum.mjs",
     "artifact": "npm run build && node tools/make-artifact.mjs"
   },
   "devDependencies": {

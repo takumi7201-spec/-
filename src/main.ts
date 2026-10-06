@@ -22,6 +22,9 @@ import {
   teamAnchor, stagePreview, effectiveParty, PARTY_SIZE,
 } from './game/party';
 import { STAGE_COUNT } from './game/data/stages';
+import {
+  buildRival, colosseumCoins, rateDelta, tierOf, COLOSSEUM_FLOOR,
+} from './game/data/colosseum';
 import { tabBar } from './ui/chrome';
 import {
   AUTO_UNLOCK_STAGE, autoCleanLevel, autoCleanScore, autoCleanUnlocked, autoCleanUses,
@@ -142,7 +145,10 @@ async function main(): Promise<void> {
    * 挑戦中の日替わり・週替わり。日付を持たせておく——戦っている最中に日が
    * 変わっても、報酬は挑んだ日のぶんとして数える
    */
-  type Special = { kind: 'daily' | 'boss'; date: string };
+  type Special =
+    | { kind: 'daily' | 'boss'; date: string }
+    /** コロシアム。挑んだ時点の相手（名前とレート）を控える——結果で使う */
+    | { kind: 'colosseum'; rival: string; rivalRate: number };
   let activeSpecial: Special | null = null;
   let lastSpecial: Special | null = null;
   /**
@@ -322,6 +328,19 @@ async function main(): Promise<void> {
     setTimeout(() => boot.classList.add('hidden'), 200);
   }
 
+  /**
+   * いま挑める相手を1人だけ用意する。
+   *
+   * 相手はレートと戦績から決まるので、札が予告したものと必ず同じになる。
+   * 名前とレートだけ控えて渡す——結果の画面で「誰に勝ったのか」を出す
+   */
+  function nextColosseumSpecial(): Special {
+    const setup = buildTeamSetup(data.roster, data.party.order);
+    const anchor = setup ? teamAnchor(setup) : { level: 1, clean: 60, size: 1 };
+    const r = buildRival(data.colosseum, anchor);
+    return { kind: 'colosseum', rival: r.name, rivalRate: r.rate };
+  }
+
   async function startBattle(
     ev: EventDef | null = null, stage = data.stageProgress + 1, special: Special | null = null,
   ): Promise<void> {
@@ -334,16 +353,30 @@ async function main(): Promise<void> {
     activeStage = Math.max(1, Math.min(STAGE_COUNT, stage));
     lastStage = activeStage;
     boot.classList.remove('hidden');
-    await progress(0.4, ev ? '記録を読み出しています…' : special?.kind === 'boss' ? '巨獣の気配を探っています…' : '闘技場を生成しています…');
+    await progress(0.4, ev ? '記録を読み出しています…'
+      : special?.kind === 'boss' ? '巨獣の気配を探っています…'
+        : special?.kind === 'colosseum' ? '対戦相手を呼び出しています…'
+          : '闘技場を生成しています…');
     const seed = (Date.now() ^ (activeStage * 104729)) >>> 0;
     // 段ごとに舞台を変える。選択画面が予告した地層と実際の闘技場を一致させる
     const daily = special?.kind === 'daily' ? dailyRuleFor(special.date) : null;
     const boss = special?.kind === 'boss' ? bossFor(special.date) : null;
-    battle.buildArena(ev ? ev.biome : daily ? daily.biome : boss ? boss.biome : stagePreview(activeStage).biome, seed);
+    // コロシアムの相手は、札が予告したものと同じ種から組む
+    const colo = special?.kind === 'colosseum' ? buildRival(data.colosseum, teamAnchor(mine)) : null;
+    const coloTier = tierOf(data.colosseum.rate);
+    battle.buildArena(
+      ev ? ev.biome
+        : daily ? daily.biome
+          : boss ? boss.biome
+            : colo ? coloTier.biome
+              : stagePreview(activeStage).biome,
+      seed,
+    );
     const foes = ev ? buildEventTeam(ev, mine.members.length)
-      : daily ? buildDailyTeam(special!.date, data.stageProgress, teamAnchor(mine))
+      : daily && special?.kind === 'daily' ? buildDailyTeam(special.date, data.stageProgress, teamAnchor(mine))
       : boss ? buildBossTeam(boss, teamAnchor(mine))
-      : buildEnemyTeam(activeStage);
+        : colo ? colo.team
+          : buildEnemyTeam(activeStage);
     const rules = daily ? daily.rules : boss ? { timeLimit: BOSS_TIME } : {};
     player = new BattlePlayer(seed, mine, foes, battle, rules);
     battleScreen.setPlayer(player);
@@ -738,6 +771,8 @@ async function main(): Promise<void> {
         }
       } else if (sp?.kind === 'boss') {
         // 段の報酬は上で渡した
+      } else if (sp?.kind === 'colosseum') {
+        coins = colosseumCoins(data.colosseum.rate, true);
       } else if (ev) {
         // イベントは進行度を進めない。編成を試す場としていつでも戻れるようにする
         const first = !data.events.cleared.includes(ev.id);
@@ -776,6 +811,42 @@ async function main(): Promise<void> {
         value: sp?.kind === 'daily' ? `勝ち筋：${dailyRuleFor(sp.date).hint}` : '編成を見直そう',
       });
     }
+    /*
+     * コロシアムのレート。
+     *
+     * 引き分け（時間切れ）は負け扱いにしない——こちらが崩せなかったのと
+     * 同じだけ相手も崩せていないので、どちらかに点を付ける理由がない。
+     */
+    if (sp?.kind === 'colosseum') {
+      const c = data.colosseum;
+      const before = c.rate;
+      if (winner === 0 || winner === 1) {
+        const won = winner === 0;
+        c.rate = Math.max(COLOSSEUM_FLOOR, c.rate + rateDelta(c.rate, sp.rivalRate, won));
+        c.best = Math.max(c.best, c.rate);
+        if (won) { c.wins++; c.streak++; c.bestStreak = Math.max(c.bestStreak, c.streak); }
+        else { c.losses++; c.streak = 0; }
+      }
+      const tier = tierOf(c.rate);
+      const moved = c.rate - before;
+      rows.push({
+        label: 'レート',
+        value: `${before} → ${c.rate}${moved === 0 ? '' : `（${moved > 0 ? '＋' : ''}${moved}）`}`,
+        kind: moved > 0 ? 'new' : 'exp',
+      });
+      if (tierOf(before).name !== tier.name) {
+        rows.push({ label: moved > 0 ? '昇級' : '降級', value: tier.name, kind: 'rank' });
+      } else {
+        rows.push({ label: '階級', value: tier.name });
+      }
+      if (c.streak > 1) rows.push({ label: '連勝', value: `${c.streak} 連勝` });
+      if (winner === 1) {
+        const lose = colosseumCoins(c.rate, false);
+        data.player.coins += lose;
+        rows.push({ label: '参加賞', value: `◈ ${lose}`, kind: 'coin' });
+      }
+    }
+
     addPlayerExp(data, winner === 0 ? 120 : 40);
 
     /*
@@ -817,15 +888,19 @@ async function main(): Promise<void> {
     const secs = Math.round(player?.sim.clock ?? 0);
     const isBoss = sp?.kind === 'boss';
     showResult({
-      eyebrow: isBoss ? '巨獣討伐' : sp ? '今日の戦場' : '戦闘終了',
+      eyebrow: isBoss ? '巨獣討伐'
+        : sp?.kind === 'colosseum' ? 'コロシアム'
+          : sp ? '今日の戦場' : '戦闘終了',
       title: isBoss
         ? (bossFrac >= 1 ? '討 伐' : winner === 1 ? '全 滅' : '時 間 切 れ')
         : winner === 0 ? '勝 利' : winner === 1 ? '敗 北' : '引 き 分 け',
-      subtitle: isBoss
-        ? `${bossFor(sp!.date).title} — 与ダメージ ${Math.floor(bossFrac * 100)}%`
-        : sp
-          ? `${dailyRuleFor(sp.date).name} — ${secs} 秒で決着`
-          : ev
+      subtitle: isBoss && sp?.kind === 'boss'
+        ? `${bossFor(sp.date).title} — 与ダメージ ${Math.floor(bossFrac * 100)}%`
+        : sp?.kind === 'colosseum'
+          ? `${sp.rival}（レート ${sp.rivalRate}） — ${secs} 秒で決着`
+          : sp?.kind === 'daily'
+            ? `${dailyRuleFor(sp.date).name} — ${secs} 秒で決着`
+            : ev
             ? `${ev.name} — ${secs} 秒で決着`
             : `ステージ ${activeStage} — ${secs} 秒で決着`,
       good: isBoss ? bossFrac >= BOSS_TIERS[0].at : winner === 0,
@@ -889,6 +964,7 @@ async function main(): Promise<void> {
   selectScreen.onEvent = (ev) => { void startBattle(ev); };
   selectScreen.onDaily = () => { void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() }); };
   selectScreen.onBoss = () => { void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() }); };
+  selectScreen.onColosseum = () => { void startBattle(null, data.stageProgress + 1, nextColosseumSpecial()); };
 
   /**
    * デバッグモードを開く。
@@ -928,8 +1004,17 @@ async function main(): Promise<void> {
       if (data.stock.length > 0) { stockScreen.setData(data); ui.show('stock'); return; }
       void startBattle();
     } else {
-      // 日替わり・週替わりは、もう一度押した時点の日付で挑み直す
-      void startBattle(lastEvent, lastStage, lastSpecial ? { kind: lastSpecial.kind, date: todayKey() } : null);
+      /*
+       * 日替わり・週替わりは、もう一度押した時点の日付で挑み直す。
+       * コロシアムはレートが動いているので、相手も組み直して挑む——
+       * 同じ相手にもう一度、ではなく「次の相手」になる
+       */
+      void startBattle(
+        lastEvent, lastStage,
+        lastSpecial === null ? null
+          : lastSpecial.kind === 'colosseum' ? nextColosseumSpecial()
+            : { kind: lastSpecial.kind, date: todayKey() },
+      );
     }
   };
 
@@ -960,6 +1045,7 @@ async function main(): Promise<void> {
     else if (jump === 'event') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'event' }); }
     else if (jump === 'daily') void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() });
     else if (jump === 'boss') void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() });
+    else if (jump === 'colosseum') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'colosseum' }); }
     else if (jump === 'select') { selectScreen.setData(data); ui.show('battleSelect'); }
     else if (jump === 'mail') { deliverMail(false); mailScreen.setData(data); ui.show('mail'); }
     else if (jump === 'digSelect') { digSelectScreen.setData(data); ui.show('digSelect'); }

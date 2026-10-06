@@ -2,6 +2,7 @@ import type { QualityTier } from './Quality';
 import type { BiomeId } from '../voxel/palette';
 import type { Engraving } from '../game/engraving';
 import { STAGE_COUNT } from '../game/data/stages';
+import { defaultColosseum, type ColosseumState } from '../game/data/colosseum';
 
 /**
  * セーブデータ。
@@ -80,6 +81,8 @@ export interface SaveData {
   dex: string[];
   unlockedBiomes: BiomeId[];
   stageProgress: number;
+  /** コロシアムのレートと戦績。古いセーブには無いので既定値で補う */
+  colosseum: ColosseumState;
   /** クリア済みイベントの id。報酬のリヴォスは初回だけ配る */
   events: {
     cleared: string[];
@@ -221,6 +224,7 @@ export function defaultSave(): SaveData {
     dex: [],
     unlockedBiomes: ['canyon'],
     stageProgress: 0,
+    colosseum: defaultColosseum(),
     events: { cleared: [] },
     mail: [],
     login: { lastDate: '', streak: 0, total: 0, deliveredStaff: [] },
@@ -292,6 +296,7 @@ export function load(): SaveData {
       // 段を30で打ち止めにしたので、それ以上まで進んでいた古いセーブは詰める。
       // 存在しない段を「到達済み」として持つと、選択画面が空の段を出す
       stageProgress: Math.min(STAGE_COUNT, Math.max(0, data.stageProgress ?? 0)),
+      colosseum: { ...defaultColosseum(), ...(data.colosseum ?? {}) },
       settings: { ...base.settings, ...(data.settings ?? {}) },
       player: {
         ...base.player, ...(data.player ?? {}),
