@@ -2,12 +2,9 @@ import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
 import type { SaveData } from '../../core/Save';
 import {
-  COLOSSEUM_FLOOR, COLOSSEUM_TIERS, buildRival, colosseumCoins, nextTier, rateDelta, tierOf,
+  COLOSSEUM_FLOOR, COLOSSEUM_TIERS, colosseumCoins, nextTier, rateRange, tierOf,
 } from '../../game/data/colosseum';
-import { buildTeamSetup, effectiveParty, teamAnchor } from '../../game/party';
-import { getRevos, revosShortName, ROLE_NAMES } from '../../game/data/revos';
-import { BIOMES, ELEMENT_NAMES } from '../../voxel/palette';
-import { revosIcon } from '../revosIcon';
+import { BIOMES } from '../../voxel/palette';
 import { coinAmount, plate, screenHead, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
@@ -25,6 +22,7 @@ export class ColosseumScreen extends Screen {
 
   onBack?: () => void;
   onGo?: () => void;
+  onRanking?: () => void;
 
   constructor() { super('colosseum', 'battle'); }
 
@@ -47,10 +45,9 @@ export class ColosseumScreen extends Screen {
     const st = this.data.colosseum;
     const tier = tierOf(st.rate);
     const up = nextTier(st.rate);
-    const setup = buildTeamSetup(this.data.roster, this.data.party.order);
-    const anchor = setup ? teamAnchor(setup) : { level: 1, clean: 60, size: 1 };
-    const rival = buildRival(st, anchor, effectiveParty(this.data).map((u) => u.defId));
     const total = st.wins + st.losses;
+    const win = rateRange(st.rate, true);
+    const lose = rateRange(st.rate, false);
     const base = tier.at;
     const span = up ? up.tier.at - base : 200;
     const fill = Math.max(0, Math.min(1, (st.rate - base) / span));
@@ -90,26 +87,14 @@ export class ColosseumScreen extends Screen {
         )),
       ),
 
-      // ---- つぎの相手 ----
-      h('div', { class: 'label col-section', text: spaced('つぎの相手') }),
-      h('div', { class: 'col-panel' },
-        h('div', { class: 'col-rival' },
-          h('span', { class: 'col-rival-name', text: rival.name }),
-          h('span', { class: 'col-rival-rate num', text: `レート ${rival.rate}` }),
-        ),
-        h('div', { class: 'col-tactic', text: rival.tactic }),
-        h('div', { class: 'event-foes' },
-          ...rival.team.members.map((m) => {
-            const d = getRevos(m.defId);
-            return h('div', { class: 'event-foe' },
-              revosIcon(m.defId, 'event-foe-icon'),
-              h('span', { class: `chip chip--${d.element}`, text: ELEMENT_NAMES[d.element] }),
-              h('span', { class: 'event-foe-name', text: revosShortName(m.defId) }),
-              h('span', { class: 'col-foe-role', text: ROLE_NAMES[d.role] }),
-            );
-          }),
-        ),
-        h('div', { class: 'event-meta num', text: `Lv${rival.team.members[0]?.level ?? 1}（こちらに合わせる）· クリーン度 ${rival.team.members[0]?.clean ?? 60}` }),
+      // ---- 相手 ----
+      h('div', { class: 'label col-section', text: spaced('相手') }),
+      h('div', { class: 'col-panel col-panel--blind' },
+        h('div', { class: 'col-blind-main', text: '挑んだときに決まる' }),
+        h('p', { class: 'col-blind-note', text:
+          '相手はいまの編成を見て組まれる。階級が上がるほど、噛み合いと'
+          + '対策まで入れてくる——誰と当たるかは出ていってから分かる。' }),
+        h('div', { class: 'col-blind-tier', text: `${tier.name}の相手：★${tier.rarityCap} まで · 刻印 ${tier.grade === 0 ? 'なし' : tier.grade} · レベルはこちらに合わせる` }),
       ),
 
       // ---- 賭けるもの ----
@@ -117,16 +102,18 @@ export class ColosseumScreen extends Screen {
       h('div', { class: 'col-stakes' },
         h('div', { class: 'col-stake col-stake--win' },
           h('span', { class: 'col-stake-tag', text: '勝ち' }),
-          h('span', { class: 'num', text: `＋${rateDelta(st.rate, rival.rate, true)}` }),
+          h('span', { class: 'num', text: `＋${win[0]}〜＋${win[1]}` }),
           coinAmount(colosseumCoins(st.rate, true)),
         ),
         h('div', { class: 'col-stake col-stake--lose' },
           h('span', { class: 'col-stake-tag', text: '負け' }),
-          h('span', { class: 'num', text: `${rateDelta(st.rate, rival.rate, false)}` }),
+          h('span', { class: 'num', text: `${lose[0]}〜${lose[1]}` }),
           coinAmount(colosseumCoins(st.rate, false)),
         ),
       ),
-      h('div', { class: 'col-note', text: '相手はレートと戦績から決まる。開き直しても替わらない' }),
+      button('使用率ランキング', () => { audio.uiTap(); this.onRanking?.(); },
+        { class: 'btn--wide btn--opt col-rank-go' }),
+      h('div', { class: 'col-note', text: '相手のレートはこちらの前後 80 に振れる。幅はそのぶん' }),
     );
 
     const deck = h('div', { class: 'deck deck--col' },

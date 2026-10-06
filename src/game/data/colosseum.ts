@@ -28,6 +28,13 @@ export interface ColosseumState {
   /** 連勝。負けで 0 に戻る */
   streak: number;
   bestStreak: number;
+  /**
+   * 相手として出てきた種の数。
+   *
+   * 闘技場の「環境」はここに溜まる——相手はこちらの編成を見て組まれるので、
+   * 何が多く出てきたかは、そのまま「自分の編成に刺さる顔ぶれ」の記録になる。
+   */
+  met: Record<string, number>;
 }
 
 export const COLOSSEUM_START = 1200;
@@ -72,18 +79,21 @@ export function nextTier(rate: number): { tier: ColosseumTier; need: number } | 
 }
 
 export function defaultColosseum(): ColosseumState {
-  return { rate: COLOSSEUM_START, best: COLOSSEUM_START, wins: 0, losses: 0, streak: 0, bestStreak: 0 };
+  return {
+    rate: COLOSSEUM_START, best: COLOSSEUM_START,
+    wins: 0, losses: 0, streak: 0, bestStreak: 0, met: {},
+  };
 }
 
 /**
- * 次の相手を決める種。
+ * 相手を決める種。
  *
- * レートと戦績から作るので、挑む前の予告と実際に出てくる相手が必ず一致し、
- * 1戦ごとに替わる。画面を開き直しても同じ相手が出る——「相手を見てから
- * 引き直す」ができないように、乱数ではなく状態から引く。
+ * 挑むボタンを押した時点で引く。挑む前から相手が分かっていると、
+ * 相性の良い相手が出るまで画面を開き直す遊びになってしまう——
+ * 誰と当たるかは、出ていってから分かる。
  */
-export function matchSeed(st: ColosseumState): number {
-  return ((st.rate * 7919) ^ ((st.wins + st.losses + 1) * 104729) ^ (st.best * 31)) >>> 0;
+export function matchSeed(): number {
+  return ((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
 }
 
 const RIVAL_NAMES = [
@@ -308,8 +318,8 @@ export function buildRival(
   anchor: { level: number; clean: number; size: number },
   /** こちらの編成。相手はこれを見て組む——レートが上がるほど強く効く */
   myParty: string[] = [],
+  seed: number = matchSeed(),
 ): Rival {
-  const seed = matchSeed(st);
   const rng = new Rng(seed);
   const tier = tierOf(st.rate);
   const rate = rivalRate(rng, st.rate);
@@ -353,6 +363,18 @@ export function rateDelta(mine: number, theirs: number, won: boolean): number {
   const d = Math.round(K * ((won ? 1 : 0) - expected));
   // 0 で止めない。格下に勝っても1は動かないと、上を叩き続ける意味が消える
   return won ? Math.max(1, d) : Math.min(-1, d);
+}
+
+/**
+ * 動く幅の見込み。
+ *
+ * 相手は挑むまで決まらないので、1つの数ではなく幅で出す——相手のレートは
+ * こちらの前後 80 に振れるので、その両端を取る。
+ */
+export function rateRange(mine: number, won: boolean): [number, number] {
+  const a = rateDelta(mine, mine - 80, won);
+  const b = rateDelta(mine, mine + 80, won);
+  return a <= b ? [a, b] : [b, a];
 }
 
 /** 1戦の報酬。勝てばレートぶん厚く、負けても手ぶらでは帰さない */

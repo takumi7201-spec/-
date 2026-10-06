@@ -108,6 +108,8 @@ export class BattleScreen extends Screen {
   private ended = false;
 
   onFinish?: (winner: Side | -1) => void;
+  /** 開幕に名乗らせる相手。闘技だけ使う——誰と当たったかは出てから分かる */
+  intro: string | null = null;
 
   constructor() { super('battle'); }
 
@@ -163,7 +165,10 @@ export class BattleScreen extends Screen {
     this.buildCards();
     this.logLines = [];
     this.renderLog();
-    this.banner('BATTLE START', 900);
+    if (this.intro) {
+      this.banner(this.intro, 1100);
+      this.ui.toast(`${this.intro} が立ちはだかる`, 'info', 2600);
+    } else this.banner('BATTLE START', 900);
   }
 
   private buildCards(): void {

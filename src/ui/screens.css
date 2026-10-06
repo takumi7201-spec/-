@@ -2137,6 +2137,61 @@ body[data-layout='wide'] .col-body { left: 18vw; right: 18vw; }
 /* 相手が何を狙って組まれたか。1行だけ、相手の名前のすぐ下に置く */
 .col-tactic { font-size: 11px; font-weight: 700; color: var(--hl-rose); }
 .col-note { font-size: 10px; color: var(--ink-faint); text-align: center; }
+/* 相手は伏せる。挑むまで誰と当たるか分からない、を画面でも言い切る */
+.col-panel--blind { align-items: center; text-align: center; gap: 4px; }
+.col-blind-main { font-size: 17px; font-weight: 900; letter-spacing: 0.06em; }
+.col-blind-note { margin: 0; font-size: 11px; color: var(--ink-soft); line-height: 1.75; }
+.col-blind-tier { font-size: 10px; color: var(--ink-faint); }
+.col-rank-go { margin-top: 2px; }
+
+/* 地の色。これが無いと3D の黒い背景がそのまま透ける */
+.screen--ranking::before, .screen--colosseum::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--ground);
+  pointer-events: none;
+}
+.screen--ranking > *, .screen--colosseum > * { z-index: 1; }
+
+/* =========================================================================
+   使用率
+   自分が連れて行った回数と、闘技場で当たった相手に入っていた回数
+   ========================================================================= */
+.rank-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 56px); bottom: var(--deck-bottom);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 6px;
+  padding-bottom: 20px;
+  pointer-events: auto;
+}
+body[data-layout='wide'] .rank-body { left: 18vw; right: 18vw; }
+.rank-head { font-size: 11px; color: var(--ink-soft); padding: 2px 4px 4px; }
+.rank-head-num { font-size: 15px; color: var(--ink); }
+.rank-row {
+  flex: none;
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 11px; border-radius: 13px;
+  background: rgba(255, 253, 248, 0.82);
+  box-shadow: 0 3px 10px rgba(72, 58, 36, 0.1);
+}
+.rank-row.is-top { background: linear-gradient(100deg, rgba(255, 214, 120, 0.55), rgba(255, 253, 248, 0.92)); }
+.rank-no { flex: none; width: 20px; text-align: center; font-size: 15px; color: var(--pen-brown); }
+.rank-icon { width: 38px; height: 38px; flex: none; }
+.rank-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rank-name-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.rank-name-row .chip { height: 17px; font-size: 9px; padding: 0 6px; flex: none; }
+.rank-name { font-size: 13px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-role { font-size: 9px; color: var(--ink-faint); flex: none; }
+.rank-bar { height: 6px; border-radius: 3px; background: rgba(72, 58, 36, 0.12); overflow: hidden; }
+.rank-bar-fill {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--hl-amber), var(--hl-amber-deep));
+}
+.rank-nums { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.rank-pct { font-size: 14px; color: var(--ink); }
+.rank-nums .dim { font-size: 10px; }
 
 .col-rate { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
 .col-rate-main { display: flex; align-items: baseline; gap: 10px; }

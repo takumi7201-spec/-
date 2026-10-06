@@ -23,7 +23,7 @@ import {
 } from './game/party';
 import { STAGE_COUNT } from './game/data/stages';
 import {
-  buildRival, colosseumCoins, rateDelta, tierOf, COLOSSEUM_FLOOR,
+  buildRival, colosseumCoins, rateDelta, tierOf, COLOSSEUM_FLOOR, type Rival,
 } from './game/data/colosseum';
 import { tabBar } from './ui/chrome';
 import {
@@ -50,6 +50,7 @@ import { grantLogin, grantStaffMail } from './game/mail';
 import { DebugScreen } from './ui/screens/DebugScreen';
 import { StockScreen } from './ui/screens/StockScreen';
 import { ColosseumScreen } from './ui/screens/ColosseumScreen';
+import { RankingScreen } from './ui/screens/RankingScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { DetailScreen } from './ui/screens/DetailScreen';
 import { REVOS, getRevos } from './game/data/revos';
@@ -148,8 +149,13 @@ async function main(): Promise<void> {
    */
   type Special =
     | { kind: 'daily' | 'boss'; date: string }
-    /** コロシアム。挑んだ時点の相手（名前とレート）を控える——結果で使う */
-    | { kind: 'colosseum'; rival: string; rivalRate: number };
+    /**
+     * コロシアム。挑んだ時点で組んだ相手を丸ごと控える。
+     *
+     * 相手は押した瞬間に決まるので、戦う相手と結果に出す名前は同じ1つの
+     * 組み立てから採る——別々に組むと、名前だけ違う相手と戦うことになる
+     */
+    | { kind: 'colosseum'; rival: Rival };
   let activeSpecial: Special | null = null;
   let lastSpecial: Special | null = null;
   /**
@@ -214,10 +220,11 @@ async function main(): Promise<void> {
   const debugScreen = new DebugScreen();
   const stockScreen = new StockScreen();
   const colosseumScreen = new ColosseumScreen();
+  const rankingScreen = new RankingScreen();
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
   const detailScreen = new DetailScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, cleanChoiceScreen, stockScreen, colosseumScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, cleanChoiceScreen, stockScreen, colosseumScreen, rankingScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
     ui.register(s);
   }
 
@@ -340,7 +347,11 @@ async function main(): Promise<void> {
     const setup = buildTeamSetup(data.roster, data.party.order);
     const anchor = setup ? teamAnchor(setup) : { level: 1, clean: 60, size: 1 };
     const r = buildRival(data.colosseum, anchor, effectiveParty(data).map((u) => u.defId));
-    return { kind: 'colosseum', rival: r.name, rivalRate: r.rate };
+    // 出てきた顔ぶれを数える。闘技場の「環境」はここに溜まる
+    for (const m of r.team.members) {
+      data.colosseum.met[m.defId] = (data.colosseum.met[m.defId] ?? 0) + 1;
+    }
+    return { kind: 'colosseum', rival: r };
   }
 
   async function startBattle(
@@ -364,9 +375,8 @@ async function main(): Promise<void> {
     const daily = special?.kind === 'daily' ? dailyRuleFor(special.date) : null;
     const boss = special?.kind === 'boss' ? bossFor(special.date) : null;
     // コロシアムの相手は、札が予告したものと同じ種から組む
-    const colo = special?.kind === 'colosseum'
-      ? buildRival(data.colosseum, teamAnchor(mine), effectiveParty(data).map((u) => u.defId))
-      : null;
+    // 相手は挑んだ時点で組み終わっている。ここでは組み直さない
+    const colo = special?.kind === 'colosseum' ? special.rival : null;
     const coloTier = tierOf(data.colosseum.rate);
     // コロシアムだけ舞台の作りが違う。円の床と観客席で囲った特設の闘技場
     if (colo) battle.buildColosseum(coloTier.biome, seed);
@@ -392,6 +402,8 @@ async function main(): Promise<void> {
     battle.resize(renderer.aspect);
     renderer.setScene(battle.scene, battle.camera);
     renderer.invalidateShadows();
+    // 誰と当たったかは、出ていってから分かる。開幕の帯で名乗らせる
+    battleScreen.intro = colo ? `${colo.name}` : null;
     player.start();
     ui.show('battle');
     audio.startMusic('battle');
@@ -826,7 +838,7 @@ async function main(): Promise<void> {
       const before = c.rate;
       if (winner === 0 || winner === 1) {
         const won = winner === 0;
-        c.rate = Math.max(COLOSSEUM_FLOOR, c.rate + rateDelta(c.rate, sp.rivalRate, won));
+        c.rate = Math.max(COLOSSEUM_FLOOR, c.rate + rateDelta(c.rate, sp.rival.rate, won));
         c.best = Math.max(c.best, c.rate);
         if (won) { c.wins++; c.streak++; c.bestStreak = Math.max(c.bestStreak, c.streak); }
         else { c.losses++; c.streak = 0; }
@@ -901,7 +913,7 @@ async function main(): Promise<void> {
       subtitle: isBoss && sp?.kind === 'boss'
         ? `${bossFor(sp.date).title} — 与ダメージ ${Math.floor(bossFrac * 100)}%`
         : sp?.kind === 'colosseum'
-          ? `${sp.rival}（レート ${sp.rivalRate}） — ${secs} 秒で決着`
+          ? `${sp.rival.name}（レート ${sp.rival.rate}） — ${secs} 秒で決着`
           : sp?.kind === 'daily'
             ? `${dailyRuleFor(sp.date).name} — ${secs} 秒で決着`
             : ev
@@ -971,6 +983,8 @@ async function main(): Promise<void> {
   selectScreen.onColosseum = () => { colosseumScreen.setData(data); ui.show('colosseum'); };
   colosseumScreen.onBack = () => { selectScreen.setData(data); ui.show('battleSelect'); };
   colosseumScreen.onGo = () => { void startBattle(null, data.stageProgress + 1, nextColosseumSpecial()); };
+  colosseumScreen.onRanking = () => { rankingScreen.setData(data); ui.show('ranking'); };
+  rankingScreen.onBack = () => { colosseumScreen.setData(data); ui.show('colosseum'); };
 
   /**
    * デバッグモードを開く。
@@ -1052,6 +1066,7 @@ async function main(): Promise<void> {
     else if (jump === 'daily') void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() });
     else if (jump === 'boss') void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() });
     else if (jump === 'colosseum') { colosseumScreen.setData(data); ui.show('colosseum'); }
+    else if (jump === 'ranking') { rankingScreen.setData(data); ui.show('ranking'); }
     else if (jump === 'select') { selectScreen.setData(data); ui.show('battleSelect'); }
     else if (jump === 'mail') { deliverMail(false); mailScreen.setData(data); ui.show('mail'); }
     else if (jump === 'digSelect') { digSelectScreen.setData(data); ui.show('digSelect'); }
