@@ -25,7 +25,9 @@ export type PassiveId =
   | 'primordial' | 'carapace' | 'irritate' | 'jetwake' | 'packrun'
   | 'sailheat' | 'unreadable' | 'cannibal' | 'fourwings'
   | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite'
-  | 'vetulibody';
+  | 'vetulibody'
+  // 試作：軸を押し上げる案（採用まで発掘にも図鑑にも出さない）
+  | 'plaguelord' | 'vector' | 'ambush' | 'headwind' | 'cascade';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
@@ -38,7 +40,8 @@ export type OdId =
   | 'cambrianjaw' | 'shellveil' | 'falsejaw' | 'straightbore' | 'boundfang'
   | 'heatshare' | 'tangledspiral' | 'bonesever' | 'glideguard'
   | 'throatbite' | 'nestguard' | 'nervejam' | 'trilobeshield' | 'twinsever'
-  | 'unknownancestor';
+  | 'unknownancestor'
+  | 'blight' | 'contagion' | 'warcry' | 'firstgust' | 'chainhunt';
 
 export interface RevosDef {
   id: string;
@@ -708,9 +711,27 @@ export const REVOS: RevosDef[] = [
     habitat: ['emberfield', 'tidehollow'], rarity: 3,
     flavor: '恐竜が去ったあとの森を歩いた、身長2mの飛べない鳥。斧のような嘴だけが残っていて、それで何を割っていたのかは今も決まっていない。',
   },
+
 ];
 
 export const REVOS_BY_ID = new Map(REVOS.map((r) => [r.id, r]));
+
+/**
+ * 計測用の追加登録。
+ *
+ * 試そうとしている個体を、ゲームの表に入れずにシミュレータへ渡すための口。
+ * 図鑑にも発掘にも出さないまま勝率だけ測りたい、というときに使う——
+ * 表に直接書くと、採用を決める前から図鑑の総数が狂う。
+ *
+ * 呼ぶのは tools/ だけ。ゲーム側からは一度も呼ばない。
+ */
+export function registerRevos(defs: RevosDef[]): void {
+  for (const d of defs) {
+    if (REVOS_BY_ID.has(d.id)) continue;
+    REVOS.push(d);
+    REVOS_BY_ID.set(d.id, d);
+  }
+}
 
 /** 幅の狭い UI 用の名前。短縮名がなければ正式名をそのまま返す */
 export function revosShortName(id: string): string {

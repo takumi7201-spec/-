@@ -2,7 +2,7 @@ import { getRevos } from '../data/revos';
 import {
   elementFactor,
   type BattleEvent, type BattleRules, type Fighter, type FighterSnapshot, type Mod, type ModKind,
-  type Side, type TeamSetup,
+  type Side, type StatusKind, type TeamSetup,
 } from './types';
 import { TACTICS, isBackliner, isRanged, isWall } from './roles';
 
@@ -102,6 +102,7 @@ const OD_RECOVERY: Record<string, number> = {
   // 支援：撃っても攻め手が止まらないよう隙を小さく
   rockaegis: 0.28, tideheal: 0.28, resonantlight: 0.28, grindfeed: 0.28,
   unknownancestor: 0.28,
+  blight: 0.85, contagion: 0.55, warcry: 0.28, firstgust: 0.5, chainhunt: 0.55,
 };
 
 /**
@@ -126,6 +127,7 @@ const OD_SHAPE: Record<string, OdShape> = {
   nervejam: 'enemies',
   nestguard: 'allies', trilobeshield: 'allies', twinsever: 'allies',
   unknownancestor: 'allies',
+  blight: 'enemies', warcry: 'allies',
 };
 /** 通常の間合いより遠くから撃てる単体技 */
 const OD_REACH: Record<string, number> = { faulthaul: 7, leapstrike: 6.5, cambrianjaw: 6.5, straightbore: 5.4 };
@@ -220,6 +222,22 @@ const BLEED_DECAY_TURNS = 6;
 const SURGE_CRIT = 0.22;
 const SURGE_CAP = 0.62;
 const SURGE_TURNS = 5;
+
+/** 「先駆けの風」が効いている秒数 */
+const HEADWIND_WINDOW = 30;
+
+/**
+ * 攻め手が数える「状態異常」。再生と奔流は掛かりだが、攻められている
+ * 印ではないので外す——味方に配った奔流で、相手の特攻が伸びては困る。
+ */
+function afflictions(f: Fighter): StatusKind[] {
+  const out: StatusKind[] = [];
+  for (const st of f.statuses) {
+    if (st.kind === 'regen' || st.kind === 'surge') continue;
+    if (!out.includes(st.kind)) out.push(st.kind);
+  }
+  return out;
+}
 
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
 const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };
@@ -382,6 +400,15 @@ export class BattleSim {
       this.regenAt.set(f.uid, REGEN_TICK);
       if (f.passive === 'vanguard') f.ready += 0.35;
     });
+    // 「奇襲」（試作）: 味方全体を一歩先に出す。全員を見てから配る
+    for (const f of this.fighters) {
+      if (f.passive !== 'ambush') continue;
+      for (const a of this.fighters) {
+        if (a.side !== f.side) continue;
+        a.ready += 0.25;
+        a.od = clamp(a.od + 25, 0, 150);
+      }
+    }
   }
 
   get isOver(): boolean { return this.finished; }
@@ -433,6 +460,9 @@ export class BattleSim {
     let m = this.modSum(f, 'spd');
     // 「群れの走り」: 生きている味方の数だけ足が速くなる。独りになれば消える
     if (f.passive === 'packrun') m += 0.04 * Math.min(4, this.alive(f.side).length - 1);
+    // 「先駆けの風」（試作）: 開幕だけ、味方全員の足が速い
+    if (this.clockV < HEADWIND_WINDOW
+      && this.alive(f.side).some((a) => a.passive === 'headwind')) m += 0.12;
     return Math.max(1, f.spd * clamp(1 + m, 0.4, 2.0));
   }
 
@@ -839,6 +869,8 @@ export class BattleSim {
   }
 
   private onActionPassives(f: Fighter, ev: BattleEvent[]): void {
+    // 一度でも動いたか。開幕を突く技が見る
+    f.stacks.acted = 1;
     // 「堆積」: 行動のたびに DEF が伸びる
     if (f.passive === 'sediment') {
       const st = f.stacks.sediment ?? 0;
@@ -956,6 +988,8 @@ export class BattleSim {
       if (p === 'firstnerve' && this.rng.chance(0.5)) this.applyDizzy(target, ev, actor.uid);
       // 「断牙」: 牙が通った傷は塞がらない。自分で血を流させ、自分でそこを衝く
       if (p === 'sabertooth') this.applyBleed(target, ev, actor.uid);
+      // 「媒介」（試作）: 付いている掛かりを、いちばん近い別の敵へ写す
+      if (p === 'vector') this.spreadOne(actor, target, ev);
       if (p === 'shearwind') {
         const st = actor.stacks.shear ?? 0;
         if (st < 3) {
@@ -1292,6 +1326,52 @@ export class BattleSim {
         if (t.alive) this.applyBleed(t, ev, actor.uid, 3);
         break;
       }
+      case 'blight': {
+        // 掛かりの数そのものを火力に換える。1つも付いていなければ素のダメージだけ
+        for (const e of enemies) {
+          this.dealDamage(actor, e, power, ev);
+          if (!e.alive) continue;
+          const n = afflictions(e).length;
+          if (n === 0) continue;
+          const dmg = Math.max(1, Math.round(e.maxHp * 0.05 * n));
+          e.hp = Math.max(0, e.hp - dmg);
+          e.taken += dmg;
+          actor.dealt += dmg;
+          ev.push({ t: 'burst', uid: e.uid, amount: dmg, tokens: n, hp: e.hp });
+          if (e.hp === 0) this.kill(e, actor, ev);
+        }
+        break;
+      }
+      case 'contagion': {
+        const t = single(); if (!t) break;
+        const kinds = afflictions(t);
+        this.dealDamage(actor, t, power, ev);
+        for (const e of this.alive(other(actor.side))) {
+          if (e === t) continue;
+          for (const k of kinds) this.copyStatus(k, e, ev, actor.uid);
+        }
+        break;
+      }
+      case 'warcry': {
+        for (const a of allies) {
+          this.addMod(a, { kind: 'spd', value: 0.25, turns: 4, source: 'warcry' }, ev, 'SPD上昇');
+          this.addMod(a, { kind: 'dealt', value: 0.18, turns: 4, source: 'warcry' }, ev, '与ダメ上昇');
+          a.ready += 0.30;
+        }
+        break;
+      }
+      case 'firstgust': {
+        const t = single(); if (!t) break;
+        // まだ一度も動いていない相手に深く入る。先に殴った側が場を決める
+        this.dealDamage(actor, t, t.stacks.acted ? power : power * 2, ev);
+        break;
+      }
+      case 'chainhunt': {
+        const t = single(); if (!t) break;
+        this.dealDamage(actor, t, power, ev);
+        if (!t.alive) for (const a of allies) this.gainOd(a, 30, ev);
+        break;
+      }
       case 'nervejam': {
         for (const e of enemies) {
           this.dealDamage(actor, e, power, ev);
@@ -1470,6 +1550,13 @@ export class BattleSim {
       && this.alive(atk.side).some((a) => a.passive === 'compoundeye')) buff *= 1.15;
     // 「群れの走り」: 数が力になる。独りになれば、ただの小型獣脚類に戻る
     if (pa === 'packrun') buff *= 1 + 0.04 * Math.min(4, this.alive(atk.side).length - 1);
+    // 「蝕みの差配」（試作）: 掛かっている異常の種類ぶん、味方全員の刃が通る
+    if (this.alive(atk.side).some((a) => a.passive === 'plaguelord')) {
+      buff *= 1 + 0.08 * afflictions(def).length;
+    }
+    // 「先駆けの風」（試作）: 開幕の一押し。時間で切れる
+    if (this.clockV < HEADWIND_WINDOW
+      && this.alive(atk.side).some((a) => a.passive === 'headwind')) buff *= 1.20;
     // 「帆の放熱」: 味方の誰かが帆を広げている間、火傷した敵はよく燃える
     if (def.statuses.some((st) => st.kind === 'burn')
       && this.alive(atk.side).some((a) => a.passive === 'sailheat')) buff *= 1.15;
@@ -1638,6 +1725,13 @@ export class BattleSim {
       this.heal(by, by, Math.round(by.maxHp * 0.12), ev);
       this.addMod(by, { kind: 'atk', value: 0.10, turns: 999, source: 'cannibal' }, ev, 'ATK上昇');
     }
+    // 「追撃の連鎖」（試作）: 1体落ちるたび、味方全員が一歩前に出る
+    for (const a of this.alive(by.side)) {
+      if (a.passive !== 'cascade') continue;
+      ev.push({ t: 'passive', uid: a.uid, label: '追撃の連鎖' });
+      for (const b2 of this.alive(by.side)) b2.ready += b2 === a ? 0.40 : 0.15;
+      break;
+    }
     // 「追い波」: 仕留めた側が、その勢いのまま次の行動に入る
     if (by !== target && by.alive && by.passive === 'pursuit') {
       by.ready += 0.38;
@@ -1788,6 +1882,28 @@ export class BattleSim {
       const src = this.byUid.get(st.source) ?? target;
       this.kill(target, src, ev);
     }
+  }
+
+  /**
+   * 掛かりを写す（試作・媒介）。
+   *
+   * 持っている種類から1つ選び、いちばん近い別の敵へ同じものを付ける。
+   * 乱数は引かない——引く回数が盤面で変わると、同じ種で同じ戦闘にならない。
+   */
+  private spreadOne(actor: Fighter, from: Fighter, ev: BattleEvent[]): void {
+    const kinds = afflictions(from);
+    if (kinds.length === 0) return;
+    const others = this.alive(other(actor.side)).filter((e) => e !== from);
+    if (others.length === 0) return;
+    const to = minBy(others, (e) => dist(from, e));
+    this.copyStatus(kinds[this.turn % kinds.length], to, ev, actor.uid);
+  }
+
+  private copyStatus(kind: StatusKind, to: Fighter, ev: BattleEvent[], source: string): void {
+    if (kind === 'burn') this.applyBurn(to, ev, source);
+    else if (kind === 'poison') this.applyPoison(to, ev, source);
+    else if (kind === 'dizzy') this.applyDizzy(to, ev, source);
+    else if (kind === 'bleed') this.applyBleed(to, ev, source);
   }
 
   private applyBurn(target: Fighter, ev: BattleEvent[], source: string): void {

@@ -13,7 +13,8 @@
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import { cpus } from 'node:os';
 import { BattleSim } from '../src/game/battle/simulate.ts';
-import { REVOS, getRevos } from '../src/game/data/revos.ts';
+import { REVOS, getRevos, registerRevos } from '../src/game/data/revos.ts';
+import { EXP_DEFS } from './expDefs.ts';
 import type { TeamSetup } from '../src/game/battle/types.ts';
 
 const LEVEL = 20;
@@ -37,12 +38,15 @@ function duel(a: string[], b: string[], n: number, seed: number): number {
 interface Job { a: string[]; b: string[]; n: number; seed: number }
 
 /** 試作は野良にも相手編成にも混ぜない。測る側だけに置く */
+registerRevos(EXP_DEFS);
+
 const REAL = REVOS.filter((r) => !r.id.startsWith('exp-')).map((r) => r.id);
 const EXP = REVOS.filter((r) => r.id.startsWith('exp-')).map((r) => r.id);
 
 const META1 = ['quetzalcoatlus', 'brachiosaurus', 'pachycephalosaurus', 'velociraptor', 'shonisaurus'];
 const META2 = ['nipponites', 'pikaia', 'quetzalcoatlus', 'irritator', 'stegosaurus'];
-const BASE = ['archelon', 'shonisaurus', 'dimetrodon', 'smilodon'];
+/** 土台はコマンドラインから。軸ごとに差し替えて、同じ物差しで測る */
+const BASE = (process.argv[2] ?? 'archelon,shonisaurus,dimetrodon,smilodon').split(',').filter(Boolean);
 
 let rs = 13572468;
 const rnd = (): number => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 0x100000000; };
