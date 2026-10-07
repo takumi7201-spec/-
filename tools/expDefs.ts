@@ -69,6 +69,51 @@ export const EXP_DEFS: RevosDef[] = [
     habitat: ['canyon'], rarity: 4, eventOnly: true, flavor: '試作。',
   },
   {
+    id: 'exp-gustb', name: 'エクスＲ先駆B', en: 'ExpR2B', element: 'gale', role: 'Striker',
+    hp: 1070, atk: 120, def: 86, spd: 128, basicPower: 86,
+    passive: {
+      id: 'headwindB', name: '先駆けの風',
+      desc: '試作の段ちがい（20秒 +15%/+8%）。',
+    },
+    od: {
+      id: 'firstgust', name: '初手の颪',
+      desc: '単体に大ダメージ。相手がまだ一度も行動していなければ威力2倍。', power: 134,
+    },
+    sprite: 'dimorphodon',
+    build: { archetype: 'pterosaur', seed: 204, bulk: 1.0, scale: 1.0 },
+    habitat: ['canyon'], rarity: 4, eventOnly: true, flavor: '試作。',
+  },
+  {
+    id: 'exp-gustc', name: 'エクスＲ先駆C', en: 'ExpR2C', element: 'gale', role: 'Striker',
+    hp: 1070, atk: 120, def: 86, spd: 128, basicPower: 86,
+    passive: {
+      id: 'headwindC', name: '先駆けの風',
+      desc: '試作の段ちがい（30秒 +12%/+8%）。',
+    },
+    od: {
+      id: 'firstgust', name: '初手の颪',
+      desc: '単体に大ダメージ。相手がまだ一度も行動していなければ威力2倍。', power: 134,
+    },
+    sprite: 'dimorphodon',
+    build: { archetype: 'pterosaur', seed: 204, bulk: 1.0, scale: 1.0 },
+    habitat: ['canyon'], rarity: 4, eventOnly: true, flavor: '試作。',
+  },
+  {
+    id: 'exp-gustd', name: 'エクスＲ先駆D', en: 'ExpR2D', element: 'gale', role: 'Striker',
+    hp: 1070, atk: 120, def: 86, spd: 128, basicPower: 86,
+    passive: {
+      id: 'headwindD', name: '先駆けの風',
+      desc: '試作の段ちがい（15秒 +20%/+12%）。',
+    },
+    od: {
+      id: 'firstgust', name: '初手の颪',
+      desc: '単体に大ダメージ。相手がまだ一度も行動していなければ威力2倍。', power: 134,
+    },
+    sprite: 'dimorphodon',
+    build: { archetype: 'pterosaur', seed: 204, bulk: 1.0, scale: 1.0 },
+    habitat: ['canyon'], rarity: 4, eventOnly: true, flavor: '試作。',
+  },
+  {
     id: 'exp-chain', name: 'エクスＲ連鎖', en: 'ExpR3', element: 'null', role: 'Finisher',
     hp: 1100, atk: 124, def: 88, spd: 120, basicPower: 88,
     passive: {

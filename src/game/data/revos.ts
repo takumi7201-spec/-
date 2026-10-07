@@ -27,7 +27,8 @@ export type PassiveId =
   | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite'
   | 'vetulibody'
   // 試作：軸を押し上げる案（採用まで発掘にも図鑑にも出さない）
-  | 'plaguelord' | 'vector' | 'ambush' | 'headwind' | 'cascade';
+  | 'plaguelord' | 'vector' | 'ambush' | 'cascade'
+  | 'headwind' | 'headwindB' | 'headwindC' | 'headwindD';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'

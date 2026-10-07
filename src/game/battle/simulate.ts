@@ -223,8 +223,27 @@ const SURGE_CRIT = 0.22;
 const SURGE_CAP = 0.62;
 const SURGE_TURNS = 5;
 
-/** 「先駆けの風」が効いている秒数 */
-const HEADWIND_WINDOW = 30;
+/**
+ * 「先駆けの風」（試作）の強さ。
+ *
+ * 開幕だけ効く掛かりなので、秒数・与ダメージ・速度の3つで強さが決まる。
+ * 1つの表にまとめて、段ごとに測れるようにしておく。
+ */
+const HEADWIND: Record<string, { sec: number; dealt: number; spd: number }> = {
+  headwind: { sec: 30, dealt: 0.20, spd: 0.12 },
+  headwindB: { sec: 20, dealt: 0.15, spd: 0.08 },
+  headwindC: { sec: 30, dealt: 0.12, spd: 0.08 },
+  headwindD: { sec: 15, dealt: 0.20, spd: 0.12 },
+};
+
+/** いま効いている「先駆けの風」。居なければ null */
+function headwindOf(team: Fighter[], clock: number): { dealt: number; spd: number } | null {
+  for (const a of team) {
+    const h = HEADWIND[a.passive];
+    if (h && clock < h.sec) return h;
+  }
+  return null;
+}
 
 /**
  * 攻め手が数える「状態異常」。再生と奔流は掛かりだが、攻められている
@@ -461,8 +480,8 @@ export class BattleSim {
     // 「群れの走り」: 生きている味方の数だけ足が速くなる。独りになれば消える
     if (f.passive === 'packrun') m += 0.04 * Math.min(4, this.alive(f.side).length - 1);
     // 「先駆けの風」（試作）: 開幕だけ、味方全員の足が速い
-    if (this.clockV < HEADWIND_WINDOW
-      && this.alive(f.side).some((a) => a.passive === 'headwind')) m += 0.12;
+    const hw = headwindOf(this.alive(f.side), this.clockV);
+    if (hw) m += hw.spd;
     return Math.max(1, f.spd * clamp(1 + m, 0.4, 2.0));
   }
 
@@ -1555,8 +1574,8 @@ export class BattleSim {
       buff *= 1 + 0.08 * afflictions(def).length;
     }
     // 「先駆けの風」（試作）: 開幕の一押し。時間で切れる
-    if (this.clockV < HEADWIND_WINDOW
-      && this.alive(atk.side).some((a) => a.passive === 'headwind')) buff *= 1.20;
+    const hw = headwindOf(this.alive(atk.side), this.clockV);
+    if (hw) buff *= 1 + hw.dealt;
     // 「帆の放熱」: 味方の誰かが帆を広げている間、火傷した敵はよく燃える
     if (def.statuses.some((st) => st.kind === 'burn')
       && this.alive(atk.side).some((a) => a.passive === 'sailheat')) buff *= 1.15;
