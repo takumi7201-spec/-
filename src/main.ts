@@ -482,6 +482,32 @@ async function main(): Promise<void> {
   ]);
   ui.mountTabs(tabs);
 
+  /*
+   * 横に払って隣の枠へ。
+   *
+   * 面の中にタブがある画面（バトル・ミッション・使用率）は、まず自分の
+   * タブを送る。送るものが無ければここへ落ちてきて、下タブを隣へ動かす。
+   * 潜行中・戦闘中・精錬中は枠そのものを持たないので、ここへは来ない。
+   */
+  const TAB_ORDER = ['home', 'dig', 'battle', 'unit', 'settings'] as const;
+  /**
+   * 枠の入口にいるときだけ横へ動かす。
+   *
+   * 枠の下へ潜った面（編成・図鑑・一覧・未精錬・使用率…）で横に払ったら、
+   * 別の枠へ飛ぶより、その面の中で何も起きないほうがいい——潜った先から
+   * 横へ飛ぶと、戻る道を1つ飛ばして別の場所に出ることになる
+   */
+  const TAB_ROOTS = new Set(['home', 'digSelect', 'battleSelect', 'unit', 'settings']);
+  ui.onSwipeNav = (dir, tab, screen) => {
+    if (!TAB_ROOTS.has(screen)) return;
+    const i = TAB_ORDER.indexOf(tab as typeof TAB_ORDER[number]);
+    if (i < 0) return;
+    const next = TAB_ORDER[i + dir];
+    if (!next) return;
+    audio.uiTap();
+    tabGo(next);
+  };
+
   /**
    * 札に貼る報せ。
    *

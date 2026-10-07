@@ -53,6 +53,17 @@ export function clear(el: HTMLElement): void {
  * ただし pointerdown が自分の中で始まった場合のみ発火させ、
  * 外からドラッグしてきた指を拾わない。
  */
+/**
+ * 横に払っている最中か。
+ *
+ * 払いの途中で指を離した先がボタンの中だと、ボタンは「自分の中で離れた」
+ * としてタップを出してしまう。払いと決まった時点でここを立て、タップ側は
+ * これを見て飲み込む——1か所の旗で済ませる（各ボタンに座標を配らない）。
+ */
+let swiping = false;
+export function setSwiping(v: boolean): void { swiping = v; }
+export function isSwiping(): boolean { return swiping; }
+
 export function button(
   label: string,
   onTap: () => void,
@@ -115,6 +126,8 @@ export function button(
     cancelHold();
     if (held) { held = false; return; }
     if (!armed || el.disabled) return;
+    // 横に払った指が、たまたまこの札の中で離れただけ
+    if (isSwiping()) { armed = false; return; }
     armed = false;
     const r = el.getBoundingClientRect();
     const pe = e as PointerEvent;

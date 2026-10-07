@@ -42,6 +42,15 @@ export class RankingScreen extends Screen {
     this.el.append(head, this.tabsEl, this.bodyEl);
   }
 
+  swipeTab(dir: 1 | -1): boolean {
+    const next: RankTab = dir > 0 ? 'arena' : 'mine';
+    if (next === this.view) return false;
+    this.view = next;
+    audio.uiTap();
+    this.render();
+    return true;
+  }
+
   enter(): void { this.render(); }
 
   private counts(): Record<string, number> {

@@ -1,4 +1,5 @@
 import { h, clear, button } from './dom';
+import { attachSwipe, type SwipeDir } from './swipe';
 import { audio } from '../core/Audio';
 
 export type LayoutKind = 'tower' | 'square' | 'wide';
@@ -32,6 +33,11 @@ export abstract class Screen {
     this.el = h('div', { class: `screen screen--${name}`, 'data-screen': name });
   }
   attach(ui: UIRoot): void { this.ui = ui; }
+  /**
+   * 横に払われた。面の中にタブがあるなら送って true を返す。
+   * false（未実装を含む）なら、UI 層が下タブを隣へ送る
+   */
+  swipeTab?(dir: SwipeDir): boolean;
   /** 初回表示前に1回だけ呼ばれる */
   build(): void {}
   enter(_params?: unknown): void { void _params; }
@@ -58,6 +64,11 @@ export class UIRoot {
   private tabs: TabBarHandle | null = null;
   /** 画面が切り替わったあとに呼ぶ。報せの数を貼り直すのに使う */
   onShow?: (name: string) => void;
+  /**
+   * 面の中で消化されなかった払い。下タブを隣へ送るのに使う。
+   * tab は払われた面がどの枠に属していたか
+   */
+  onSwipeNav?: (dir: SwipeDir, tab: string, screen: string) => void;
   private built = new Set<string>();
   private current: Screen | null = null;
   private toasts: HTMLElement[] = [];
@@ -74,8 +85,19 @@ export class UIRoot {
     root.appendChild(h('div', { id: 'vignette' }));
     root.appendChild(h('div', { id: 'grain' }));
     this.updateLayout();
+    // 横の払いは層で1つだけ受ける。面ごとに付けると、面を増やすたびに
+    // 付け忘れが出るし、同じ指を2か所で見ることになる
+    attachSwipe(root, (dir) => this.swipe(dir));
     addEventListener('resize', () => this.updateLayout());
     addEventListener('orientationchange', () => setTimeout(() => this.updateLayout(), 120));
+  }
+
+  /** 払いの行き先。面の中のタブが先、消化されなければ下タブ */
+  private swipe(dir: SwipeDir): void {
+    const s = this.current;
+    if (!s) return;
+    if (s.swipeTab?.(dir)) return;
+    if (s.tab) this.onSwipeNav?.(dir, s.tab, s.name);
   }
 
   register(screen: Screen): void {

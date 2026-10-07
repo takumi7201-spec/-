@@ -45,6 +45,15 @@ export class MissionScreen extends Screen {
     this.el.append(head, this.tabsEl, this.bodyEl, h('div', { class: 'deck deck--mail' }, this.allBtn));
   }
 
+  swipeTab(dir: 1 | -1): boolean {
+    const next: MissionGroup = dir > 0 ? 'record' : 'daily';
+    if (next === this.group) return false;
+    this.group = next;
+    audio.uiTap();
+    this.render();
+    return true;
+  }
+
   enter(params?: unknown): void {
     const p = params as { group?: MissionGroup } | undefined;
     if (p?.group) this.group = p.group;

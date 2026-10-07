@@ -62,6 +62,16 @@ export class BattleSelectScreen extends Screen {
     this.el.append(head, this.tabsEl, this.bodyEl);
   }
 
+  /** 通常 ⇄ イベントは払いで送る。闘技は別の面なので、ここには入れない */
+  swipeTab(dir: 1 | -1): boolean {
+    const next: BattleMode = dir > 0 ? 'event' : 'normal';
+    if (next === this.mode) return false;
+    this.mode = next;
+    audio.uiTap();
+    this.render();
+    return true;
+  }
+
   enter(params?: unknown): void {
     const p = params as { mode?: BattleMode } | undefined;
     if (p?.mode) this.mode = p.mode;
