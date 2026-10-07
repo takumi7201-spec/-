@@ -226,17 +226,21 @@ const SURGE_TURNS = 5;
 /**
  * 「先駆けの風」。
  *
- * 開戦からこの秒数だけ、味方全体が速く・重くなる。行動数ではなく秒で切る
- * ——速い編成ほど「窓の内側で何回動けるか」が増えるので、速攻を選んだこと
- * 自体が見返りになる。
+ * 開戦からこの秒数だけ、味方が速く・重くなる。ただし乗るのは「風を起こした
+ * 本人と同じかそれより速い味方」だけ——先駆ける者に付いていける者だけが
+ * 一緒に伸びる、という形にする。
  *
- * 強さは倍率で詰めてある。窓を 30→15→10 秒と縮めてもロスターの勝率レンジは
- * 16.0 → 15.6 → 13.4pt までしか落ちず、倍率を下げたときだけ 7.4pt に収まった。
- * 平均の戦闘が33秒しかないので、窓の長さは「ほぼ全域かどうか」しか変えない。
+ * 平らに全員へ配る形も測ったが、それだと軸を押し上げられなかった。
+ * ロスター全体の勝率に揃えるには倍率を小さくするしかなく（15秒 +8%/+5%）、
+ * その大きさでは削り合いの決着がほとんど動かない——速攻の土台に足しても、
+ * 耐久編成への勝率は 23% で、既存のエラスモサウルス（42%）より下だった。
+ *
+ * 条件を付ければ、無作為な編成では平均1〜2体にしか乗らず、速い面々で
+ * 固めた編成でだけ満額になる。倍率を大きいまま置ける理由がここにある。
  */
-const HEADWIND_SEC = 15;
-const HEADWIND_DEALT = 0.08;
-const HEADWIND_SPD = 0.05;
+const HEADWIND_SEC = 20;
+const HEADWIND_DEALT = 0.14;
+const HEADWIND_SPD = 0.09;
 
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
 const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };
@@ -403,18 +407,26 @@ export class BattleSim {
   }
 
   /**
-   * 「先駆けの風」が立っている側。
+   * 「先駆けの風」が乗る速さの敷居。側ごとに、風を起こしている者のうち
+   * いちばん遅い者の速度。居なければ Infinity（誰にも乗らない）。
    *
    * 当たり判定と足の速さの両方が毎刻み見るので、そのたびに味方を数えると
-   * 1秒あたり数百回の走査になる。立っているかどうかは誰かが倒れたときしか
-   * 変わらないので、そこだけで数え直す。
+   * 1秒あたり数百回の走査になる。敷居が動くのは誰かが倒れたときだけなので、
+   * そこで数え直して控えておく。
+   *
+   * 比べるのは素の速度（掛かりを乗せる前）。乗せた後の値で比べると、
+   * 風で速くなった者が新たに条件を満たして、自分で自分を引き上げてしまう。
    */
-  private headwind: [boolean, boolean] = [false, false];
+  private headwind: [number, number] = [Infinity, Infinity];
 
   private syncHeadwind(): void {
-    this.headwind = [0, 1].map((side) => this.fighters.some(
-      (f) => f.alive && f.side === side && f.passive === 'headwind',
-    )) as [boolean, boolean];
+    this.headwind = [0, 1].map((side) => {
+      let min = Infinity;
+      for (const f of this.fighters) {
+        if (f.alive && f.side === side && f.passive === 'headwind') min = Math.min(min, f.spd);
+      }
+      return min;
+    }) as [number, number];
   }
 
   get isOver(): boolean { return this.finished; }
@@ -467,7 +479,7 @@ export class BattleSim {
     // 「群れの走り」: 生きている味方の数だけ足が速くなる。独りになれば消える
     if (f.passive === 'packrun') m += 0.04 * Math.min(4, this.alive(f.side).length - 1);
     // 「先駆けの風」: 開幕だけ、味方全員の足が速い
-    if (this.clockV < HEADWIND_SEC && this.headwind[f.side]) m += HEADWIND_SPD;
+    if (this.clockV < HEADWIND_SEC && f.spd >= this.headwind[f.side]) m += HEADWIND_SPD;
     return Math.max(1, f.spd * clamp(1 + m, 0.4, 2.0));
   }
 
@@ -1514,7 +1526,7 @@ export class BattleSim {
     // 「群れの走り」: 数が力になる。独りになれば、ただの小型獣脚類に戻る
     if (pa === 'packrun') buff *= 1 + 0.04 * Math.min(4, this.alive(atk.side).length - 1);
     // 「先駆けの風」: 開幕の一押し。秒で切れる
-    if (this.clockV < HEADWIND_SEC && this.headwind[atk.side]) buff *= 1 + HEADWIND_DEALT;
+    if (this.clockV < HEADWIND_SEC && atk.spd >= this.headwind[atk.side]) buff *= 1 + HEADWIND_DEALT;
     // 「帆の放熱」: 味方の誰かが帆を広げている間、火傷した敵はよく燃える
     if (def.statuses.some((st) => st.kind === 'burn')
       && this.alive(atk.side).some((a) => a.passive === 'sailheat')) buff *= 1.15;

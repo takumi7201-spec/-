@@ -716,7 +716,7 @@ export const REVOS: RevosDef[] = [
     hp: 1070, atk: 120, def: 86, spd: 128, basicPower: 86,
     passive: {
       id: 'headwind', name: '先駆けの風',
-      desc: '戦闘開始から 15 秒のあいだ、味方全体の 与ダメージ +8% / 速度 +5%。以後は消える。',
+      desc: '戦闘開始から 20 秒のあいだ、自分と同じかそれより速い味方の 与ダメージ +14% / 速度 +9%。以後は消える。',
     },
     od: {
       id: 'firstgust', name: '初手の颪',
