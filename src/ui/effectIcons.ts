@@ -14,7 +14,7 @@ import { spriteUrl } from '../fx/SpriteUnit';
  */
 export type EffectKind =
   | 'atk' | 'def' | 'spd' | 'dealt' | 'surge'
-  | 'burn' | 'poison' | 'dizzy' | 'bleed' | 'clone';
+  | 'burn' | 'poison' | 'dizzy' | 'bleed' | 'clone' | 'timed';
 
 /** 掛かり（上がるもの）。戦場のカードにはこれだけを出す */
 export type BuffKind = 'atk' | 'def' | 'spd' | 'dealt';
@@ -30,6 +30,7 @@ export const EFFECT_SPRITE: Record<EffectKind, string> = {
   dizzy: 'fx-dizzy',
   bleed: 'fx-bleed',
   clone: 'fx-clone.gif',
+  timed: 'fx-timed.gif',
 };
 
 export const EFFECT_NAME: Record<EffectKind, string> = {
@@ -43,6 +44,7 @@ export const EFFECT_NAME: Record<EffectKind, string> = {
   dizzy: '目眩',
   bleed: '出血',
   clone: '分身',
+  timed: '時間制限',
 };
 
 export function effectIcon(kind: EffectKind, className = ''): HTMLElement {
@@ -89,6 +91,14 @@ const PATTERNS: { kind: EffectKind; re: RegExp }[] = [
   { kind: 'dizzy', re: /目眩/ },
   { kind: 'bleed', re: /出血/ },
   { kind: 'clone', re: /分身/ },
+  /*
+   * 時間で切れるもの。
+   *
+   * この戦闘の掛かりはほとんどが「行動◯回ぶん」で、秒で書かれているものだけが
+   * 別の時計で動いている——速くしても縮まらないし、足を止めても延びない。
+   * 読み手にとっては別物なので、秒が出てきたら砂時計を添える。
+   */
+  { kind: 'timed', re: /\d+\s*秒/ },
 ];
 
 export function effectsInText(text: string): EffectKind[] {

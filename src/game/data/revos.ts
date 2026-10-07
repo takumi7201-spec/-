@@ -25,10 +25,7 @@ export type PassiveId =
   | 'primordial' | 'carapace' | 'irritate' | 'jetwake' | 'packrun'
   | 'sailheat' | 'unreadable' | 'cannibal' | 'fourwings'
   | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite'
-  | 'vetulibody'
-  // 試作：軸を押し上げる案（採用まで発掘にも図鑑にも出さない）
-  | 'plaguelord' | 'vector' | 'ambush' | 'cascade'
-  | 'headwind' | 'headwindB' | 'headwindC' | 'headwindD';
+  | 'vetulibody' | 'headwind';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
@@ -41,8 +38,7 @@ export type OdId =
   | 'cambrianjaw' | 'shellveil' | 'falsejaw' | 'straightbore' | 'boundfang'
   | 'heatshare' | 'tangledspiral' | 'bonesever' | 'glideguard'
   | 'throatbite' | 'nestguard' | 'nervejam' | 'trilobeshield' | 'twinsever'
-  | 'unknownancestor'
-  | 'blight' | 'contagion' | 'warcry' | 'firstgust' | 'chainhunt';
+  | 'unknownancestor' | 'firstgust';
 
 export interface RevosDef {
   id: string;
@@ -713,6 +709,24 @@ export const REVOS: RevosDef[] = [
     flavor: '恐竜が去ったあとの森を歩いた、身長2mの飛べない鳥。斧のような嘴だけが残っていて、それで何を割っていたのかは今も決まっていない。',
   },
 
+  {
+    id: 'ornithomimus', name: 'オルニトミムス', short: 'オルニト', en: 'Ornithomimus',
+    element: 'gale', role: 'Striker',
+    // 単体の数字は同格の攻め役より控えめ。強さは「開幕の30秒」の側で持たせる
+    hp: 1070, atk: 120, def: 86, spd: 128, basicPower: 86,
+    passive: {
+      id: 'headwind', name: '先駆けの風',
+      desc: '戦闘開始から 15 秒のあいだ、味方全体の 与ダメージ +8% / 速度 +5%。以後は消える。',
+    },
+    od: {
+      id: 'firstgust', name: '初手の颪',
+      desc: '単体に大ダメージ。相手がまだ一度も行動していなければ威力2倍。', power: 134,
+    },
+    sprite: 'ornithomimus',
+    build: { archetype: 'raptor', seed: 7714, bulk: 0.92, scale: 1.0, crest: true },
+    habitat: ['canyon', 'frostpeak'], rarity: 4,
+    flavor: '走ることだけに骨を預けた体。群れが動き出す最初の一歩を、いつもこの首が決める。',
+  },
 ];
 
 export const REVOS_BY_ID = new Map(REVOS.map((r) => [r.id, r]));
