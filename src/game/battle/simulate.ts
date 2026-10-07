@@ -130,7 +130,7 @@ const OD_SHAPE: Record<string, OdShape> = {
   blight: 'enemies', warcry: 'allies',
 };
 /** 通常の間合いより遠くから撃てる単体技 */
-const OD_REACH: Record<string, number> = { faulthaul: 7, leapstrike: 6.5, cambrianjaw: 6.5, straightbore: 5.4 };
+const OD_REACH: Record<string, number> = { faulthaul: 7, leapstrike: 6.5, cambrianjaw: 6.5, straightbore: 5.4, pierceveil: 6.5 };
 
 /** 「制空覇道」の持続（秒） */
 const SKYREIGN_DURATION = 10;
@@ -1341,6 +1341,14 @@ export class BattleSim {
         if (t.alive) this.applyBleed(t, ev, actor.uid, 3);
         break;
       }
+      case 'pierceveil': {
+        // 肩代わりを無視して、奥の1体を直接撃つ
+        const back = enemies.filter((e) => isBackliner(e.role));
+        const t = (back.length > 0 ? minBy(back, (e) => dist(actor, e)) : null)
+          ?? picked ?? this.chooseTarget(actor);
+        if (t) this.dealDamage(actor, t, power, ev, true);
+        break;
+      }
       case 'firstgust': {
         const t = single(); if (!t) break;
         // まだ一度も動いていない相手に深く入る。先に殴った側が場を決める
@@ -1434,6 +1442,8 @@ export class BattleSim {
    */
   private coverFor(actor: Fighter, target: Fighter, ev: BattleEvent[]): Fighter {
     if (isWall(target.role)) return target;
+    // 「見切り」（試作）: 割って入られても、狙った相手に届く
+    if (actor.passive === 'truestrike') return target;
     let best: Fighter | null = null;
     let bestD = Infinity;
     for (const g of this.fighters) {
@@ -1561,6 +1571,8 @@ export class BattleSim {
    * 居るときだけにする。
    */
   private hitChance(f: Fighter): number {
+    // 「見切り」（試作）: 眩んでも外さない
+    if (f.passive === 'truestrike') return 1;
     const d = f.statuses.find((x) => x.kind === 'dizzy');
     return d ? Math.max(MIN_HIT, 1 - d.value) : 1;
   }

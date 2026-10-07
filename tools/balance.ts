@@ -4,8 +4,16 @@
  *   npm run balance
  */
 import { BattleSim } from '../src/game/battle/simulate.ts';
-import { REVOS } from '../src/game/data/revos.ts';
+import { REVOS, registerRevos } from '../src/game/data/revos.ts';
+import { EXP_DEFS } from './expDefs.ts';
 import type { TeamSetup, BattleEvent } from '../src/game/battle/types.ts';
+
+/*
+ * 試作個体も同じ土俵で測る。ゲームの表には入っていないので、ここで
+ * 差し込まないと「無作為な編成に混ぜたときの勝率」が出せない——
+ * 効きすぎを捕まえられるのはこの物差しだけ。
+ */
+registerRevos(EXP_DEFS);
 
 /** 1チームの数。編成の枠と揃える */
 const TEAM = 5;
