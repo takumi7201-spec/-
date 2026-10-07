@@ -10,20 +10,4 @@
  */
 import type { RevosDef } from '../src/game/data/revos.ts';
 
-export const EXP_DEFS: RevosDef[] = [
-  {
-    id: 'exp-truestrike', name: 'エクスＢ必中', en: 'ExpB', element: 'null', role: 'Sprinter',
-    hp: 1120, atk: 126, def: 84, spd: 134, basicPower: 86,
-    passive: {
-      id: 'truestrike', name: '見切り',
-      desc: '自分の攻撃は外れない。肩代わりにも割り込まれず、狙った相手に届く。',
-    },
-    od: {
-      id: 'pierceveil', name: '帳を裂く',
-      desc: '奥にいる敵1体に特大ダメージ。肩代わりを無視する。', power: 164,
-    },
-    sprite: 'velociraptor',
-    build: { archetype: 'raptor', seed: 102, bulk: 1.0, scale: 1.0 },
-    habitat: ['canyon'], rarity: 4, eventOnly: true, flavor: '試作。',
-  },
-];
+export const EXP_DEFS: RevosDef[] = [];

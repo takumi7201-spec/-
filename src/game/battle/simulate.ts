@@ -238,9 +238,9 @@ const SURGE_TURNS = 5;
  * 条件を付ければ、無作為な編成では平均1〜2体にしか乗らず、速い面々で
  * 固めた編成でだけ満額になる。倍率を大きいまま置ける理由がここにある。
  */
-const HEADWIND_SEC = 20;
-const HEADWIND_DEALT = 0.14;
-const HEADWIND_SPD = 0.09;
+const HEADWIND_SEC = 18;
+const HEADWIND_DEALT = 0.12;
+const HEADWIND_SPD = 0.08;
 
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
 const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };

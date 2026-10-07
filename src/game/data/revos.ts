@@ -25,9 +25,7 @@ export type PassiveId =
   | 'primordial' | 'carapace' | 'irritate' | 'jetwake' | 'packrun'
   | 'sailheat' | 'unreadable' | 'cannibal' | 'fourwings'
   | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite'
-  | 'vetulibody' | 'headwind'
-  // 試作（tools/expDefs.ts だけが使う）
-  | 'truestrike';
+  | 'vetulibody' | 'headwind' | 'truestrike';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
@@ -40,8 +38,7 @@ export type OdId =
   | 'cambrianjaw' | 'shellveil' | 'falsejaw' | 'straightbore' | 'boundfang'
   | 'heatshare' | 'tangledspiral' | 'bonesever' | 'glideguard'
   | 'throatbite' | 'nestguard' | 'nervejam' | 'trilobeshield' | 'twinsever'
-  | 'unknownancestor' | 'firstgust'
-  | 'pierceveil';
+  | 'unknownancestor' | 'firstgust' | 'pierceveil';
 
 export interface RevosDef {
   id: string;
@@ -719,7 +716,7 @@ export const REVOS: RevosDef[] = [
     hp: 1070, atk: 120, def: 86, spd: 128, basicPower: 86,
     passive: {
       id: 'headwind', name: '先駆けの風',
-      desc: '戦闘開始から 20 秒のあいだ、自分と同じかそれより速い味方の 与ダメージ +14% / 速度 +9%。以後は消える。',
+      desc: '戦闘開始から 18 秒のあいだ、自分と同じかそれより速い味方の 与ダメージ +12% / 速度 +8%。以後は消える。',
     },
     od: {
       id: 'firstgust', name: '初手の颪',
@@ -729,6 +726,25 @@ export const REVOS: RevosDef[] = [
     build: { archetype: 'raptor', seed: 7714, bulk: 0.92, scale: 1.0, crest: true },
     habitat: ['canyon', 'frostpeak'], rarity: 4,
     flavor: '走ることだけに骨を預けた体。群れが動き出す最初の一歩を、いつもこの首が決める。',
+  },
+  {
+    id: 'concavenator', name: 'コンカヴェナトル', short: 'コンカ', en: 'Concavenator',
+    element: 'terra', role: 'Sprinter',
+    // 特性が噛み合う相手は限られる（目眩を撒くのは1体、守護役は4体）。
+    // 刺さらない日でも出せるよう、素の数字は特攻役の上限に寄せてある
+    hp: 1150, atk: 131, def: 86, spd: 135, basicPower: 88,
+    passive: {
+      id: 'truestrike', name: '見切り',
+      desc: '自分の攻撃は外れない。肩代わりにも割り込まれず、狙った相手に届く。',
+    },
+    od: {
+      id: 'pierceveil', name: '帳を裂く',
+      desc: '奥にいる敵1体に特大ダメージ。肩代わりを無視する。', power: 164,
+    },
+    sprite: 'concavenator',
+    build: { archetype: 'theropod', seed: 4471, bulk: 1.02, scale: 1.0, sail: true },
+    habitat: ['canyon', 'emberfield'], rarity: 4,
+    flavor: '腰にひとつだけ隆起を背負う。前を塞ぐものを見ずに、その後ろだけを見ている。',
   },
 ];
 
