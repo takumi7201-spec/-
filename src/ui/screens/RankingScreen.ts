@@ -42,12 +42,23 @@ export class RankingScreen extends Screen {
     this.el.append(head, this.tabsEl, this.bodyEl);
   }
 
+  swipeEdge(dir: 1 | -1): void {
+    const want: RankTab = dir > 0 ? 'mine' : 'arena';
+    if (want === this.view) return;
+    this.view = want;
+    this.render();
+  }
+
+  swipeSurface(): HTMLElement | null { return this.bodyEl ?? null; }
+
   swipeTab(dir: 1 | -1): boolean {
     const next: RankTab = dir > 0 ? 'arena' : 'mine';
     if (next === this.view) return false;
     this.view = next;
     audio.uiTap();
     this.render();
+    // 替えた先は頭から読ませる。途中から始まると、何が変わったのか分からない
+    this.bodyEl.scrollTop = 0;
     return true;
   }
 

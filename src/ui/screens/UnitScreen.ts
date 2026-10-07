@@ -22,6 +22,7 @@ export type UnitWhere = 'roster' | 'party' | 'dex' | 'transfer';
  */
 export class UnitScreen extends Screen {
   private data!: SaveData;
+  private bodyEl!: HTMLElement;
   private gridEl!: HTMLElement;
   private facesEl!: HTMLElement;
   private countPlate = plate('手持ち', { tone: 'amber' });
@@ -35,8 +36,12 @@ export class UnitScreen extends Screen {
     const head = screenHead({ eyebrow: '手持ち', title: 'ユニット', right: this.countPlate.el });
     this.facesEl = h('div', { class: 'unit-faces' });
     this.gridEl = h('div', { class: 'unit-grid' });
-    this.el.append(head, h('div', { class: 'unit-body' }, this.facesEl, this.gridEl));
+    this.bodyEl = h('div', { class: 'unit-body' }, this.facesEl, this.gridEl);
+    this.el.append(head, this.bodyEl);
   }
+
+  /** 払いで動かすのは中身だけ。見出しと地の色は止めておく */
+  swipeSurface(): HTMLElement | null { return this.bodyEl ?? null; }
 
   enter(): void { this.render(); }
 

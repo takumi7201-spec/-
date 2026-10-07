@@ -45,12 +45,23 @@ export class MissionScreen extends Screen {
     this.el.append(head, this.tabsEl, this.bodyEl, h('div', { class: 'deck deck--mail' }, this.allBtn));
   }
 
+  swipeEdge(dir: 1 | -1): void {
+    const want: MissionGroup = dir > 0 ? 'daily' : 'record';
+    if (want === this.group) return;
+    this.group = want;
+    this.render();
+  }
+
+  swipeSurface(): HTMLElement | null { return this.bodyEl ?? null; }
+
   swipeTab(dir: 1 | -1): boolean {
     const next: MissionGroup = dir > 0 ? 'record' : 'daily';
     if (next === this.group) return false;
     this.group = next;
     audio.uiTap();
     this.render();
+    // 替えた先は頭から読ませる。途中から始まると、何が変わったのか分からない
+    this.bodyEl.scrollTop = 0;
     return true;
   }
 

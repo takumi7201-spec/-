@@ -38,6 +38,18 @@ export abstract class Screen {
    * false（未実装を含む）なら、UI 層が下タブを隣へ送る
    */
   swipeTab?(dir: SwipeDir): boolean;
+  /**
+   * 払いで動かす面。タブのある画面は中身（一覧）だけを返す——
+   * 見出しとタブまで動くと、同じ板が丸ごと滑って行き先が読めない
+   */
+  swipeSurface?(): HTMLElement | null;
+  /**
+   * 払いで入ってきた。入ってきた側に近いタブを選ぶ。
+   *
+   * 左へ払って入ったなら先頭、右へ払って入ったなら最後——「右へ払い続けたら
+   * タブを逆から拾っていく」が、1本の列を戻っている感じになる
+   */
+  swipeEdge?(dir: SwipeDir): void;
   /** 初回表示前に1回だけ呼ばれる */
   build(): void {}
   enter(_params?: unknown): void { void _params; }
@@ -85,20 +97,119 @@ export class UIRoot {
     root.appendChild(h('div', { id: 'vignette' }));
     root.appendChild(h('div', { id: 'grain' }));
     this.updateLayout();
-    // 横の払いは層で1つだけ受ける。面ごとに付けると、面を増やすたびに
-    // 付け忘れが出るし、同じ指を2か所で見ることになる
-    attachSwipe(root, (dir) => this.swipe(dir));
+    /*
+     * 横の払いは層で1つだけ受ける。面ごとに付けると、面を増やすたびに
+     * 付け忘れが出るし、同じ指を2か所で見ることになる。
+     *
+     * 受けるのは文書そのもの。UI の板より下（3D の面）を触って払うことも
+     * あるので、UI 層に付けると「拠点で地面を払っても何も起きない」になる
+     */
+    attachSwipe(root.ownerDocument?.documentElement ?? root, {
+      onMove: (dx) => this.swipeMove(dx),
+      onEnd: (dir) => (dir === 0 ? this.swipeCancel() : this.swipe(dir)),
+    });
     addEventListener('resize', () => this.updateLayout());
     addEventListener('orientationchange', () => setTimeout(() => this.updateLayout(), 120));
+  }
+
+  /*
+   * 払いの手触り。
+   *
+   * 指に付いてくる → 離した先で入れ替わる、を1つながりにする。指が
+   * 動いているあいだは中身を一緒に動かし（抵抗を入れて引っ張る感じにする）、
+   * 送ると決まったら、新しい中身を指の進んだ向きの反対側から滑り込ませる。
+   *
+   * 動かすのは「中身だけ」。タブのある面では一覧だけが動き、見出しと
+   * タブは止まったままになる——板ごと動くと、どこへ行くのか分からない。
+   */
+  private dragEl: HTMLElement | null = null;
+  private reduced = matchMedia('(prefers-reduced-motion: reduce)');
+
+  /**
+   * 指と一緒に動かす中身。
+   *
+   * 既定は「動かさない」。面ごと動かすと、どいた先に3Dの黒い背景が覗く——
+   * 地の色は面の中（::before）に塗ってあるので、面が動けば地も一緒に動く。
+   * 動かしてよい中身（一覧や札の並び）を、画面側から申告してもらう。
+   */
+  private surfaceOf(s: Screen): HTMLElement | null {
+    return s.swipeSurface?.() ?? null;
+  }
+
+  private swipeMove(dx: number): void {
+    const s = this.current;
+    if (!s || this.reduced.matches) return;
+    if (!this.dragEl) this.dragEl = this.surfaceOf(s);
+    if (!this.dragEl) return;
+    // 抵抗。指の 45% しか動かさず、72px で頭打ちにする——
+    // 1:1 で付いてくると、送らずに戻したときの跳ね返りが大きすぎる
+    const r = Math.sign(dx) * Math.min(Math.abs(dx) * 0.45, 72);
+    this.dragEl.style.transition = 'none';
+    this.dragEl.style.transform = `translate3d(${r.toFixed(1)}px,0,0)`;
+    this.dragEl.style.opacity = String(1 - Math.min(0.3, Math.abs(r) / 260));
+  }
+
+  /** 送らずに離した。元の位置へ戻す */
+  private swipeCancel(): void {
+    const el = this.dragEl;
+    this.dragEl = null;
+    if (!el) return;
+    el.style.transition = 'transform 200ms cubic-bezier(.2,.8,.3,1), opacity 200ms linear';
+    el.style.transform = '';
+    el.style.opacity = '';
+  }
+
+  /** 新しい中身を、指の進んだ向きの反対側から滑り込ませる */
+  private slideIn(el: HTMLElement | null, dir: SwipeDir): void {
+    if (!el) return;
+    if (this.reduced.matches) { el.style.transform = ''; el.style.opacity = ''; return; }
+    el.style.transition = 'none';
+    el.style.transform = `translate3d(${dir * 34}px,0,0)`;
+    el.style.opacity = '0.35';
+    /*
+     * 置いた位置を「計算させて」から戻す。
+     *
+     * 同じフレームのうちに置いて戻すと、ブラウザは最後の値しか計算しないので、
+     * 補間は指が離した位置から始まってしまう（新しい中身が反対側から入って
+     * こない）。読み取りを1回挟んで、置いた位置を確定させる——結果を変数へ
+     * 受けるのは、式だけだと捨てられても気付けないため。
+     */
+    const forced = el.getBoundingClientRect().width;
+    if (forced >= 0) {
+      el.style.transition = 'transform 230ms cubic-bezier(.2,.75,.25,1), opacity 180ms linear';
+      el.style.transform = '';
+      el.style.opacity = '';
+    }
   }
 
   /** 払いの行き先。面の中のタブが先、消化されなければ下タブ */
   private swipe(dir: SwipeDir): void {
     const s = this.current;
+    const held = this.dragEl;
+    this.dragEl = null;
     if (!s) return;
-    if (s.swipeTab?.(dir)) return;
-    if (s.tab) this.onSwipeNav?.(dir, s.tab, s.name);
+    if (s.swipeTab?.(dir)) {
+      // 中身は入れ替わった。同じ器を反対側から入れ直す
+      this.slideIn(held ?? this.surfaceOf(s), dir);
+      return;
+    }
+    if (s.tab) {
+      this.pendingSlide = dir;
+      this.onSwipeNav?.(dir, s.tab, s.name);
+      // 面が変わらなかった（端だった）なら、引っ張ったぶんを戻す
+      if (this.pendingSlide !== null) {
+        this.pendingSlide = null;
+        this.dragEl = held;
+        this.swipeCancel();
+      }
+      return;
+    }
+    this.dragEl = held;
+    this.swipeCancel();
   }
+
+  /** 払いで面が変わるときだけ立つ。show() が滑り込みに使う */
+  private pendingSlide: SwipeDir | null = null;
 
   register(screen: Screen): void {
     screen.attach(this);
@@ -138,6 +249,15 @@ export class UIRoot {
     if (this.current === next) { next.enter(params); return; }
 
     if (this.current) {
+      // 引っ張ったまま面が変わることがある。ずらした中身をそのまま仕舞うと、
+      // 次に開いたときに横へずれた状態で出てくる
+      const prev = this.surfaceOf(this.current);
+      if (prev) {
+        prev.style.transition = '';
+        prev.style.transform = '';
+        prev.style.opacity = '';
+      }
+      this.dragEl = null;
       this.current.exit();
       this.current.el.classList.remove('is-active');
       this.current.el.style.pointerEvents = 'none';
@@ -155,6 +275,12 @@ export class UIRoot {
     this.syncTabs();
     next.enter(params);
     this.onShow?.(name);
+    if (this.pendingSlide !== null) {
+      const dir = this.pendingSlide;
+      this.pendingSlide = null;
+      next.swipeEdge?.(dir);
+      this.slideIn(this.surfaceOf(next), dir);
+    }
   }
 
   update(dt: number): void {

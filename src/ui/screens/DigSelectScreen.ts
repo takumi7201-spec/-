@@ -23,6 +23,7 @@ const MAX_HEARTS = 5;
  */
 export class DigSelectScreen extends Screen {
   private data!: SaveData;
+  private bodyEl!: HTMLElement;
   private goEl!: HTMLElement;
   private permitEl!: HTMLElement;
   private cleanEl!: HTMLElement;
@@ -45,8 +46,12 @@ export class DigSelectScreen extends Screen {
     this.goEl = h('div', { class: 'digsel-slot' });
     this.permitEl = h('div', { class: 'digsel-slot digsel-slot--permit' });
     this.cleanEl = h('div', { class: 'digsel-slot' });
-    this.el.append(head, h('div', { class: 'digsel-body' }, this.goEl, this.permitEl, this.cleanEl));
+    this.bodyEl = h('div', { class: 'digsel-body' }, this.goEl, this.permitEl, this.cleanEl);
+    this.el.append(head, this.bodyEl);
   }
+
+  /** 払いで動かすのは中身だけ。見出しと地の色は止めておく */
+  swipeSurface(): HTMLElement | null { return this.bodyEl ?? null; }
 
   enter(): void { this.render(); }
 

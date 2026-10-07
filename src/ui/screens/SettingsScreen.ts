@@ -35,6 +35,9 @@ export class SettingsScreen extends Screen {
     this.el.append(head, this.bodyEl);
   }
 
+  /** 払いで動かすのは中身だけ。見出しと地の色は止めておく */
+  swipeSurface(): HTMLElement | null { return this.bodyEl ?? null; }
+
   enter(): void { this.render(); }
 
   /** 値を並べて1つ選ぶ行。いま選んでいる札だけが明るい */

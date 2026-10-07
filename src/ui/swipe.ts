@@ -27,8 +27,15 @@ const MAX_MS = 1400;
 
 export type SwipeDir = -1 | 1;
 
+export interface SwipeHandlers {
+  /** 指が横に動いているあいだ。dx は押し始めからの横の移動量 */
+  onMove?(dx: number): void;
+  /** 指を離した。送るなら向き、戻すなら 0 */
+  onEnd(dir: SwipeDir | 0): void;
+}
+
 /** 横に払ったら呼ぶ。-1 が右へ払う（前の面）、+1 が左へ払う（次の面） */
-export function attachSwipe(el: HTMLElement, onSwipe: (dir: SwipeDir) => void): void {
+export function attachSwipe(el: HTMLElement, handlers: SwipeHandlers): void {
   let id: number | null = null;
   let x0 = 0, y0 = 0, t0 = 0;
   /** 最後に見えた位置。pointercancel は座標を持たないことがあるので控える */
@@ -47,14 +54,16 @@ export function attachSwipe(el: HTMLElement, onSwipe: (dir: SwipeDir) => void): 
 
   el.addEventListener('pointermove', (e) => {
     const pe = e as PointerEvent;
-    if (id !== pe.pointerId || locked) return;
+    if (id !== pe.pointerId) return;
     lx = pe.clientX; ly = pe.clientY;
     const dx = lx - x0;
     const dy = ly - y0;
-    if (Math.abs(dx) >= LOCK && Math.abs(dx) > Math.abs(dy) * RATIO) {
+    if (!locked && Math.abs(dx) >= LOCK && Math.abs(dx) > Math.abs(dy) * RATIO) {
       locked = true;
       setSwiping(true);
     }
+    // 指に付いてくる。決まってから動かすのではなく、動かしながら決める
+    if (locked) handlers.onMove?.(dx);
   }, { passive: true });
 
   /*
@@ -80,7 +89,7 @@ export function attachSwipe(el: HTMLElement, onSwipe: (dir: SwipeDir) => void): 
       && performance.now() - t0 <= MAX_MS;
     // タップの判定が済んでから下ろす。同じ指の pointerup より後に回す
     setTimeout(() => setSwiping(false), 0);
-    if (ok) onSwipe(dx < 0 ? 1 : -1);
+    handlers.onEnd(ok ? (dx < 0 ? 1 : -1) : 0);
   };
   el.addEventListener('pointerup', end, { passive: true });
   el.addEventListener('pointercancel', end, { passive: true });

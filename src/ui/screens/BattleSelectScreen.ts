@@ -62,6 +62,17 @@ export class BattleSelectScreen extends Screen {
     this.el.append(head, this.tabsEl, this.bodyEl);
   }
 
+  /** 払いで入ってきた側に近いタブを開く。右から入れば末尾（イベント） */
+  swipeEdge(dir: 1 | -1): void {
+    const want: BattleMode = dir > 0 ? 'normal' : 'event';
+    if (want === this.mode) return;
+    this.mode = want;
+    this.render();
+  }
+
+  /** 払いで動かすのは一覧だけ。見出しとタブは止めておく */
+  swipeSurface(): HTMLElement | null { return this.bodyEl ?? null; }
+
   /** 通常 ⇄ イベントは払いで送る。闘技は別の面なので、ここには入れない */
   swipeTab(dir: 1 | -1): boolean {
     const next: BattleMode = dir > 0 ? 'event' : 'normal';
@@ -69,6 +80,8 @@ export class BattleSelectScreen extends Screen {
     this.mode = next;
     audio.uiTap();
     this.render();
+    // 替えた先は頭から読ませる。途中から始まると、何が変わったのか分からない
+    this.bodyEl.scrollTop = 0;
     return true;
   }
 
