@@ -12,6 +12,10 @@
     "balance": "esbuild tools/balance.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/balance.mjs --log-level=error && node node_modules/.cache/balance.mjs",
     "stagecurve": "esbuild tools/stagecurve.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/stagecurve.mjs --log-level=error && node node_modules/.cache/stagecurve.mjs",
     "stagetune": "esbuild tools/stagetune.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/stagetune.mjs --log-level=error && node node_modules/.cache/stagetune.mjs",
+    "meta": "esbuild tools/meta.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/meta.mjs --log-level=error && node node_modules/.cache/meta.mjs",
+    "metadiag": "esbuild tools/metadiag.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/metadiag.mjs --log-level=error && node node_modules/.cache/metadiag.mjs",
+    "arena": "esbuild tools/arena.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/arena.mjs --log-level=error && node node_modules/.cache/arena.mjs",
+    "expunit": "esbuild tools/expunit.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/expunit.mjs --log-level=error && node node_modules/.cache/expunit.mjs",
     "colosseum": "esbuild tools/colosseum.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/colosseum.mjs --log-level=error && node node_modules/.cache/colosseum.mjs",
     "artifact": "npm run build && node tools/make-artifact.mjs"
   },
