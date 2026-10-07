@@ -198,6 +198,15 @@ export class PartyScreen extends Screen {
     }
   }
 
+  /** 枠に並んでいる順。詳細を払って隣の枠へ移るのに使う */
+  visibleList(): OwnedRevos[] {
+    const byUid = new Map(this.data.roster.map((r) => [r.uid, r]));
+    return this.order.flatMap((uid) => {
+      const u = uid ? byUid.get(uid) : undefined;
+      return u ? [u] : [];
+    });
+  }
+
   /** 長押しで開く1体ぶんの詳細。編成を組みながら性能を確かめられるようにする */
   private openDetail(u: OwnedRevos): void {
     audio.uiTap();

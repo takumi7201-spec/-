@@ -1726,6 +1726,15 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
   pointer-events: none;
 }
 /* 絵の後ろの光。属性色ではなく虹にする——ここは「見せ場」であって分類ではない */
+/*
+ * 絵と本文を載せる1枚。払いで動かすのはこれだけ。
+ * 中身は元のまま面の四隅を基準に置くので、枠は四隅に張る
+ */
+.det-sheet {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  will-change: transform;
+}
 .det-art {
   position: absolute; left: 50%; top: 88px;
   transform: translateX(-50%);
@@ -1778,7 +1787,9 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
   overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
   pointer-events: auto;
 }
-.det-title { padding-top: 6px; }
+/* 名前の段。右端に「いま何番目か」を添える——行を1つ増やさない */
+.det-title { padding-top: 6px; display: flex; align-items: center; gap: 10px; }
+.det-title-main { flex: 1; min-width: 0; }
 .det-head { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
 /* 属性は面ではなく淡い地に置く。詳細では属性より名前を先に読ませたい */
 .det-head .chip {
@@ -1889,6 +1900,25 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
     rgb(223, 209, 178) 0%, rgb(223, 209, 178) 72%, rgba(223, 209, 178, 0) 100%);
 }
 .det-habitat-main { flex: 1; min-width: 0; }
+/*
+ * 隣へ移る札。一覧の並びのまま行き来できる。
+ * 払える指なら要らないので、下の端に小さく置くだけにする
+ */
+.det-nav {
+  display: flex; align-items: center; gap: 2px;
+  flex: none;
+}
+.det-nav-btn {
+  width: 28px; min-width: 28px; min-height: 28px; padding: 0;
+  background: transparent; box-shadow: none;
+  font-size: 13px; color: var(--ink-line);
+}
+.det-nav-btn:disabled { opacity: 0.22; }
+.det-nav-pos {
+  font-family: var(--font-num);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--ink-faint); min-width: 40px; text-align: center;
+}
 .det-habitat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; color: var(--ink-faint); }
 .det-habitat { font-size: 12px; color: var(--ink-line); margin-top: 1px; display: flex; align-items: center; gap: 6px; }
 /* まだ持っていない個体を開いているときの印 */

@@ -52,7 +52,7 @@ import { StockScreen } from './ui/screens/StockScreen';
 import { ColosseumScreen } from './ui/screens/ColosseumScreen';
 import { RankingScreen } from './ui/screens/RankingScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
-import { DetailScreen } from './ui/screens/DetailScreen';
+import { DetailScreen, type DetailEntry } from './ui/screens/DetailScreen';
 import { REVOS, getRevos } from './game/data/revos';
 import {
   BOSS_TIERS, BOSS_TIME, DAILY_REPLAY_COINS,
@@ -63,7 +63,7 @@ import { audio } from './core/Audio';
 import {
   load as loadSave, save as writeSave, defaultSave, dropDecay, addExp, addPlayerExp,
   countToday, rollDaily, clearSave, todayKey,
-  type SaveData,
+  type SaveData, type OwnedRevos,
 } from './core/Save';
 import type { BiomeId } from './voxel/palette';
 
@@ -535,11 +535,19 @@ async function main(): Promise<void> {
 
   rosterScreen.onBack = () => goUnit();
   rosterScreen.onPrefChange = () => writeSave(data);
+  /** 手持ちの1体を詳細の1件にする。同じ種の所持数はここでまとめて数える */
+  const ownedEntry = (u: OwnedRevos): DetailEntry => ({
+    defId: u.defId,
+    unit: u,
+    owned: data.roster.filter((o) => o.defId === u.defId),
+  });
+
   rosterScreen.onDetail = (defId, unit) => {
     ui.show('detail', {
+      ...ownedEntry(unit),
       defId,
-      unit,
-      owned: data.roster.filter((u) => u.defId === defId),
+      // 一覧が並べていた順をそのまま渡す。払うと隣の個体へ移る
+      list: rosterScreen.visibleList().map(ownedEntry),
       back: () => { rosterScreen.setData(data); ui.show('roster'); },
     });
   };
@@ -603,17 +611,23 @@ async function main(): Promise<void> {
     ui.show('detail', {
       defId,
       owned: mine,
+      // 図鑑は種の並び。絞り込みも並べ替えも効いた順で行き来する
+      list: dexScreen.visibleList().map((id) => ({
+        defId: id,
+        owned: data.roster.filter((u) => u.defId === id),
+      })),
       back: () => { dexScreen.setData(data); ui.show('dex'); },
-      // 持っていない個体を編成へ送っても置けない。導線ごと出さない
-      onEquip: mine.length > 0 ? () => { partyScreen.setData(data); ui.show('party'); } : undefined,
+      // 持っていない個体を編成へ送っても置けない。導線ごと出さない。
+      // 払って移った先の所持は詳細側が見るので、ここでは渡すだけ
+      onEquip: () => { partyScreen.setData(data); ui.show('party'); },
     });
   };
   dexScreen.onPrefChange = () => writeSave(data);
   partyScreen.onDetail = (defId, unit) => {
     ui.show('detail', {
+      ...ownedEntry(unit),
       defId,
-      unit,
-      owned: data.roster.filter((u) => u.defId === defId),
+      list: partyScreen.visibleList().map(ownedEntry),
       back: () => { partyScreen.setData(data); ui.show('party'); },
     });
   };

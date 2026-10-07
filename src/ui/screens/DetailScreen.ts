@@ -28,15 +28,29 @@ interface StatRow {
   color: string;
 }
 
-export interface DetailParams {
+/**
+ * 払いで行き来する1件。
+ *
+ * 開いた一覧がそのとき並べていた順そのままを受ける。詳細の中で並べ直すと、
+ * 戻ったときの一覧と順番が食い違う——「右の次は誰か」は一覧が決める。
+ */
+export interface DetailEntry {
   defId: string;
   /** この個体を開いているなら、種の基準値ではなく手元の値を出す */
   unit?: OwnedRevos;
+  /** 同じ種の手持ち。産出の段に出す */
   owned?: OwnedRevos[];
+}
+
+export interface DetailParams extends DetailEntry {
   /** 閉じたときの行き先 */
   back: () => void;
   /** 編成へ送る導線。図鑑から開いたときだけ出す */
   onEquip?: () => void;
+  /** 開いた一覧の並び。横に払って隣の個体へ移る */
+  list?: DetailEntry[];
+  /** list の中で今どこを見ているか */
+  at?: number;
 }
 
 /**
@@ -48,6 +62,8 @@ export interface DetailParams {
  */
 export class DetailScreen extends Screen {
   private p: DetailParams | null = null;
+  /** list の中で今どこを見ているか。払うとここが動く */
+  private at = 0;
   /** 数字を「合計」で読むか「素＋加算」で読むか。タップで入れ替える */
   private mode: 'total' | 'base' = 'total';
   private rows: StatRow[] = [];
@@ -67,6 +83,12 @@ export class DetailScreen extends Screen {
   private habitatEl!: HTMLElement;
   private habitatLabel!: HTMLElement;
   private equipBtn!: HTMLButtonElement;
+  private sheetEl!: HTMLElement;
+  private bodyEl!: HTMLElement;
+  private navEl!: HTMLElement;
+  private navPos!: HTMLElement;
+  private navPrev!: HTMLButtonElement;
+  private navNext!: HTMLButtonElement;
 
   constructor() { super('detail', 'unit'); }
 
@@ -106,33 +128,82 @@ export class DetailScreen extends Screen {
 
     const close = button('✕', () => { audio.uiBack(); this.p?.back(); }, { class: 'btn--rail det-close' });
 
-    this.el.append(
-      this.artEl,
-      close,
-      this.tagEl,
-      h('div', { class: 'det-body' },
-        h('div', { class: 'det-title' }, this.headEl, this.nameEl, this.latinEl),
-        this.statsBtn,
-        this.engraveEl,
-        this.passiveEl,
-        this.odEl,
-        h('div', { class: 'det-foot' },
-          h('div', { class: 'det-habitat-main' },
-            this.habitatLabel,
-            this.habitatEl,
-          ),
-          this.equipBtn,
+    // 隣へ移る札。払えない指（PC）でも同じ順に行き来できるようにする
+    this.navPrev = button('◂', () => this.step(-1), { class: 'btn--sm det-nav-btn' });
+    this.navNext = button('▸', () => this.step(1), { class: 'btn--sm det-nav-btn' });
+    this.navPos = h('span', { class: 'det-nav-pos num' });
+    this.navEl = h('div', { class: 'det-nav' }, this.navPrev, this.navPos, this.navNext);
+
+    this.bodyEl = h('div', { class: 'det-body' },
+      h('div', { class: 'det-title' },
+        h('div', { class: 'det-title-main' }, this.headEl, this.nameEl, this.latinEl),
+        this.navEl,
+      ),
+      this.statsBtn,
+      this.engraveEl,
+      this.passiveEl,
+      this.odEl,
+      h('div', { class: 'det-foot' },
+        h('div', { class: 'det-habitat-main' },
+          this.habitatLabel,
+          this.habitatEl,
         ),
+        this.equipBtn,
       ),
     );
+    /*
+     * 絵・等級・本文を1枚にまとめる。
+     *
+     * 払いで動かすのはこの1枚だけ。地の色は面（::before）に塗ってあるので、
+     * 面ごと動かすと下の3Dが覗く——動くのは中身にとどめる。閉じる札は
+     * 外に置く。送っている途中でも、抜ける口はいつも同じ場所に要る。
+     */
+    this.sheetEl = h('div', { class: 'det-sheet' }, this.artEl, this.tagEl, this.bodyEl);
+    this.el.append(this.sheetEl, close);
+  }
+
+  /** 払いで動かすのは1枚だけ。閉じる札と地の色は止めておく */
+  swipeSurface(): HTMLElement | null { return this.sheetEl ?? null; }
+
+  /**
+   * 横に払われた。開いた一覧と同じ順で隣の個体へ移る。
+   *
+   * 端では false を返す——面ごと送られても、詳細から行ける隣の面は無い。
+   * UI 層が引っ張ったぶんを戻すので、「これ以上は無い」が手触りで分かる。
+   */
+  swipeTab(dir: -1 | 1): boolean { return this.step(dir); }
+
+  /** list の中を1つ動かす。動けたら true */
+  private step(dir: -1 | 1): boolean {
+    const list = this.p?.list;
+    if (!list || list.length < 2) return false;
+    const next = this.at + dir;
+    if (next < 0 || next >= list.length) return false;
+    this.at = next;
+    audio.uiTap();
+    this.paint(list[next]);
+    return true;
   }
 
   enter(params?: unknown): void {
     const p = params as DetailParams | undefined;
     if (!p) return;
     this.p = p;
-    const r = getRevos(p.defId);
-    const u = p.unit;
+    // 渡された位置を信じない。開いた札が一覧の何番目かは、同じ個体を
+    // 探し直したほうが確か——並びが変わっていても追従する
+    const list = p.list ?? [];
+    const found = list.findIndex((e) => (p.unit ? e.unit?.uid === p.unit.uid : e.defId === p.defId));
+    this.at = found >= 0 ? found : (p.at ?? 0);
+    this.paint(found >= 0 ? list[found] : p);
+  }
+
+  /** 1件ぶんを描く。払いで差し替えるときもここだけを通る */
+  private paint(e: DetailEntry): void {
+    const r = getRevos(e.defId);
+    const u = e.unit;
+    // スクロールは頭へ戻す。前の個体の「必殺」の位置で新しい個体が開くと、
+    // 名前も絵も見ないまま別の子の説明を読むことになる
+    this.bodyEl.scrollTop = 0;
     // 手元の個体を開いているときは、その育ち方を反映した値を出す。
     // 種の基準値を見せても「この子がどれだけ強いか」は分からない
     const ls = u ? 1 + 0.055 * (u.level - 1) : 1;
@@ -210,7 +281,7 @@ export class DetailScreen extends Screen {
 
     // 産出。手元に居るなら、居る事実のほうが先に要る
     clear(this.habitatEl);
-    const owned = p.owned ?? [];
+    const owned = e.owned ?? [];
     this.habitatLabel.textContent = spaced(u || owned.length > 0 ? '手持ち' : '産出');
     if (u) {
       this.habitatEl.append(
@@ -238,7 +309,17 @@ export class DetailScreen extends Screen {
       );
     }
 
-    this.equipBtn.hidden = !p.onEquip;
+    // 編成への導線は「持っている個体」にだけ出す。払って未所持の子へ
+    // 移ったのに札が残っていると、押しても何も置けない
+    this.equipBtn.hidden = !this.p?.onEquip || (!u && owned.length === 0);
+
+    const list = this.p?.list ?? [];
+    this.navEl.hidden = list.length < 2;
+    if (list.length >= 2) {
+      this.navPos.textContent = `${this.at + 1} / ${list.length}`;
+      this.navPrev.disabled = this.at === 0;
+      this.navNext.disabled = this.at === list.length - 1;
+    }
   }
 
   /**

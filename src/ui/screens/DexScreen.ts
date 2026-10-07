@@ -36,6 +36,9 @@ export class DexScreen extends Screen {
   private progFill!: HTMLElement;
   private footEl!: HTMLElement;
 
+  /** 最後に並べた順。詳細を払って隣へ移るとき、この順をそのまま渡す */
+  private shown: string[] = [];
+
   onBack?: () => void;
   /** 詳細は下から引く紙ではなく1枚の画面。行き先はゲーム側が決める */
   onDetail?: (defId: string) => void;
@@ -118,6 +121,7 @@ export class DexScreen extends Screen {
       .filter((r) => this.filter === 'all' || r.element === this.filter)
       .slice()
       .sort((a, b) => this.compare(a, b, owned));
+    this.shown = list.map((r) => r.id);
 
     clear(this.gridEl);
     for (const r of list) {
@@ -195,6 +199,9 @@ export class DexScreen extends Screen {
         return idx * dir;
     }
   }
+
+  /** いま格子に並んでいる順。絞り込みも並べ替えも反映した並び */
+  visibleList(): string[] { return this.shown; }
 
   private openDetail(id: string): void {
     audio.uiTap();

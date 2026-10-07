@@ -40,6 +40,9 @@ export class RosterScreen extends Screen {
   private listEl!: HTMLElement;
   private countPlate = plate('所持', { tone: 'amber' });
 
+  /** 最後に並べた順。詳細を払って隣へ移るとき、この順をそのまま渡す */
+  private shown: OwnedRevos[] = [];
+
   onBack?: () => void;
   onDetail?: (defId: string, unit: OwnedRevos) => void;
   /** 並びと見せ方は設定に残す。保存はゲーム側に任せる */
@@ -108,6 +111,7 @@ export class RosterScreen extends Screen {
     // ---- 中身 ----
     const inParty = new Set(effectiveParty(this.data).map((u) => u.uid));
     const list = this.data.roster.slice().sort((a, b) => this.compare(a, b));
+    this.shown = list;
 
     clear(this.listEl);
     this.listEl.className = this.view === 'grid' ? 'ros-body ros-body--grid' : 'ros-body';
@@ -124,6 +128,9 @@ export class RosterScreen extends Screen {
       );
     }
   }
+
+  /** いま画面に並んでいる順。詳細の行き来に使う */
+  visibleList(): OwnedRevos[] { return this.shown; }
 
   private listCard(u: OwnedRevos, inParty: boolean): HTMLElement {
     const d = getRevos(u.defId);
