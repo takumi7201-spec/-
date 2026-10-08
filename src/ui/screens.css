@@ -1883,6 +1883,45 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
 .det-skill--passive .det-skill-desc { color: #3e4a49; }
 .det-skill--od .det-skill-desc { color: #4a3e28; }
 
+/* 技レベル。満ちていない枠を残して「あと何回重ねられるか」を見せる */
+.det-skill-pips { margin-left: auto; display: flex; align-items: center; gap: 3px; }
+.det-skill-pips-tag {
+  font-size: 9px; font-weight: 900; letter-spacing: 0.18em;
+  color: var(--ink-faint); margin-right: 2px;
+}
+.det-pip {
+  width: 7px; height: 7px; border-radius: 2px;
+  background: color-mix(in srgb, #96620c 18%, transparent);
+}
+.det-pip.is-on { background: #96620c; }
+
+/*
+ * 効き目の表。
+ *
+ * 説明文が言葉で書いていることの、いまの数字。文と同じ枠の中に置くと
+ * 読み分けられないので、1段へこませて別の紙に見せる。
+ */
+.det-od-calc {
+  margin-top: 8px; padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(150, 98, 12, 0.07);
+  border: 1px solid rgba(150, 98, 12, 0.14);
+}
+/* 名前と数字で1行、条件つきの伸びしろは次の行へ送る */
+.det-od-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.det-od-row + .det-od-row { margin-top: 4px; }
+.det-od-label { flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--ink-soft); }
+.det-od-value { flex: 0 0 auto; font-size: 15px; font-weight: 900; color: #7a4f08; }
+.det-od-note {
+  flex: 0 0 100%;
+  font-size: 10px; color: var(--ink-faint);
+}
+.det-od-foot {
+  margin-top: 6px; padding-top: 5px;
+  border-top: 1px solid rgba(150, 98, 12, 0.14);
+  font-size: 10px; line-height: 1.6; color: var(--ink-faint);
+}
+
 /*
  * 産出と「編成する」は貼り付ける。
  *

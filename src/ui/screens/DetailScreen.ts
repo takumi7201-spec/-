@@ -8,7 +8,24 @@ import { cleanMultiplier, cleanRank } from '../../game/battle/simulate';
 import { revosIcon } from '../revosIcon';
 import { spaced } from '../chrome';
 import { engraveChip } from './CleanChoiceScreen';
+import { OD_OVERCHARGE, odReadout, refDefenderDef } from '../../game/odInfo';
 import { audio } from '../../core/Audio';
+
+/**
+ * 技レベルの粒。
+ *
+ * 同じ種を重ねるたびに1つ増える（5が上限）。数字で「3 / 5」と書くより、
+ * 満ちていない枠が見えるほうが「あと2回重ねられる」が一目で分かる。
+ */
+function skillPips(level: number): HTMLElement {
+  const el = h('div', { class: 'det-skill-pips' },
+    h('span', { class: 'det-skill-pips-tag', text: '技' }),
+  );
+  for (let i = 1; i <= 5; i++) {
+    el.appendChild(h('i', { class: `det-pip ${i <= level ? 'is-on' : ''}` }));
+  }
+  return el;
+}
 
 /** 帯の満ち具合を決める基準値。種ごとの差が読める幅に取る */
 const STAT_CEIL = { hp: 1900, atk: 180, def: 170, spd: 148 } as const;
@@ -273,11 +290,48 @@ export class DetailScreen extends Screen {
       h('div', { class: 'det-skill-head' },
         h('span', { class: 'det-skill-tag', text: spaced('必殺') }),
         h('span', { class: 'det-skill-name', text: r.od.name }),
+        // 技レベルは重ねた回数。どこにも出ていなかったので、技の名前の隣に置く
+        u ? skillPips(u.skillLevel) : null,
       ),
       h('div', { class: 'det-skill-desc', text: r.od.desc }),
     );
     const oBuffs = effectRow(r.od.desc);
     if (oBuffs) this.odEl.appendChild(oBuffs);
+
+    /*
+     * 効き目を、この個体の数字で出す。
+     *
+     * 「単体に大ダメージ」だけでは、威力 128 と 185 の差も、攻撃力 96 と
+     * 175 の差も読めない。育てたぶんが技の側にどう出ているのかを、
+     * 説明文の下に数字で置く——図鑑（素の値）でも同じ式で出すので、
+     * 手に入れる前と後で比べられる。
+     */
+    const lv = u?.level ?? 1;
+    const lines = odReadout(r, {
+      atk: this.rows[1].scaled + this.rows[1].eg,
+      def: this.rows[2].scaled + this.rows[2].eg,
+      maxHp: this.rows[0].scaled + this.rows[0].eg,
+      level: lv,
+    });
+    if (lines.length > 0) {
+      const box = h('div', { class: 'det-od-calc' });
+      for (const line of lines) {
+        box.appendChild(h('div', { class: 'det-od-row' },
+          h('span', { class: 'det-od-label', text: line.label }),
+          h('span', { class: 'det-od-value num', text: line.value }),
+          line.note ? h('span', { class: 'det-od-note', text: line.note }) : null,
+        ));
+      }
+      // 脚注。何に当てた値かと、溜めたぶんの伸びしろ。ダメージの無い技に
+      // 「防御◯の相手に」と書いても、当てる相手が居ない
+      const hitsSomething = lines.some((x) => x.label.startsWith('ダメージ'));
+      box.appendChild(h('div', { class: 'det-od-foot' },
+        `Lv${lv}${u ? '' : '（素の値）'}で計算。`
+        + (hitsSomething ? `同じLvの標準的な相手（防御 ${refDefenderDef(lv)}）に通る量。` : '')
+        + `必殺ゲージを限界まで溜めると ×${OD_OVERCHARGE.toFixed(2)}。`,
+      ));
+      this.odEl.appendChild(box);
+    }
 
     // 産出。手元に居るなら、居る事実のほうが先に要る
     clear(this.habitatEl);
