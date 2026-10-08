@@ -312,6 +312,7 @@ export class DetailScreen extends Screen {
       def: this.rows[2].scaled + this.rows[2].eg,
       maxHp: this.rows[0].scaled + this.rows[0].eg,
       level: lv,
+      skillLevel: u?.skillLevel ?? 1,
     });
     if (lines.length > 0) {
       const box = h('div', { class: 'det-od-calc' });
@@ -326,7 +327,7 @@ export class DetailScreen extends Screen {
       // 「防御◯の相手に」と書いても、当てる相手が居ない
       const hitsSomething = lines.some((x) => x.label.startsWith('ダメージ'));
       box.appendChild(h('div', { class: 'det-od-foot' },
-        `Lv${lv}${u ? '' : '（素の値）'}で計算。`
+        `Lv${lv}${u ? `・技Lv${u.skillLevel}` : '（素の値）'}で計算。`
         + (hitsSomething ? `同じLvの標準的な相手（防御 ${refDefenderDef(lv)}）に通る量。` : '')
         + `必殺ゲージを限界まで溜めると ×${OD_OVERCHARGE.toFixed(2)}。`,
       ));

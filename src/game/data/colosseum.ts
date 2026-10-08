@@ -296,6 +296,18 @@ function rivalPower(rate: number): number {
   return Math.min(1.6, 1 + Math.max(0, rate - 1700) / 1800);
 }
 
+/**
+ * 相手の技レベル。
+ *
+ * 段の相手は全員 技Lv1 のままでいい——重ねるのは手持ちを育てる側の
+ * 仕組みで、固定の相手に積ませる意味がない。闘技場だけは別で、こちらが
+ * 重ねたぶん必殺が重くなるのに向かいが 1 のままだと、レートが上がるほど
+ * 楽になる。レートに合わせて 1 → 5 まで並べる。
+ */
+function rivalSkill(rate: number): number {
+  return Math.max(1, Math.min(5, 1 + Math.floor((rate - COLOSSEUM_START) / 150)));
+}
+
 function pickTeam(rng: Rng, tier: ColosseumTier, brain: Brain, foes: RevosDef[]): {
   team: RevosDef[]; tactic: string;
 } {
@@ -343,7 +355,7 @@ export function buildRival(
         defId: def.id,
         level,
         clean,
-        skillLevel: 1,
+        skillLevel: rivalSkill(st.rate),
         boost: power !== 1 ? { hp: power, atk: power, def: power } : undefined,
         engraving: tier.grade > 0
           ? buildEngraving(

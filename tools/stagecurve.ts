@@ -24,7 +24,7 @@ function rngInt(s: { v: number }, n: number): number {
   return Math.floor((s.v / 0x100000000) * n);
 }
 
-interface Unit { defId: string; level: number; exp: number; clean: number; eng?: ReturnType<typeof buildEngraving> }
+interface Unit { defId: string; level: number; exp: number; clean: number; skill: number; eng?: ReturnType<typeof buildEngraving> }
 
 /** 掘って出てくる可能性のある種。許可区とイベント限定は外す */
 const DIG_POOL = REVOS.filter((r) => !r.eventOnly && !r.permitOnly);
@@ -57,7 +57,7 @@ function pickParty(roster: Unit[]): Unit[] {
 function setup(units: Unit[]): TeamSetup {
   return {
     members: units.map((u, i) => ({
-      uid: `me${i}`, defId: u.defId, level: u.level, clean: u.clean, skillLevel: 1, engraving: u.eng,
+      uid: `me${i}`, defId: u.defId, level: u.level, clean: u.clean, skillLevel: u.skill, engraving: u.eng,
     })),
     order: units.map((_, i) => i),
   };
@@ -67,7 +67,7 @@ const TRIES = Number(process.argv[2] ?? 60);
 const s = { v: 20260104 };
 
 const roster: Unit[] = ['ankylosaurus', 'yutyrannus', 'shonisaurus'].map((defId) => ({
-  defId, level: 3, exp: 0, clean: 62,
+  defId, level: 3, exp: 0, clean: 62, skill: 1,
 }));
 
 /** 1段ぶん掘る。段が進むほど良い石が出る——削りの腕も上がっていく */
@@ -77,18 +77,35 @@ function dig(stage: number): void {
   const def = pool[rngInt(s, pool.length)];
   const clean = Math.min(96, 60 + stage);
   const grade = stage >= 6 ? Math.max(1, Math.min(4, Math.floor(stage / 7) + 1)) : 0;
+
+  /*
+   * すでに持っている種が出たら重ねる（mergeFossil と同じ）。技レベルが
+   * 上がり、クリーン度は高いほうを採る。
+   *
+   * 枠が埋まるまでは体を増やすほうを採る——出撃は5体なので、6体目から
+   * 先は「同じ顔がもう1体」より「いま出している1体が重くなる」ほうが効く。
+   * プレイヤーもそう選ぶ。
+   */
+  const dup = roster.find((u) => u.defId === def.id);
+  if (dup && roster.length >= 6) {
+    dup.skill = Math.min(5, dup.skill + 1);
+    dup.clean = Math.max(dup.clean, clean);
+    return;
+  }
+
   roster.push({
     defId: def.id,
     level: Math.max(1, Math.round(roster.reduce((a, u) => a + u.level, 0) / roster.length) - 1),
     exp: 0,
     clean,
+    skill: 1,
     eng: grade > 0 && rngInt(s, 100) < 45
       ? buildEngraving(ENGRAVE_PATTERNS[rngInt(s, ENGRAVE_PATTERNS.length)], grade)
       : undefined,
   });
 }
 
-console.log('段  名前              相手  Lv  初挑戦勝率  越えるまで  こちらLv  手持ち  決着秒');
+console.log('段  名前              相手  Lv  初挑戦勝率  越えるまで  こちらLv  技Lv  手持ち  決着秒');
 let totalTries = 0;
 
 for (const st of STAGES) {
@@ -129,7 +146,8 @@ for (const st of STAGES) {
   console.log(
     `${String(st.n).padStart(2)}  ${st.name.padEnd(12)}  ${String(foes.members.length).padStart(2)}体  ${String(st.level).padStart(2)}`
     + `  ${(wr * 100).toFixed(0).padStart(7)}%  ${String(tries).padStart(8)}回`
-    + `  ${String(myLv).padStart(6)}  ${String(roster.length).padStart(4)}体  ${(secs / TRIES).toFixed(0).padStart(5)}s`,
+    + `  ${String(myLv).padStart(6)}  ${(party.reduce((a, u) => a + u.skill, 0) / party.length).toFixed(1).padStart(4)}`
+    + `  ${String(roster.length).padStart(4)}体  ${(secs / TRIES).toFixed(0).padStart(5)}s`,
   );
 }
 console.log(`\n総挑戦回数 ${totalTries}（30段を越えるまで）`);

@@ -1,4 +1,5 @@
 import { REVOS, type RevosDef } from './data/revos';
+import { skillMultiplier } from './battle/simulate';
 
 /**
  * 必殺技の効き目を、その個体の数字で出す。
@@ -48,6 +49,8 @@ export interface OdStats {
   def: number;
   maxHp: number;
   level: number;
+  /** 重ねた回数。必殺の重さに乗る（Lv5 で ×1.28） */
+  skillLevel: number;
 }
 
 /**
@@ -118,12 +121,14 @@ export function odReadout(def: RevosDef, s: OdStats): OdLine[] {
   const out: OdLine[] = [];
   const id = def.od.id;
   const shape = SHAPES[id] ?? {};
+  // 重ねたぶん。威力にも、攻撃力や防御から出る量にも同じだけ乗る
+  const skill = skillMultiplier(s.skillLevel);
 
   if (def.od.power > 0) {
     // 標準の相手。同じレベルまで育った、平均的な硬さの個体
     const refDef = AVG_DEF * levelScale(s.level) * cleanMul(REF_CLEAN);
     const dr = DR_BASE / (DR_BASE + refDef);
-    let one = DMG_K * (def.od.power / 100) * s.atk * dr;
+    let one = DMG_K * (def.od.power / 100) * s.atk * dr * skill;
     if (shape.crit) one *= CRIT_MUL;
     const hits = shape.hits ?? 1;
     const total = Math.round(one * hits);
@@ -140,13 +145,13 @@ export function odReadout(def: RevosDef, s: OdStats): OdLine[] {
   }
 
   const atkOne = FROM_ATK[id];
-  if (atkOne) out.push({ label: atkOne.label, value: Math.round(s.atk * atkOne.k).toLocaleString('ja-JP') });
+  if (atkOne) out.push({ label: atkOne.label, value: Math.round(s.atk * atkOne.k * skill).toLocaleString('ja-JP') });
 
   const defOne = FROM_DEF[id];
-  if (defOne) out.push({ label: defOne.label, value: Math.round(s.def * defOne.k).toLocaleString('ja-JP') });
+  if (defOne) out.push({ label: defOne.label, value: Math.round(s.def * defOne.k * skill).toLocaleString('ja-JP') });
 
   const hpOne = FROM_HP[id];
-  if (hpOne) out.push({ label: hpOne.label, value: Math.round(s.maxHp * hpOne.k).toLocaleString('ja-JP') });
+  if (hpOne) out.push({ label: hpOne.label, value: Math.round(s.maxHp * hpOne.k * skill).toLocaleString('ja-JP') });
 
   // 技ごとの、式に乗らない取り返し
   if (id === 'harvest') out.push({ label: '自分へ還す', value: '与えたダメージの 28%' });

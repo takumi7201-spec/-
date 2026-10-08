@@ -242,6 +242,23 @@ const HEADWIND_SEC = 18;
 const HEADWIND_DEALT = 0.12;
 const HEADWIND_SPD = 0.08;
 
+/**
+ * 技レベル。同じ種を重ねるたびに 1 上がり、5 で止まる。
+ *
+ * これまで Fighter に載っているだけで、戦闘では一度も読まれていなかった
+ * ——重ねても何も起きないのに、一覧には「技Lv3」と出ていた。必殺の重さに
+ * 繋ぐ。倍率を掛けるのはダメージ・回復・シールドの量だけで、技が配る
+ * 強化の割合（攻撃 +20% など）は動かさない——説明文に書いてある数字が
+ * 個体ごとに変わると、読んで比べられなくなる。
+ */
+const SKILL_STEP = 0.07;
+const SKILL_MAX = 5;
+
+/** 技レベルぶんの倍率。Lv1 で 1.00、Lv5 で 1.28 */
+export function skillMultiplier(level: number): number {
+  return 1 + SKILL_STEP * (clamp(level, 1, SKILL_MAX) - 1);
+}
+
 /** 刻印の無い個体ぶん。毎回 0 のオブジェクトを作らない */
 const NO_ENGRAVING = { atk: 0, def: 0, hp: 0, spd: 0 };
 
@@ -1016,7 +1033,15 @@ export class BattleSim {
   }
 
   private performOd(actor: Fighter, picked: Fighter | null, ev: BattleEvent[]): void {
-    const mod = 1 + 0.35 * (clamp(actor.od, 100, 150) - 100) / 50;
+    /*
+     * 技の重さに掛かる2つ。
+     *   mod   … 溜めたぶん（100→150 で ×1.35）。技レベルも込みで、
+     *           威力と「mod を掛けている量」に乗る
+     *   skill … 重ねたぶんだけ（技Lv5 で ×1.28）。盾のように、もともと
+     *           溜め具合で動かない量にはこちらだけを掛ける
+     */
+    const skill = skillMultiplier(actor.skillLevel);
+    const mod = (1 + 0.35 * (clamp(actor.od, 100, 150) - 100) / 50) * skill;
     const power = odPower(actor) * mod;
     const enemies = this.alive(other(actor.side));
     const allies = this.alive(actor.side);
@@ -1054,7 +1079,7 @@ export class BattleSim {
         break;
       }
       case 'rockaegis': {
-        const amount = Math.round(actor.def * 3.0 * (1 + this.modSum(actor, 'def')));
+        const amount = Math.round(actor.def * 3.0 * (1 + this.modSum(actor, 'def')) * skill);
         for (const a of allies) {
           a.shield = { amount, turns: 4 };
           ev.push({ t: 'shield', uid: a.uid, amount });
@@ -1267,7 +1292,7 @@ export class BattleSim {
         break;
       }
       case 'shellveil': {
-        const amount = Math.round(actor.def * 2.2 * (1 + this.modSum(actor, 'def')));
+        const amount = Math.round(actor.def * 2.2 * (1 + this.modSum(actor, 'def')) * skill);
         for (const a of allies) {
           const v = a === actor ? amount * 2 : amount;
           a.shield = { amount: v, turns: 4 };
