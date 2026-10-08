@@ -320,12 +320,19 @@ export class DetailScreen extends Screen {
         box.appendChild(h('div', { class: 'det-od-row' },
           h('span', { class: 'det-od-label', text: line.label }),
           h('span', { class: 'det-od-value num', text: line.value }),
+          // 能力の「1,586 +197」と同じ並び。合計を先に置き、重ねたぶんを後ろに添える
+          line.skillAdd ? h('span', { class: 'det-od-add num', text: `+${line.skillAdd.toLocaleString('ja-JP')}` }) : null,
           line.note ? h('span', { class: 'det-od-note', text: line.note }) : null,
         ));
       }
       // 脚注。何に当てた値かと、溜めたぶんの伸びしろ。ダメージの無い技に
       // 「防御◯の相手に」と書いても、当てる相手が居ない
       const hitsSomething = lines.some((x) => x.label.startsWith('ダメージ'));
+      if (lines.some((x) => x.skillAdd)) {
+        box.appendChild(h('div', { class: 'det-od-legend' },
+          h('i', null), `技Lv${u?.skillLevel ?? 1} ぶん`,
+        ));
+      }
       box.appendChild(h('div', { class: 'det-od-foot' },
         `Lv${lv}${u ? `・技Lv${u.skillLevel}` : '（素の値）'}で計算。`
         + (hitsSomething ? `同じLvの標準的な相手（防御 ${refDefenderDef(lv)}）に通る量。` : '')

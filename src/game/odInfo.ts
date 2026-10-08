@@ -39,6 +39,12 @@ const REF_CLEAN = 70;
 export interface OdLine {
   label: string;
   value: string;
+  /**
+   * 技レベルで積み上がったぶん。能力の「+197」と同じ読み方をさせる——
+   * 合計だけ出すと、重ねた手間がどこへ行ったのか分からない。
+   * 技Lv1 なら 0 で、画面には出さない。
+   */
+  skillAdd?: number;
   /** 補足。条件つきで伸びるぶんなど */
   note?: string;
 }
@@ -124,6 +130,17 @@ export function odReadout(def: RevosDef, s: OdStats): OdLine[] {
   // 重ねたぶん。威力にも、攻撃力や防御から出る量にも同じだけ乗る
   const skill = skillMultiplier(s.skillLevel);
 
+  /** 1行ぶん。技レベルを外した値との差を、上積みとして添える */
+  const line = (label: string, raw: number, note?: string): OdLine => {
+    const total = Math.round(raw);
+    return {
+      label,
+      value: total.toLocaleString('ja-JP'),
+      skillAdd: total - Math.round(raw / skill),
+      note,
+    };
+  };
+
   if (def.od.power > 0) {
     // 標準の相手。同じレベルまで育った、平均的な硬さの個体
     const refDef = AVG_DEF * levelScale(s.level) * cleanMul(REF_CLEAN);
@@ -131,27 +148,27 @@ export function odReadout(def: RevosDef, s: OdStats): OdLine[] {
     let one = DMG_K * (def.od.power / 100) * s.atk * dr * skill;
     if (shape.crit) one *= CRIT_MUL;
     const hits = shape.hits ?? 1;
-    const total = Math.round(one * hits);
+    const total = one * hits;
 
-    out.push({
-      label: shape.all ? 'ダメージ（1体あたり）' : hits > 1 ? `ダメージ ${hits}発の合計` : 'ダメージ',
-      value: total.toLocaleString('ja-JP'),
+    out.push(line(
+      shape.all ? 'ダメージ（1体あたり）' : hits > 1 ? `ダメージ ${hits}発の合計` : 'ダメージ',
+      total,
       // 条件つきで伸びるぶん。「◯◯なら」は条件文の側に書いてあるので、
       // ここでは矢印でつなぐだけにする
-      note: shape.upTo
+      shape.upTo
         ? `${shape.upTo[1]} → ${Math.round(total * shape.upTo[0]).toLocaleString('ja-JP')}`
         : undefined,
-    });
+    ));
   }
 
   const atkOne = FROM_ATK[id];
-  if (atkOne) out.push({ label: atkOne.label, value: Math.round(s.atk * atkOne.k * skill).toLocaleString('ja-JP') });
+  if (atkOne) out.push(line(atkOne.label, s.atk * atkOne.k * skill));
 
   const defOne = FROM_DEF[id];
-  if (defOne) out.push({ label: defOne.label, value: Math.round(s.def * defOne.k * skill).toLocaleString('ja-JP') });
+  if (defOne) out.push(line(defOne.label, s.def * defOne.k * skill));
 
   const hpOne = FROM_HP[id];
-  if (hpOne) out.push({ label: hpOne.label, value: Math.round(s.maxHp * hpOne.k * skill).toLocaleString('ja-JP') });
+  if (hpOne) out.push(line(hpOne.label, s.maxHp * hpOne.k * skill));
 
   // 技ごとの、式に乗らない取り返し
   if (id === 'harvest') out.push({ label: '自分へ還す', value: '与えたダメージの 28%' });

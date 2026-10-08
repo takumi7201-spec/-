@@ -1911,10 +1911,25 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
 .det-od-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .det-od-row + .det-od-row { margin-top: 4px; }
 .det-od-label { flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--ink-soft); }
-.det-od-value { flex: 0 0 auto; font-size: 15px; font-weight: 900; color: #7a4f08; }
+.det-od-value { flex: 0 0 auto; margin-left: auto; font-size: 15px; font-weight: 900; color: #7a4f08; }
+/* 技レベルで積み上がったぶん。能力の帯に出る「+197」と同じ読み方をさせる */
+.det-od-add {
+  flex: 0 0 auto;
+  font-size: 11px; font-weight: 900;
+  color: var(--pen-green);
+}
 .det-od-note {
   flex: 0 0 100%;
   font-size: 10px; color: var(--ink-faint);
+}
+.det-od-legend {
+  margin-top: 5px;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: var(--ink-faint);
+}
+.det-od-legend i {
+  width: 16px; height: 4px; border-radius: 2px;
+  background: var(--pen-green);
 }
 .det-od-foot {
   margin-top: 6px; padding-top: 5px;
