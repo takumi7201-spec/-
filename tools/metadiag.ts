@@ -8,8 +8,11 @@
  *   npm run metadiag -- <編成A のid,…> <編成B のid,…> [戦数]
  */
 import { BattleSim } from '../src/game/battle/simulate.ts';
-import { REVOS, getRevos } from '../src/game/data/revos.ts';
+import { REVOS, getRevos, registerRevos } from '../src/game/data/revos.ts';
+import { EXP_DEFS } from './expDefs.ts';
 import type { TeamSetup, BattleEvent } from '../src/game/battle/types.ts';
+
+registerRevos(EXP_DEFS);
 
 const LEVEL = 20;
 const CLEAN = 75;

@@ -1018,6 +1018,8 @@ export class BattleSim {
       // 帆そのものも焼く。支援役だが、自分の一撃で火種を作れないと働き始められない
       if (p === 'sailheat' && this.rng.chance(0.45)) this.applyBurn(target, ev, actor.uid);
       if (p === 'venomgland' && this.rng.chance(0.45)) this.applyPoison(target, ev, actor.uid);
+      // 「散毒」（試作）: 確率を挟まず必ず乗る
+      if (p === 'venomspray' && this.rng.chance(0.75)) this.applyPoison(target, ev, actor.uid);
       // 「原始の神経」: 当てた相手の平衡を狂わせる
       if (p === 'firstnerve' && this.rng.chance(0.5)) this.applyDizzy(target, ev, actor.uid);
       // 「断牙」: 牙が通った傷は塞がらない。自分で血を流させ、自分でそこを衝く
@@ -1366,6 +1368,49 @@ export class BattleSim {
         if (t.alive) this.applyBleed(t, ev, actor.uid, 3);
         break;
       }
+      case 'miregift': {
+        // 味方に板を配りつつ、向かいへ毒を1つずつ置く。長引くほど効く側に立つ
+        const amount = Math.round(actor.def * 2.4 * (1 + this.modSum(actor, 'def')) * skill);
+        for (const a of allies) {
+          a.shield = { amount, turns: 4 };
+          ev.push({ t: 'shield', uid: a.uid, amount });
+        }
+        for (const e of enemies) this.applyPoison(e, ev, actor.uid);
+        break;
+      }
+      case 'miasma': {
+        for (const e of enemies) {
+          this.dealDamage(actor, e, power, ev);
+          if (!e.alive) continue;
+          this.applyPoison(e, ev, actor.uid);
+          this.applyPoison(e, ev, actor.uid);
+        }
+        break;
+      }
+      case 'venomfang': {
+        const t = single(); if (!t) break;
+        this.dealDamage(actor, t, power, ev);
+        for (let i = 0; i < 3 && t.alive; i++) this.applyPoison(t, ev, actor.uid);
+        break;
+      }
+      case 'toxinburst': {
+        // 溜まった毒を一度に出す。消すので、撒き直す手が要る
+        for (const e of enemies) {
+          this.dealDamage(actor, e, power, ev);
+          if (!e.alive) continue;
+          const st = e.statuses.find((x) => x.kind === 'poison');
+          if (!st) continue;
+          const stacks = Math.round(st.value / 0.03);
+          e.statuses = e.statuses.filter((x) => x !== st);
+          const dmg = Math.max(1, Math.round(e.maxHp * 0.07 * stacks));
+          e.hp = Math.max(0, e.hp - dmg);
+          e.taken += dmg;
+          actor.dealt += dmg;
+          ev.push({ t: 'burst', uid: e.uid, amount: dmg, tokens: stacks, hp: e.hp });
+          if (e.hp === 0) this.kill(e, actor, ev);
+        }
+        break;
+      }
       case 'pierceveil': {
         // 肩代わりを無視して、奥の1体を直接撃つ
         const back = enemies.filter((e) => isBackliner(e.role));
@@ -1560,6 +1605,9 @@ export class BattleSim {
       && this.alive(atk.side).some((a) => a.passive === 'compoundeye')) buff *= 1.15;
     // 「群れの走り」: 数が力になる。独りになれば、ただの小型獣脚類に戻る
     if (pa === 'packrun') buff *= 1 + 0.04 * Math.min(4, this.alive(atk.side).length - 1);
+    // 「毒の読み」（試作）: 毒がまわっている相手は、味方全員にとって狙い目
+    if (def.statuses.some((st) => st.kind === 'poison')
+      && this.alive(atk.side).some((a) => a.passive === 'virulent')) buff *= 1.25;
     // 「先駆けの風」: 開幕の一押し。秒で切れる
     if (this.clockV < HEADWIND_SEC && atk.spd >= this.headwind[atk.side]) buff *= 1 + HEADWIND_DEALT;
     // 「帆の放熱」: 味方の誰かが帆を広げている間、火傷した敵はよく燃える
@@ -1644,6 +1692,10 @@ export class BattleSim {
     // 一度でも打たれた相手は覚えておく（原初の捕食者が見る）
     target.stacks.hit = 1;
 
+    // 「毒沼」（試作）: 踏み込んだ側が毒をもらう。毒が回った相手の手は鈍る
+    if (target.passive === 'venomire' && atk !== target && atk.alive && this.rng.chance(0.5)) {
+      this.applyPoison(atk, ev, target.uid);
+    }
     // 「苛立たせる」: 殴ってきた相手の手元を狂わせる
     if (target.passive === 'irritate' && atk !== target && atk.alive) {
       const st = target.stacks[`irr${atk.uid}`] ?? 0;
@@ -1813,12 +1865,24 @@ export class BattleSim {
    * 攻撃力に一切依存しないので、硬い相手ほど殴るより効く。
    */
   private applyPoison(target: Fighter, ev: BattleEvent[], source: string): void {
+    /*
+     * 「濃縮」（試作）: 撒いた側に居れば、1つぶんも重なりの上限も上がる。
+     *
+     * 毒は最大体力の割合で削るので、防御にも相性にも、積み上げた倍率にも
+     * 触れない——倍率を配る支援が飽和して効かないこの盤面で、濃さを
+     * 変える側だけは素通りで効く。
+     */
+    const by = this.byUid.get(source);
+    const thick = by && this.alive(by.side).some((a) => a.passive === 'concentrate');
+    const per = thick ? 0.05 : POISON_PER_STACK;
+    const cap = thick ? 4 * 0.05 : POISON_MAX_STACK * POISON_PER_STACK;
+
     const existing = target.statuses.find((s) => s.kind === 'poison');
     if (existing) {
-      existing.value = Math.min(POISON_MAX_STACK * POISON_PER_STACK, existing.value + POISON_PER_STACK);
+      existing.value = Math.min(cap, existing.value + per);
       existing.turns = POISON_TURNS;
     } else {
-      target.statuses.push({ kind: 'poison', turns: POISON_TURNS, value: POISON_PER_STACK, source });
+      target.statuses.push({ kind: 'poison', turns: POISON_TURNS, value: Math.min(cap, per), source });
     }
     ev.push({ t: 'status', uid: target.uid, kind: 'poison', applied: true });
   }

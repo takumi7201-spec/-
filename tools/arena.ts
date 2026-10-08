@@ -10,8 +10,11 @@
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import { cpus } from 'node:os';
 import { BattleSim } from '../src/game/battle/simulate.ts';
-import { REVOS, getRevos } from '../src/game/data/revos.ts';
+import { REVOS, getRevos, registerRevos } from '../src/game/data/revos.ts';
+import { EXP_DEFS } from './expDefs.ts';
 import type { TeamSetup } from '../src/game/battle/types.ts';
+
+registerRevos(EXP_DEFS);
 
 const LEVEL = 20;
 const CLEAN = 75;
@@ -50,13 +53,20 @@ const NAMED: [string, string[]][] = [
   ['崩し（硬いのを割る）', ['irritator', 'archelon', 'kronosaurus', 'spinosaurus', 'carnotaurus']],
   ['星5ならべ', ['tylosaurus', 'pliosaurus-funkei', 'quetzalcoatlus', 'tyrannosaurus-sue', 'brachiosaurus']],
   ['火力だけ', ['kronosaurus', 'diatryma', 'iguanodon', 'therizinosaurus', 'spinosaurus']],
+  // 毒を主軸にできるか。殻を3通り変えて、どれかが上位に届くかを見る
+  ['毒（沼＋撒）', ['elasmosaurus', 'exp-mire', 'exp-spray', 'shonisaurus', 'smilodon']],
+  ['毒（沼のみ）', ['elasmosaurus', 'exp-mire', 'shonisaurus', 'smilodon', 'dimetrodon']],
+  ['毒×速攻', ['elasmosaurus', 'exp-spray', 'anomalocaris', 'carnotaurus', 'microraptor']],
 ];
 
 let rs = 7654321;
 const rnd = (): number => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 0x100000000; };
+/** 野良には試作を混ぜない。測る側の編成にだけ置く */
+const REAL = REVOS.filter((r) => !r.id.startsWith('exp-'));
+
 function randomComp(): string[] {
   const set = new Set<string>();
-  while (set.size < TEAM) set.add(REVOS[Math.floor(rnd() * REVOS.length)].id);
+  while (set.size < TEAM) set.add(REAL[Math.floor(rnd() * REAL.length)].id);
   return [...set];
 }
 

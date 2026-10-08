@@ -25,7 +25,9 @@ export type PassiveId =
   | 'primordial' | 'carapace' | 'irritate' | 'jetwake' | 'packrun'
   | 'sailheat' | 'unreadable' | 'cannibal' | 'fourwings'
   | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite'
-  | 'vetulibody' | 'headwind' | 'truestrike';
+  | 'vetulibody' | 'headwind' | 'truestrike'
+  // 試作（tools/expDefs.ts だけが使う）
+  | 'venomspray' | 'concentrate' | 'virulent' | 'venomire';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
@@ -38,7 +40,8 @@ export type OdId =
   | 'cambrianjaw' | 'shellveil' | 'falsejaw' | 'straightbore' | 'boundfang'
   | 'heatshare' | 'tangledspiral' | 'bonesever' | 'glideguard'
   | 'throatbite' | 'nestguard' | 'nervejam' | 'trilobeshield' | 'twinsever'
-  | 'unknownancestor' | 'firstgust' | 'pierceveil';
+  | 'unknownancestor' | 'firstgust' | 'pierceveil'
+  | 'miasma' | 'venomfang' | 'toxinburst' | 'miregift';
 
 export interface RevosDef {
   id: string;
