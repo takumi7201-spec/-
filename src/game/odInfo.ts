@@ -109,6 +109,7 @@ const FROM_ATK: Record<string, { k: number; label: string }> = {
 const FROM_DEF: Record<string, { k: number; label: string }> = {
   rockaegis: { k: 3.0, label: 'シールド（味方全体）' },
   shellveil: { k: 2.2, label: 'シールド（味方全体／自分は2倍）' },
+  miregift: { k: 2.4, label: 'シールド（味方全体）' },
 };
 
 /** 最大体力に掛かるもの */

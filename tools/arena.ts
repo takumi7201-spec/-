@@ -54,9 +54,8 @@ const NAMED: [string, string[]][] = [
   ['星5ならべ', ['tylosaurus', 'pliosaurus-funkei', 'quetzalcoatlus', 'tyrannosaurus-sue', 'brachiosaurus']],
   ['火力だけ', ['kronosaurus', 'diatryma', 'iguanodon', 'therizinosaurus', 'spinosaurus']],
   // 毒を主軸にできるか。殻を3通り変えて、どれかが上位に届くかを見る
-  ['毒（沼＋撒）', ['elasmosaurus', 'exp-mire', 'exp-spray', 'shonisaurus', 'smilodon']],
-  ['毒（沼のみ）', ['elasmosaurus', 'exp-mire', 'shonisaurus', 'smilodon', 'dimetrodon']],
-  ['毒×速攻', ['elasmosaurus', 'exp-spray', 'anomalocaris', 'carnotaurus', 'microraptor']],
+  ['毒（沼）', ['elasmosaurus', 'jobaria', 'shonisaurus', 'smilodon', 'dimetrodon']],
+  ['毒×速攻', ['elasmosaurus', 'jobaria', 'anomalocaris', 'carnotaurus', 'microraptor']],
 ];
 
 let rs = 7654321;

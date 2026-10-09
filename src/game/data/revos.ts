@@ -25,9 +25,7 @@ export type PassiveId =
   | 'primordial' | 'carapace' | 'irritate' | 'jetwake' | 'packrun'
   | 'sailheat' | 'unreadable' | 'cannibal' | 'fourwings'
   | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite'
-  | 'vetulibody' | 'headwind' | 'truestrike'
-  // 試作（tools/expDefs.ts だけが使う）
-  | 'venomspray' | 'concentrate' | 'virulent' | 'venomire';
+  | 'vetulibody' | 'headwind' | 'truestrike' | 'venomire';
 
 export type OdId =
   | 'faultcrush' | 'flamevolley' | 'vortexfang' | 'galerend' | 'rockaegis'
@@ -40,8 +38,7 @@ export type OdId =
   | 'cambrianjaw' | 'shellveil' | 'falsejaw' | 'straightbore' | 'boundfang'
   | 'heatshare' | 'tangledspiral' | 'bonesever' | 'glideguard'
   | 'throatbite' | 'nestguard' | 'nervejam' | 'trilobeshield' | 'twinsever'
-  | 'unknownancestor' | 'firstgust' | 'pierceveil'
-  | 'miasma' | 'venomfang' | 'toxinburst' | 'miregift';
+  | 'unknownancestor' | 'firstgust' | 'pierceveil' | 'miregift';
 
 export interface RevosDef {
   id: string;
@@ -748,6 +745,25 @@ export const REVOS: RevosDef[] = [
     build: { archetype: 'theropod', seed: 4471, bulk: 1.02, scale: 1.0, sail: true },
     habitat: ['canyon', 'emberfield'], rarity: 4,
     flavor: '腰にひとつだけ隆起を背負う。前を塞ぐものを見ずに、その後ろだけを見ている。',
+  },
+  {
+    id: 'jobaria', name: 'ジョバリア', short: 'ジョバ', en: 'Jobaria',
+    element: 'aqua', role: 'Guardian',
+    // 毒は最大体力の割合で削る＝防御も相性も素通りする。触れる側の数字は
+    // 一段低く置く——返す毒を確率にしても、壁として立つ時間ぶんだけ積み上がる
+    hp: 1500, atk: 98, def: 130, spd: 86, basicPower: 84,
+    passive: {
+      id: 'venomire', name: '毒沼',
+      desc: '自分を攻撃した相手に 50% で毒を1つ重ねる。',
+    },
+    od: {
+      id: 'miregift', name: '沼を分ける',
+      desc: '味方全体にシールド ＋ 敵全体に毒を1つ重ねる。', power: 0,
+    },
+    sprite: 'jobaria',
+    build: { archetype: 'sauropod', seed: 3318, bulk: 1.16, scale: 1.06 },
+    habitat: ['tidehollow', 'canyon'], rarity: 4,
+    flavor: '沼の縁を踏み固めて歩く。沈んだ足が持ち上げる泥には、底で溜まっていたものが混ざっている。',
   },
 ];
 
