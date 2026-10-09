@@ -64,7 +64,12 @@ function setup(units: Unit[]): TeamSetup {
 }
 
 const TRIES = Number(process.argv[2] ?? 60);
-const s = { v: 20260104 };
+/*
+ * 掘りの種。1本の試行だけで段の善し悪しを決めない——種を1つ足すだけで
+ * 抽選が全部ずれ、同じ段が 2% にも 33% にもなる。壁かどうかは、種を
+ * 変えて何本か回して、どの本でも壁になっているかで見る。
+ */
+const s = { v: Number(process.argv[3] ?? 20260104) };
 
 const roster: Unit[] = ['ankylosaurus', 'yutyrannus', 'shonisaurus'].map((defId) => ({
   defId, level: 3, exp: 0, clean: 62, skill: 1,
