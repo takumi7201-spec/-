@@ -31,6 +31,16 @@ export interface FossilBlock {
   rarity: number;
   boneTotal: number;
   rockTotal: number;
+  /**
+   * 骨を覆っている岩。grid と同じ並びで 1 が立つ。
+   *
+   * 仕上がりを数えるのはこれだけ。母岩を最後の一粒まで砕く作業ではなく、
+   * 「骨の上に載っているぶんを退ける」作業にする——16×16×10 の塊は
+   * 1800 粒あり、骨は 30〜130 粒しかない。全部削らせると、作業の9割は
+   * 化石と関係のない岩を叩いている時間になる。
+   */
+  cover: Uint8Array;
+  coverTotal: number;
 }
 
 /** 骨のボクセル群を 18×18×14 のブロックに収まるよう縮約する */
@@ -134,7 +144,42 @@ export function buildFossilBlock(defId: string, rarity: number, seed: number): F
       }
 
   markSkin(grid);
-  return { grid, defId, rarity, boneTotal, rockTotal };
+  const { cover, coverTotal } = markCover(grid);
+  return { grid, defId, rarity, boneTotal, rockTotal, cover, coverTotal };
+}
+
+/**
+ * 骨の真上・真横・真下に載っている岩に印を付ける。
+ *
+ * 骨の粒ごとに6方向へ外まで線を引き、通り道の岩を拾う。骨の裏に回り込んだ
+ * ぶんも拾うので、どの面から覗いても化石が見える状態が「削り終わり」になる。
+ * 別の骨に当たったらそこで止める——奥の骨のために、手前の骨を削る形にはしない。
+ */
+function markCover(grid: VoxelGrid): { cover: Uint8Array; coverTotal: number } {
+  const cover = new Uint8Array(SIZE.x * SIZE.y * SIZE.z);
+  const at = (x: number, y: number, z: number): number => (z * SIZE.y + y) * SIZE.x + x;
+  const dirs: [number, number, number][] = [
+    [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+  ];
+  let total = 0;
+  for (let z = 0; z < SIZE.z; z++)
+    for (let y = 0; y < SIZE.y; y++)
+      for (let x = 0; x < SIZE.x; x++) {
+        if (grid.get(x, y, z) !== F.BONE) continue;
+        for (const [dx, dy, dz] of dirs) {
+          let cx = x + dx, cy = y + dy, cz = z + dz;
+          while (cx >= 0 && cy >= 0 && cz >= 0 && cx < SIZE.x && cy < SIZE.y && cz < SIZE.z) {
+            const v = grid.get(cx, cy, cz);
+            if (v === F.BONE) break;
+            if (v !== F.EMPTY) {
+              const i = at(cx, cy, cz);
+              if (cover[i] === 0) { cover[i] = 1; total++; }
+            }
+            cx += dx; cy += dy; cz += dz;
+          }
+        }
+      }
+  return { cover, coverTotal: total };
 }
 
 /** 骨に接する軟岩を SKIN に変える。露出間近を色で伝えるための層 */
@@ -172,7 +217,20 @@ export function cleanCap(boneDamage: number): number {
 }
 
 /**
- * C = min(88·Rrock + 12·Rtime, 100 − 3·Dbone)
+ * 余らせていれば満点になる残り時間の割合。
+ *
+ * 以前は「残り時間 ÷ 制限時間」をそのまま 12 点に掛けていた。削るには
+ * 時間が要るので、この値が 1 になることはない——つまり 100 点はどう
+ * 削っても出ない数字だった。ここまで余らせたら時間の満点、という線を
+ * 引いておく。
+ */
+const TIME_FULL = 0.3;
+
+/**
+ * C = min(88·Rcover + 12·Rtime, 100 − 3·Dbone)
+ *
+ * Rcover は「骨を覆っていた岩のうち、どれだけ退けたか」。母岩を最後まで
+ * 砕く必要はない——削り終わりは、化石がどの面からも見えている状態。
  *
  * 損傷は点を引くのではなく、上限を下げる。
  *
@@ -182,12 +240,13 @@ export function cleanCap(boneDamage: number): number {
  * 上限として効かせれば、損傷ぶんの天井まではこれまで通り作業で埋められる。
  */
 export function scoreClean(
-  removedRock: number, rockTotal: number,
+  removedCover: number, coverTotal: number,
   remainTime: number, limitTime: number,
   boneDamage: number,
 ): CleanScore {
-  const rockRatio = rockTotal > 0 ? Math.min(1, removedRock / rockTotal) : 1;
-  const timeRatio = limitTime > 0 ? Math.max(0, Math.min(1, remainTime / limitTime)) : 0;
+  const rockRatio = coverTotal > 0 ? Math.min(1, removedCover / coverTotal) : 1;
+  const left = limitTime > 0 ? Math.max(0, remainTime / limitTime) : 0;
+  const timeRatio = Math.min(1, left / TIME_FULL);
   const work = 88 * rockRatio + 12 * timeRatio;
   const cap = cleanCap(boneDamage);
   const clean = Math.max(0, Math.min(cap, Math.round(work)));

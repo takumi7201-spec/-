@@ -87,6 +87,8 @@ export class CleanScene {
   block!: FossilBlock;
   tool: ToolId = 'pick';
   removedRock = 0;
+  /** 骨を覆っていた岩のうち、退けた数。仕上がりはこちらで数える */
+  removedCover = 0;
   boneDamage = 0;
 
   private root = new THREE.Group();
@@ -151,12 +153,13 @@ export class CleanScene {
   load(defId: string, rarity: number, seed: number): void {
     this.block = buildFossilBlock(defId, rarity, seed);
     this.removedRock = 0;
+    this.removedCover = 0;
     this.boneDamage = 0;
     this.yaw = 0;
     this.pitch = -0.12;
     this.debris.clear();
     this.rebuild();
-    this.events.onProgress?.(0, this.block.rockTotal);
+    this.events.onProgress?.(0, this.block.coverTotal);
   }
 
   private rebuild(): void {
@@ -189,7 +192,10 @@ export class CleanScene {
 
   rotate(dx: number, dy: number): void {
     this.yaw += dx;
-    this.pitch = THREE.MathUtils.clamp(this.pitch + dy, -1.1, 1.1);
+    // 真上と真下の近くまで倒せるようにする。削る対象が「骨を覆っている岩」に
+    // なったので、天面と底面の列にも手を入れる必要がある——±63° では
+    // 底の中央が画面の縁に張り付いたままで狙えなかった
+    this.pitch = THREE.MathUtils.clamp(this.pitch + dy, -1.4, 1.4);
     this.spin = 0;
   }
 
@@ -287,13 +293,16 @@ export class CleanScene {
 
           g.set(x, y, z, F.EMPTY);
           removed++;
+          // 骨の上に載っていた粒だけを数える。母岩のどこを砕いても点にはならない
+          const ci = (z * SIZE.y + y) * SIZE.x + x;
+          if (this.block.cover[ci] === 1) { this.block.cover[ci] = 2; this.removedCover++; }
         }
 
     if (removed > 0 || boneHit > 0) {
       markSkin(g);
       this.dirty = true;
       this.removedRock += removed;
-      this.events.onProgress?.(this.removedRock, this.block.rockTotal);
+      this.events.onProgress?.(this.removedCover, this.block.coverTotal);
     }
 
     if (boneHit > 0) {
@@ -333,7 +342,7 @@ export class CleanScene {
   }
 
   score(remainTime: number, limitTime: number): CleanScore {
-    return scoreClean(this.removedRock, this.block.rockTotal, remainTime, limitTime, this.boneDamage);
+    return scoreClean(this.removedCover, this.block.coverTotal, remainTime, limitTime, this.boneDamage);
   }
 
   update(dt: number, autoSpin: boolean): void {

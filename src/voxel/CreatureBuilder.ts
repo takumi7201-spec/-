@@ -593,16 +593,39 @@ export function creatureToObject3D(
 }
 
 /** 骨だけを残した化石データ。図鑑の完成形と掘り出す化石が必ず一致する */
+/**
+ * 生きた姿から、地中に残るぶんだけを取り出す。
+ *
+ * 外側の一枚（皮膚）を剥いで、中身を骨として残す。爪・牙・角・板は
+ * 一枚きりの薄い作りなので、剥くと何も残らない——こちらは厚みを見ずに
+ * そのまま拾う。
+ *
+ * 以前は「骨質のスロット」だけを拾っていた。爪と角しか残らないので、
+ * 竜脚類のように爪も角も持たない種では化石が1つも出来ず、母岩だけの
+ * ブロックを削らせていた（ジョバリア・ブラキオサウルスが該当）。
+ */
 export function extractFossil(model: CreatureModel): Map<string, VoxelGrid> {
   const out = new Map<string, VoxelGrid>();
   for (const [name, p] of model.parts) {
-    const g = p.grid.clone();
-    for (let i = 0; i < g.data.length; i++) {
-      const v = g.data[i];
-      if (v === 0) continue;
-      // 外殻（皮膚）は落とし、骨質のスロットと内部構造だけを残す
-      g.data[i] = BONE_SLOTS.has(v) ? SLOT.ACCENT : SLOT.EMPTY;
-    }
+    const src = p.grid;
+    const g = src.clone();
+    for (let z = 0; z < src.sz; z++)
+      for (let y = 0; y < src.sy; y++)
+        for (let x = 0; x < src.sx; x++) {
+          const v = src.get(x, y, z);
+          if (v === 0) continue;
+          if (BONE_SLOTS.has(v)) { g.set(x, y, z, SLOT.ACCENT); continue; }
+          // 6方向のうちいくつが埋まっているか。縁を1枚ぶん落として芯を残す。
+          // 全周を条件にすると細い脚や尾の先が丸ごと消えるので、5面で通す
+          let around = 0;
+          if (src.isSolid(x + 1, y, z)) around++;
+          if (src.isSolid(x - 1, y, z)) around++;
+          if (src.isSolid(x, y + 1, z)) around++;
+          if (src.isSolid(x, y - 1, z)) around++;
+          if (src.isSolid(x, y, z + 1)) around++;
+          if (src.isSolid(x, y, z - 1)) around++;
+          g.set(x, y, z, around >= 5 ? SLOT.ACCENT : SLOT.EMPTY);
+        }
     out.set(name, g);
   }
   return out;

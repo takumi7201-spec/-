@@ -36,6 +36,7 @@ export class CleanScreen extends Screen {
   private limit = 60;
   /** 生のクリーン度を出すための、直近の除去量 */
   private removed = 0;
+  /** 骨を覆っていた岩の数。進み具合も仕上がりもこれが分母 */
   private rockTotal = 0;
   private shownClean = -1;
   private running = false;

@@ -53,8 +53,11 @@ export function autoCleanToNext(uses: number): number {
 function ratios(level: number): { rock: number; time: number } {
   const t = (level - 1) / (AUTO_MAX_LEVEL - 1);
   // 始まりを C ランク（50以上）に置く。開くのが第15段なので、最初の1回が
-  // D ランクだと、手持ちより悪い石しか出てこない機能になってしまう
-  return { rock: 0.62 + 0.33 * t, time: 0.22 + 0.18 * t };
+  // D ランクだと、手持ちより悪い石しか出てこない機能になってしまう。
+  //
+  // 時間の側は 0.3 で満点になる（scoreClean の TIME_FULL）。任せると
+  // 手際では上限に届かない範囲に収めてある——S は自分の手でしか出ない
+  return { rock: 0.60 + 0.27 * t, time: 0.10 + 0.19 * t };
 }
 
 /** その腕前で見込める仕上がり（ブレの中央）。画面の予告に使う */
