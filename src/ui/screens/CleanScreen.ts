@@ -248,13 +248,14 @@ export class CleanScreen extends Screen {
     // 損傷は溜まる側の帯で出す。減っていく点だと「残り」に見えて、
     // 削ってはいけないものを削っている自覚が出ない
     const d = this.scene.boneDamage;
-    // 帯は上限が0になる損傷量（100/3）を満タンとする
-    this.boneEl.style.width = `${Math.min(100, (d / (100 / 3)) * 100)}%`;
+    // 帯は「化石をどれだけ削ってしまったか」そのまま。満タン＝化石が丸ごと傷
+    this.boneEl.style.width = `${Math.min(100, d * 100)}%`;
     // 損傷は点を引かず上限を下げる。下がった天井を除去率の帯の上に出す
     const cap = cleanCap(d);
     this.capEl.style.left = `${cap}%`;
     this.capEl.hidden = cap >= 100;
-    this.boneNumEl.textContent = d > 0 ? `−${d.toFixed(1)}` : '0.0';
+    // 数字は「下がった天井」。傷の粒数より、何点失ったかのほうが読める
+    this.boneNumEl.textContent = cap < 100 ? `−${100 - cap}` : '0';
     this.boneNumEl.classList.toggle('is-bad', d > 0);
     // 天井が下がればクリーン度も頭を打つ。同じ操作で両方が動く
     this.renderClean();

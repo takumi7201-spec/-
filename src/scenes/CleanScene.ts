@@ -24,8 +24,16 @@ export interface ToolSpec {
   breaksHard: boolean;
   /** 硬岩に当てたときの進みの遅さ（連続ツールのみ。1 で等速） */
   hardRate?: number;
-  /** 骨に当てたときのペナルティ */
+  /** 骨に当てたときの重み。1 で「触れた骨の数ぶん」 */
   bonePenalty: number;
+  /**
+   * 骨を傷つける半径。省略すると radius と同じ。
+   *
+   * 岩を削る範囲より内側に置ける。先端が触れた骨だけが傷になり、
+   * 球の縁をかすめただけでは傷にならない——道具を骨の脇に添えて
+   * 際を落とす、という使い方が成立する。
+   */
+  boneRadius?: number;
   /** 表層1層だけを剥がす */
   surfaceOnly: boolean;
 }
@@ -40,19 +48,23 @@ export const TOOLS: Record<ToolId, ToolSpec> = {
    * 硬岩はピックのほうが圧倒的に速い——その関係は残っている。
    */
   pick: { id: 'pick', name: 'ピック', radius: 2.4, continuous: false, rate: 0, breaksHard: true, bonePenalty: 1, surfaceOnly: false },
-  drill: { id: 'drill', name: 'ドリル', radius: 1.5, continuous: true, rate: 22, breaksHard: true, hardRate: 0.34, bonePenalty: 0.35, surfaceOnly: false },
+  /*
+   * ドリルは秒に22回削る。触れた骨を毎回まるごと傷にしていたので、骨へ
+   * 押し当てると1秒で上限が 0 まで落ちていた（半径1.5の球は19粒を覆う）。
+   * 傷にするのは先端（半径0.9）に入った骨だけにし、重みも半分にする。
+   */
+  drill: { id: 'drill', name: 'ドリル', radius: 1.5, continuous: true, rate: 22, breaksHard: true, hardRate: 0.34, bonePenalty: 0.5, boneRadius: 0.9, surfaceOnly: false },
   brush: { id: 'brush', name: 'ブラシ', radius: 3.2, continuous: true, rate: 12, breaksHard: false, bonePenalty: 0, surfaceOnly: true },
 };
 
 /**
- * 1回の接触で入る損傷の上限。
+ * 1回の接触で傷にできる骨の数。
  *
- * 損傷は触れた骨ボクセルの数ぶん積む。ピックは半径2.4の球なので、
- * 骨の真上に一度置いただけで20ボクセル以上をまとめて削ることがあり、
- * そのまま積むと「一度の押し間違いでその化石は終わり」になる。
- * 失敗は痛いが、取り返せる幅を残す。
+ * ピックは半径2.4の球なので、骨の真上に一度置いただけで20粒以上を
+ * まとめて削ることがある。そのまま積むと「一度の押し間違いでその化石は
+ * 終わり」になる。失敗は痛いが、取り返せる幅を残す。
  */
-const MAX_HIT_DAMAGE = 6;
+const MAX_HIT_SCAR = 6;
 
 const VOX = 0.052;
 
@@ -89,7 +101,19 @@ export class CleanScene {
   removedRock = 0;
   /** 骨を覆っていた岩のうち、退けた数。仕上がりはこちらで数える */
   removedCover = 0;
-  boneDamage = 0;
+  /** 傷にした骨の数（道具の重み込み） */
+  boneScarred = 0;
+
+  /**
+   * 化石のうち、どれだけを傷にしたか（0〜1）。
+   *
+   * 粒の数そのままだと、化石の大きさで意味が変わる——131粒の化石と
+   * 321粒の化石で、同じ「10粒の傷」が別の重さになっていた。割合で持てば、
+   * どの化石でも「3割削ってしまった」が同じ失点になる。
+   */
+  get boneDamage(): number {
+    return Math.min(1, this.boneScarred / Math.max(1, this.block.boneTotal));
+  }
 
   private root = new THREE.Group();
   private mesh: THREE.Mesh | null = null;
@@ -160,7 +184,7 @@ export class CleanScene {
     this.block = buildFossilBlock(defId, rarity, seed);
     this.removedRock = 0;
     this.removedCover = 0;
-    this.boneDamage = 0;
+    this.boneScarred = 0;
     this.debris.clear();
     this.rebuild();
     this.events.onProgress?.(0, this.block.coverTotal);
@@ -275,8 +299,9 @@ export class CleanScene {
           if (v === F.EMPTY || v === F.SCAR) continue;
 
           if (v === F.BONE) {
-            // ブラシは骨に当てても安全。終盤の「あと少しで露出」で必ず使いたくなる
-            if (spec.bonePenalty > 0) {
+            // ブラシは骨に当てても安全。終盤の「あと少しで露出」で必ず使いたくなる。
+            // 先端から離れた骨は、球の内側でも傷にしない
+            if (spec.bonePenalty > 0 && Math.hypot(dx, dy, dz) <= (spec.boneRadius ?? spec.radius)) {
               g.set(x, y, z, F.SCAR);
               boneHit++;
             }
@@ -301,8 +326,8 @@ export class CleanScene {
     }
 
     if (boneHit > 0) {
-      const dmg = Math.min(MAX_HIT_DAMAGE, boneHit * spec.bonePenalty);
-      this.boneDamage += dmg;
+      const dmg = Math.min(MAX_HIT_SCAR, boneHit) * spec.bonePenalty;
+      this.boneScarred += dmg;
       this.events.onBoneHit?.(dmg);
       audio.uiError();
       this.debris.burst(world, 0xa8482e, 10, { speed: 1.2, up: 1.4, life: 0.6, size: 0.7 });

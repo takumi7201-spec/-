@@ -16,6 +16,7 @@
     "metadiag": "esbuild tools/metadiag.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/metadiag.mjs --log-level=error && node node_modules/.cache/metadiag.mjs",
     "arena": "esbuild tools/arena.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/arena.mjs --log-level=error && node node_modules/.cache/arena.mjs",
     "expunit": "esbuild tools/expunit.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/expunit.mjs --log-level=error && node node_modules/.cache/expunit.mjs",
+    "cleantest": "esbuild tools/cleantest.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/cleantest.mjs --log-level=error && node node_modules/.cache/cleantest.mjs",
     "colosseum": "esbuild tools/colosseum.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/colosseum.mjs --log-level=error && node node_modules/.cache/colosseum.mjs",
     "artifact": "npm run build && node tools/make-artifact.mjs"
   },

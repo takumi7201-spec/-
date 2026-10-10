@@ -219,17 +219,23 @@ export interface CleanScore {
   rank: 'S' | 'A' | 'B' | 'C' | 'D';
   rockRatio: number;
   timeRatio: number;
+  /** 化石のうち傷にした割合（0〜1） */
   boneDamage: number;
   /** 損傷で下がった上限。作業中も同じ式で出して画面に見せる */
   cap: number;
 }
 
-/** 骨1点の損傷が上限を何点下げるか */
-const CAP_PER_DAMAGE = 3;
+/**
+ * 化石を全部傷にしたときに、上限が何点下がるか。
+ *
+ * 1.2 なら、8割強を削った時点で上限が 0 になる。粒の数ではなく割合で
+ * 効かせるのは、化石の大きさで「10粒の傷」の重さが変わらないようにするため。
+ */
+const CAP_SPAN = 1.2;
 
-/** 損傷から到達できる上限を出す。作業中の表示もここを通す */
+/** 傷の割合（0〜1）から、到達できる上限を出す。作業中の表示もここを通す */
 export function cleanCap(boneDamage: number): number {
-  return Math.max(0, Math.round(100 - CAP_PER_DAMAGE * boneDamage));
+  return Math.max(0, Math.round(100 - 100 * CAP_SPAN * boneDamage));
 }
 
 /**
@@ -243,7 +249,7 @@ export function cleanCap(boneDamage: number): number {
 const TIME_FULL = 0.3;
 
 /**
- * C = min(88·Rcover + 12·Rtime, 100 − 3·Dbone)
+ * C = min(88·Rcover + 12·Rtime, 100 − 120·Dbone)
  *
  * Rcover は「骨を覆っていた岩のうち、どれだけ退けたか」。母岩を最後まで
  * 砕く必要はない——削り終わりは、化石がどの面からも見えている状態。
