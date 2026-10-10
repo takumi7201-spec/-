@@ -23,7 +23,15 @@ export const F = {
   SCAR: 5,
 } as const;
 
-export const SIZE = { x: 16, y: 16, z: 10 };
+/**
+ * 母岩の形。
+ *
+ * 奥行きを薄くしてある。削る面は固定で、手前に載っている岩だけが対象なので、
+ * 奥へ伸ばしたぶんは「退けても化石の見え方が変わらない岩」にしかならない。
+ * 化石は面いっぱいに寝かせて、その上に数枚の岩を被せる——「板から掘り出す」
+ * 形にすると、削り終わりが目で分かる。
+ */
+export const SIZE = { x: 16, y: 16, z: 7 };
 
 export interface FossilBlock {
   grid: VoxelGrid;
@@ -48,14 +56,19 @@ function fitBones(parts: Map<string, VoxelGrid>, seed: number): VoxelGrid {
   const out = new VoxelGrid(SIZE.x, SIZE.y, SIZE.z);
   const rng = new Rng(seed);
 
-  // 頭部を主役にする。種の識別はシルエットで付くし、
-  // 頭骨は「化石らしさ」が最も強い部位でもある
-  const order = ['head', 'neck', 'body', 'tail0', 'legFL', 'legL'];
+  /*
+   * 胴を主役にして、頭と尾を添える。
+   *
+   * 以前は頭から2つ採っていた。立体を回して眺める作りだったころは、頭骨
+   * ひとつでも「化石らしさ」が出たが、面いっぱいに寝かせる作りでは、
+   * 16×16 の板に頭だけが小さく載って、残りは削る意味のない岩になる。
+   */
+  const order = ['body', 'head', 'tail0', 'neck', 'legFL', 'legL'];
   const picked: VoxelGrid[] = [];
   for (const name of order) {
     const g = parts.get(name);
     if (g && g.countSolid() > 10) picked.push(g);
-    if (picked.length >= 2) break;
+    if (picked.length >= 3) break;
   }
   if (picked.length === 0) {
     for (const g of parts.values()) { if (g.countSolid() > 0) { picked.push(g); break; } }
@@ -63,26 +76,35 @@ function fitBones(parts: Map<string, VoxelGrid>, seed: number): VoxelGrid {
 
   // 最大のパーツを中央に、残りを周囲に散らす
   picked.sort((a, b) => b.countSolid() - a.countSolid());
-  picked.slice(0, 2).forEach((src, idx) => {
+  picked.slice(0, 3).forEach((src, idx) => {
     const b = src.bounds();
     if (!b) return;
     const sw = b.max[0] - b.min[0] + 1;
     const sh = b.max[1] - b.min[1] + 1;
-    const sd = b.max[2] - b.min[2] + 1;
-    // 収まるように間引く
-    const step = Math.max(1, Math.ceil(Math.max(sw / 11, sh / 11, sd / 7)));
-    const ox = idx === 0 ? Math.floor((SIZE.x - sw / step) / 2) : rng.int(2, SIZE.x - 5);
-    const oy = idx === 0 ? Math.floor((SIZE.y - sh / step) / 2) : rng.int(2, SIZE.y - 5);
-    const oz = idx === 0 ? Math.floor((SIZE.z - sd / step) / 2) : rng.int(2, SIZE.z - 4);
+    /*
+     * 面いっぱいに寝かせる。
+     *
+     * 間引きは縦横だけで決める（奥行きは入り切らなければ後で切る）。奥行きに
+     * 合わせて間引くと、細長い部位ほど縦横まで small になって、16×16 の面に
+     * 数粒しか載らない化石になっていた。
+     */
+    const step = Math.max(1, Math.ceil(Math.max(sw / 14, sh / 14)));
+    const ox = idx === 0 ? Math.floor((SIZE.x - sw / step) / 2) : rng.int(1, Math.max(2, SIZE.x - 6));
+    const oy = idx === 0 ? Math.floor((SIZE.y - sh / step) / 2) : rng.int(1, Math.max(2, SIZE.y - 6));
+    // 奥へ寄せて置く。手前には岩を被せる余地を残す
+    const oz = 0;
 
     for (let z = b.min[2]; z <= b.max[2]; z += step)
       for (let y = b.min[1]; y <= b.max[1]; y += step)
         for (let x = b.min[0]; x <= b.max[0]; x += step) {
           if (!src.isSolid(x, y, z)) continue;
+          const gz = oz + Math.floor((z - b.min[2]) / step);
+          // 手前の3枚は岩に残す。化石が表面に露出した状態で始まらないように
+          if (gz > SIZE.z - 4) continue;
           out.set(
             ox + Math.floor((x - b.min[0]) / step),
             oy + Math.floor((y - b.min[1]) / step),
-            oz + Math.floor((z - b.min[2]) / step),
+            gz,
             F.BONE,
           );
         }
@@ -149,36 +171,30 @@ export function buildFossilBlock(defId: string, rarity: number, seed: number): F
 }
 
 /**
- * 骨の真上・真横・真下に載っている岩に印を付ける。
+ * 手前に載っている岩に印を付ける。
  *
- * 骨の粒ごとに6方向へ外まで線を引き、通り道の岩を拾う。骨の裏に回り込んだ
- * ぶんも拾うので、どの面から覗いても化石が見える状態が「削り終わり」になる。
- * 別の骨に当たったらそこで止める——奥の骨のために、手前の骨を削る形にはしない。
+ * 削る面は固定で、ブロックは回らない。見えているのは +z 側の一面だけなので、
+ * 列ごとに「いちばん手前の骨」を探し、そこより手前の岩を対象にする。
+ * 骨の裏や、骨の無い列の岩は数えない——退けても化石の見え方は変わらないし、
+ * 退ける意味のない岩を叩いている時間は、作業ではなく待ち時間になる。
  */
 function markCover(grid: VoxelGrid): { cover: Uint8Array; coverTotal: number } {
   const cover = new Uint8Array(SIZE.x * SIZE.y * SIZE.z);
-  const at = (x: number, y: number, z: number): number => (z * SIZE.y + y) * SIZE.x + x;
-  const dirs: [number, number, number][] = [
-    [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
-  ];
   let total = 0;
-  for (let z = 0; z < SIZE.z; z++)
-    for (let y = 0; y < SIZE.y; y++)
-      for (let x = 0; x < SIZE.x; x++) {
-        if (grid.get(x, y, z) !== F.BONE) continue;
-        for (const [dx, dy, dz] of dirs) {
-          let cx = x + dx, cy = y + dy, cz = z + dz;
-          while (cx >= 0 && cy >= 0 && cz >= 0 && cx < SIZE.x && cy < SIZE.y && cz < SIZE.z) {
-            const v = grid.get(cx, cy, cz);
-            if (v === F.BONE) break;
-            if (v !== F.EMPTY) {
-              const i = at(cx, cy, cz);
-              if (cover[i] === 0) { cover[i] = 1; total++; }
-            }
-            cx += dx; cy += dy; cz += dz;
-          }
-        }
+  for (let y = 0; y < SIZE.y; y++)
+    for (let x = 0; x < SIZE.x; x++) {
+      // いちばん手前の骨。骨の無い列は、何を退けても化石は現れない
+      let front = -1;
+      for (let z = SIZE.z - 1; z >= 0; z--) {
+        if (grid.get(x, y, z) === F.BONE) { front = z; break; }
       }
+      if (front < 0) continue;
+      for (let z = SIZE.z - 1; z > front; z--) {
+        if (grid.get(x, y, z) === F.EMPTY) continue;
+        cover[(z * SIZE.y + y) * SIZE.x + x] = 1;
+        total++;
+      }
+    }
   return { cover, coverTotal: total };
 }
 

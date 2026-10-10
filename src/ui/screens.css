@@ -692,7 +692,7 @@ body[data-layout='wide'] .battle-log { display: block; width: 320px; max-height:
 .clean-surface {
   position: absolute;
   top: calc(var(--safe-t) + var(--head-h) + 84px);
-  left: 0; right: 64px;
+  left: 0; right: 0;
   bottom: 176px;
   touch-action: none;
   cursor: crosshair;
@@ -701,22 +701,6 @@ body[data-layout='wide'] .battle-log { display: block; width: 320px; max-height:
 /* 作業面にはUI側の飾りを置かない。
    #ui は3Dの上の層なので、ここに光を敷くと岩の中心が白く抜ける——
    「何が岩で何が骨か」を一番見たい場所を、演出で潰していた */
-
-/* 回転レール。指を離さずにY軸回転できる */
-.clean-rail {
-  position: absolute;
-  right: calc(var(--safe-r));
-  top: 108px; bottom: 188px;
-  width: 56px;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(90deg, transparent, rgba(255, 253, 248, 0.5));
-  border: 0;
-  touch-action: none;
-}
-.clean-rail .rail-label {
-  font-size: 10px; letter-spacing: 0.2em; color: var(--text-faint);
-  writing-mode: vertical-rl;
-}
 
 .deck--clean { flex-direction: column; align-items: stretch; }
 .clean-deck-inner { display: flex; flex-direction: column; gap: 8px; width: 100%; }
@@ -754,8 +738,7 @@ body[data-layout='wide'] .battle-log { display: block; width: 320px; max-height:
   box-shadow: 0 5px 14px rgba(72, 58, 36, 0.18);
 }
 
-body[data-layout='wide'] .clean-surface { left: 12vw; right: calc(12vw + 64px); bottom: 150px; }
-body[data-layout='wide'] .clean-rail { right: 10vw; }
+body[data-layout='wide'] .clean-surface { left: 12vw; right: 12vw; bottom: 150px; }
 body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px); justify-content: center; }
 
 /* =========================================================================

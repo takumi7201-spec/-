@@ -105,9 +105,15 @@ export class CleanScene {
   private invMatrix = new THREE.Matrix4();
   private localOrigin = new THREE.Vector3();
   private localDir = new THREE.Vector3();
-  private yaw = 0;
-  private pitch = -0.12;
-  private spin = 0.12;
+  /*
+   * 見る向きは固定。
+   *
+   * 削るのは手前に載っている岩だけで、裏へ回る理由が無い。回せるままだと
+   * 「裏も削るのかもしれない」と思わせてしまうので、向きごと取り払う。
+   * わずかに傾けてあるのは、平らな面に見えて奥行きが読めなくなるのを防ぐため。
+   */
+  private readonly yaw = 0.05;
+  private readonly pitch = -0.08;
 
   constructor(quality: QualitySettings) {
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.05, 40);
@@ -155,8 +161,6 @@ export class CleanScene {
     this.removedRock = 0;
     this.removedCover = 0;
     this.boneDamage = 0;
-    this.yaw = 0;
-    this.pitch = -0.12;
     this.debris.clear();
     this.rebuild();
     this.events.onProgress?.(0, this.block.coverTotal);
@@ -188,15 +192,6 @@ export class CleanScene {
     this.tool = t;
     // 道具を持ち替えたら溜めは引き継がない
     this.drillAccum = 0;
-  }
-
-  rotate(dx: number, dy: number): void {
-    this.yaw += dx;
-    // 真上と真下の近くまで倒せるようにする。削る対象が「骨を覆っている岩」に
-    // なったので、天面と底面の列にも手を入れる必要がある——±63° では
-    // 底の中央が画面の縁に張り付いたままで狙えなかった
-    this.pitch = THREE.MathUtils.clamp(this.pitch + dy, -1.4, 1.4);
-    this.spin = 0;
   }
 
   /** 画面NDC座標からブロックにレイを飛ばし、当たったボクセルを返す */
@@ -345,12 +340,11 @@ export class CleanScene {
     return scoreClean(this.removedCover, this.block.coverTotal, remainTime, limitTime, this.boneDamage);
   }
 
-  update(dt: number, autoSpin: boolean): void {
+  update(dt: number): void {
     if (this.dirty) {
       this.dirty = false;
       this.rebuild();
     }
-    if (autoSpin) this.yaw += this.spin * dt;
     this.root.rotation.set(this.pitch, this.yaw, 0);
     this.debris.update(dt, -1.4);
     // カーソルは常にカメラを向ける

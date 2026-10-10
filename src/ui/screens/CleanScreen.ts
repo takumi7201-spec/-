@@ -30,10 +30,10 @@ export class CleanScreen extends Screen {
   private nameEl!: HTMLElement;
   private surface!: HTMLElement;
   private toolBtns = new Map<ToolId, HTMLButtonElement>();
-  private rail!: HTMLElement;
 
   private remain = 60;
-  private limit = 60;
+  /** 持ち時間。最初の onProgress で、退ける量から決まる */
+  private limit = 0;
   /** 生のクリーン度を出すための、直近の除去量 */
   private removed = 0;
   /** 骨を覆っていた岩の数。進み具合も仕上がりもこれが分母 */
@@ -42,12 +42,8 @@ export class CleanScreen extends Screen {
   private running = false;
   private defId = '';
   private dragging = false;
-  private rotating = false;
-  private lastX = 0;
-  private lastY = 0;
   private pointerNdc: { x: number; y: number } | null = null;
   private firstTouch = false;
-  private idleSpin = 0;
 
   onFinish?: (score: CleanScore, defId: string) => void;
 
@@ -105,12 +101,6 @@ export class CleanScreen extends Screen {
     this.surface = h('div', { class: 'clean-surface interactive', 'data-ui-block': '' });
     this.bindSurface();
 
-    // ---- 回転レール（右端／左利き設定で左へ）----
-    this.rail = h('div', { class: 'clean-rail interactive', 'data-ui-block': '' },
-      h('span', { class: 'rail-label', text: '回転' }),
-    );
-    this.bindRail();
-
     // ---- ツールバー ----
     const toolBar = h('div', { class: 'clean-tools' });
     // 記号は道具の動きに寄せる。⛏は打つ、⌁は細く走る、〜は撫でる
@@ -143,7 +133,7 @@ export class CleanScreen extends Screen {
       ),
     );
 
-    this.el.append(head, strip, this.surface, this.rail, deck);
+    this.el.append(head, strip, this.surface, deck);
     this.selectTool('pick');
   }
 
@@ -163,62 +153,24 @@ export class CleanScreen extends Screen {
     this.surface.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.surface.setPointerCapture?.(e.pointerId);
-      // マウス右ボタンは回転。タッチは常に削る（回転はレール）
-      if (e.pointerType === 'mouse' && e.button === 2) {
-        this.rotating = true;
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        return;
-      }
       this.dragging = true;
       this.firstTouch = true;
       this.pointerNdc = ndcOf(e);
-      this.idleSpin = 0;
     }, { passive: false });
 
     this.surface.addEventListener('pointermove', (e) => {
-      if (this.rotating) {
-        this.scene.rotate((e.clientX - this.lastX) * 0.008, (e.clientY - this.lastY) * 0.006);
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        return;
-      }
       this.pointerNdc = ndcOf(e);
       if (!this.dragging && e.pointerType === 'mouse') this.scene.aim(this.pointerNdc);
     });
 
     const end = (e: PointerEvent): void => {
       this.dragging = false;
-      this.rotating = false;
       if (e.pointerType === 'touch') { this.pointerNdc = null; this.scene.hideCursor(); }
     };
     this.surface.addEventListener('pointerup', end);
     this.surface.addEventListener('pointercancel', end);
     this.surface.addEventListener('pointerleave', () => { if (!this.dragging) this.scene.hideCursor(); });
     this.surface.addEventListener('contextmenu', (e) => e.preventDefault());
-    this.surface.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      this.scene.rotate(0, (e.deltaY > 0 ? 1 : -1) * 0.06);
-    }, { passive: false });
-  }
-
-  private bindRail(): void {
-    let active = false;
-    let last = 0;
-    this.rail.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      active = true;
-      last = e.clientY;
-      this.rail.setPointerCapture?.(e.pointerId);
-    }, { passive: false });
-    this.rail.addEventListener('pointermove', (e) => {
-      if (!active) return;
-      this.scene.rotate((e.clientY - last) * 0.012, 0);
-      last = e.clientY;
-    });
-    const stop = (): void => { active = false; };
-    this.rail.addEventListener('pointerup', stop);
-    this.rail.addEventListener('pointercancel', stop);
   }
 
   private selectTool(id: ToolId): void {
@@ -233,19 +185,30 @@ export class CleanScreen extends Screen {
     const p = params as { defId: string; rarity: number; seed: number } | undefined;
     if (!p) return;
     this.defId = p.defId;
-    this.limit = p.rarity >= 5 ? 95 : p.rarity >= 3 ? 75 : 60;
-    this.remain = this.limit;
     this.running = true;
-    this.idleSpin = 1;
 
     this.removed = 0;
     this.rockTotal = 0;
+    this.limit = 0;
+    this.remain = 0;
     this.shownClean = -1;
     // 受け口は load より先に繋ぐ。load は総量を1度だけ知らせるので、
     // 後から繋ぐとその1回を取りこぼし、最初の一削りまで計器が 0 のままになる
     this.scene.events.onProgress = (removed, total) => {
       this.removed = removed;
       this.rockTotal = total;
+      /*
+       * 持ち時間は、退ける岩の量から出す。
+       *
+       * 等級で 60/75/95 秒と決めていたころは、削る対象が母岩まるごとで
+       * どの化石でも同じ量だった。手前に載っているぶんだけになると、
+       * 種によって 150 粒と 300 粒ほどの差が出る——同じ時間を渡すと、
+       * 小さい化石ほど手が余る。
+       */
+      if (this.limit === 0 && total > 0) {
+        this.limit = Math.round(24 + total * 0.16);
+        this.remain = this.limit;
+      }
       this.renderClean();
       if (total > 0 && removed / total >= 0.999) this.finish();
     };
@@ -334,8 +297,7 @@ export class CleanScreen extends Screen {
       this.scene.apply(this.pointerNdc, dt, this.firstTouch);
       this.firstTouch = false;
     }
-    // 触っていない間だけゆっくり回す。形を把握させるため
-    this.scene.update(dt, !this.dragging && !this.rotating && this.idleSpin > 0);
+    this.scene.update(dt);
   }
 
   onLayout(kind: LayoutKind): void {
