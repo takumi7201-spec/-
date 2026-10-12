@@ -35,7 +35,7 @@ export type OdId =
   | 'skyreign' | 'spikebore' | 'leapstrike'
   | 'hatzegwing' | 'grindfeed' | 'tyrantrequiem'
   | 'forkjaw' | 'gazepierce' | 'hornrout' | 'crimsoncharge' | 'harvest' | 'serpentvenom'
-  | 'cambrianjaw' | 'shellveil' | 'falsejaw' | 'straightbore' | 'boundfang'
+  | 'cambrianjaw' | 'shellveil' | 'falsejaw' | 'straightbore' | 'packcall'
   | 'heatshare' | 'tangledspiral' | 'bonesever' | 'glideguard'
   | 'throatbite' | 'nestguard' | 'nervejam' | 'trilobeshield' | 'twinsever'
   | 'unknownancestor' | 'firstgust' | 'pierceveil' | 'miregift';
@@ -145,11 +145,11 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'xidazoon', name: 'シダズーン', en: 'Xidazoon', element: 'flame', role: 'Special',
-    // 2体ぶんの体で戦うので、1体ぶんの数字は他の★1より低い
-    hp: 910, atk: 104, def: 87, spd: 104, basicPower: 72,
+    // 分身を入れて 1.5体ぶんの体で戦う。1体ぶんの数字はそのぶん低い
+    hp: 1230, atk: 141, def: 118, spd: 106, basicPower: 79,
     passive: {
       id: 'vetulibody', name: '二分されし身体',
-      desc: '開戦と同時に自分の分身を1体呼ぶ。2体で戦うぶん、1体ぶんの数値は低い。',
+      desc: '開戦と同時に自分の分身を1体呼ぶ。分身は数値が半分で、特性も必殺も出ない。',
     },
     od: {
       id: 'unknownancestor', name: '未知なる祖',
@@ -261,15 +261,15 @@ export const REVOS: RevosDef[] = [
   },
   {
     id: 'coelophysis', name: 'コエロフィシス', short: 'コエロ', en: 'Coelophysis',
-    element: 'terra', role: 'Striker',
-    hp: 907, atk: 113, def: 78, spd: 126, basicPower: 88,
+    element: 'terra', role: 'Special',
+    hp: 860, atk: 106, def: 74, spd: 126, basicPower: 84,
     passive: {
       id: 'packrun', name: '群れの走り',
       desc: '生きている味方1体につき 速度 +4% / 与ダメージ +4%（最大 +16%）。',
     },
     od: {
-      id: 'boundfang', name: '束ねた牙',
-      desc: '単体に3連撃。', power: 62,
+      id: 'packcall', name: '群れを呼ぶ',
+      desc: '自分の分身を2体呼ぶ。分身は数値が半分で、特性も必殺も出ない。', power: 0,
     },
     sprite: 'coelophysis',
     build: { archetype: 'raptor', seed: 5519, bulk: 0.72, scale: 0.84 },

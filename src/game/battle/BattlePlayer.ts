@@ -108,6 +108,16 @@ export class BattlePlayer {
     while (this.acc >= DT && n++ < MAX_STEPS_PER_FRAME) {
       this.acc -= DT;
       for (const e of this.sim.step()) {
+        // 増えた分身の絵を先に立てる。present より後だと、同じ刻みの
+        // 攻撃や被弾が「まだ居ない相手」を指すことになる
+        if (e.t === 'spawn') {
+          const f = this.sim.fighters.find((x) => x.uid === e.uid);
+          if (f) {
+            this.scene.addFighter(f);
+            this.maxHp.set(f.uid, f.maxHp);
+            this.sideOf.set(f.uid, f.side);
+          }
+        }
         this.present(e);
         this.events.onEvent?.(e);
         if (this.finished) return;

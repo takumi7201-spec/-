@@ -75,7 +75,6 @@ interface OdShape {
 
 const SHAPES: Record<string, OdShape> = {
   flamevolley: { hits: 2, upTo: [1.5, '相手が火傷なら3発'] },
-  boundfang: { hits: 3 },
   serpentvenom: { hits: 2 },
   forkjaw: { hits: 2 },
   straightbore: { hits: 2 },

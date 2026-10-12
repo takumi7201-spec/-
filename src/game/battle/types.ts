@@ -190,6 +190,8 @@ export interface Cast {
 
 export type BattleEvent =
   | { t: 'start'; fighters: FighterSnapshot[] }
+  // 戦闘の途中で分身が増えた。絵を立てるのは受け取った側
+  | { t: 'spawn'; uid: string }
   | { t: 'action'; uid: string; kind: 'basic' | 'od'; name: string; targets: string[]; ranged: boolean; windup: number }
   | { t: 'damage'; uid: string; from: string; amount: number; crit: boolean; eff: 1.5 | 1 | 0.7; hp: number; shielded: number }
   | { t: 'heal'; uid: string; from: string; amount: number; hp: number }

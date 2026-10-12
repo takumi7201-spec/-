@@ -314,7 +314,18 @@ export class BattleScene {
 
   setFighters(fighters: Fighter[]): void {
     this.clearUnits();
-    for (const f of fighters) {
+    for (const f of fighters) this.addFighter(f);
+  }
+
+  /**
+   * 1体ぶんの絵を立てる。
+   *
+   * 開戦時の並べ直しと、途中で呼ばれた分身の両方がここを通る——以前は
+   * 開戦時に一度作るだけだったので、途中で増えた分身は盤面には居るのに
+   * 画面には出てこなかった。
+   */
+  addFighter(f: Fighter): void {
+    {
       const def = getRevos(f.defId);
       const unit = new SpriteUnit(def.sprite, {
         // 巨獣は体ごと大きい。シミュレータの押し合いの半径と同じ倍率で描く

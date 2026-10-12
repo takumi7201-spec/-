@@ -93,7 +93,7 @@ const OD_RECOVERY: Record<string, number> = {
   tyrantrequiem: 0.55, forkjaw: 0.6, gazepierce: 0.5,
   crimsoncharge: 0.55, harvest: 0.55, serpentvenom: 0.5,
   hornrout: 0.8,
-  cambrianjaw: 0.55, straightbore: 0.5, boundfang: 0.5, bonesever: 0.55, falsejaw: 0.8,
+  cambrianjaw: 0.55, straightbore: 0.5, bonesever: 0.55, falsejaw: 0.8,
   shellveil: 0.28, heatshare: 0.28, tangledspiral: 0.28, glideguard: 0.28,
   throatbite: 0.55, nervejam: 0.8,
   nestguard: 0.28, trilobeshield: 0.28,
@@ -328,34 +328,52 @@ function buildFighters(setup: TeamSetup, side: Side): Fighter[] {
 }
 
 /**
- * 分身。
+ * 分身の作り方。
  *
- * 「二分されし身体」は開戦と同時に、自分と同じ体をもう1つ立てる。
- * 数値は本体と同じで、落ちても本体は残り、本体が落ちても分身は残る——
- * 1体ぶんの数字を低く置いてあるのは、常に2体で戦う前提だから。
- *
- * 分身からは分身を呼ばない（passive を 'none' に落とす）。呼べるのは
- * 開戦の1回きりで、倒されても戻らない。
+ * 数値は本体の半分。特性も必殺も出ない——同じ札が2枚並ぶのではなく、
+ * 「頭数が増える」ことだけが見返りになる。本体が落ちても分身は残り、
+ * 分身が落ちても本体は残る。分身から分身は呼ばない。
  */
+const CLONE_SCALE = 0.5;
+
+/** 「群れを呼ぶ」で一度に増える数 */
+const PACKCALL_COUNT = 2;
+
+function makeClone(f: Fighter, index: number): Fighter {
+  const back = f.side === 0 ? 1 : -1;
+  const half = (v: number): number => Math.max(1, Math.round(v * CLONE_SCALE));
+  // 本体の斜め後ろへ扇状に置く。同じ点から始めると、1刻み目の押し合いで弾かれる
+  const side = index % 2 === 0 ? 1 : -1;
+  const rank = Math.floor(index / 2) + 1;
+  return {
+    ...f,
+    uid: `${f.uid}~c${index}`,
+    cloneOf: f.uid,
+    passive: 'none',
+    maxHp: half(f.maxHp),
+    hp: half(f.maxHp),
+    atk: half(f.atk),
+    def: half(f.def),
+    spd: half(f.spd),
+    x: clamp(f.x + side * rank, -ARENA_X, ARENA_X),
+    z: clamp(f.z + back * (0.8 + (rank - 1) * 0.6), -ARENA_Z, ARENA_Z),
+    px: f.x, pz: f.z,
+    ready: 0,
+    od: 0,
+    alive: true,
+    mods: [], statuses: [], shield: null,
+    target: null, cast: null,
+    dealt: 0, taken: 0, healed: 0, kills: 0,
+    stacks: {},
+  };
+}
+
+/** 開戦と同時に呼ぶぶん（「二分されし身体」） */
 function spawnClones(team: Fighter[]): Fighter[] {
   const out: Fighter[] = [];
   for (const f of team) {
     if (f.passive !== 'vetulibody') continue;
-    const back = f.side === 0 ? 1 : -1;
-    out.push({
-      ...f,
-      uid: `${f.uid}~c`,
-      cloneOf: f.uid,
-      passive: 'none',
-      // 本体の斜め後ろに立てる。同じ点から始めると、1刻み目の押し合いで弾かれる
-      x: f.x + (f.slot % 2 === 0 ? 1.0 : -1.0),
-      z: f.z + back * 0.8,
-      px: f.x, pz: f.z,
-      mods: [], statuses: [], shield: null,
-      target: null, cast: null,
-      dealt: 0, taken: 0, healed: 0, kills: 0,
-      stacks: {},
-    });
+    out.push(makeClone(f, 0));
   }
   return out;
 }
@@ -862,6 +880,8 @@ export class BattleSim {
    * 150 で自動的に放出する（上限を超えたぶんは捨てるだけなので、溜め得にはしない）。
    */
   private shouldFireOd(f: Fighter): boolean {
+    // 分身は撃たない。頭数が増えるだけの存在にしておく
+    if (f.cloneOf) return false;
     if (f.od < 100) return false;
     if (this.odFire.has(f.uid)) return true;
     if (this.odHold.has(f.uid) || !this.autoOd) return f.od >= 150;
@@ -1326,11 +1346,6 @@ export class BattleSim {
         if (behind.length > 0) this.dealDamage(actor, minBy(behind, (e) => gap(actor, e)), power, ev);
         break;
       }
-      case 'boundfang': {
-        const t = single(); if (!t) break;
-        for (let i = 0; i < 3 && t.alive; i++) this.dealDamage(actor, t, power, ev);
-        break;
-      }
       case 'heatshare': {
         for (const a of allies) {
           this.addMod(a, { kind: 'atk', value: 0.20, turns: 4, source: 'heatshare' }, ev, 'ATK上昇');
@@ -1364,6 +1379,27 @@ export class BattleSim {
         const t = single(); if (!t) break;
         this.dealDamage(actor, t, power, ev);
         if (t.alive) this.applyBleed(t, ev, actor.uid, 3);
+        break;
+      }
+      case 'packcall': {
+        /*
+         * 群れを呼ぶ。
+         *
+         * 同じ刻みのうちに fighters へ差し込む。入れる場所は本体のすぐ後ろ
+         * ——末尾へ付けると、処理順を1刻みごとに折り返す stepOrder の都合で、
+         * 本体と分身の行動順が毎刻み入れ替わって見える。
+         */
+        const born: Fighter[] = [];
+        const already = this.fighters.filter((x) => x.cloneOf === actor.uid).length;
+        for (let i = 0; i < PACKCALL_COUNT; i++) born.push(makeClone(actor, already + i));
+        this.fighters.splice(this.fighters.indexOf(actor) + 1, 0, ...born);
+        for (const c of born) {
+          this.byUid.set(c.uid, c);
+          this.retargetAt.set(c.uid, this.clockV);
+          this.statusAt.set(c.uid, this.clockV + STATUS_TICK);
+          this.regenAt.set(c.uid, this.clockV + REGEN_TICK);
+          ev.push({ t: 'spawn', uid: c.uid });
+        }
         break;
       }
       case 'miregift': {
