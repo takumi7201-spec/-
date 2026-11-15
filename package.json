@@ -20,7 +20,8 @@
     "colosseum": "esbuild tools/colosseum.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/colosseum.mjs --log-level=error && node node_modules/.cache/colosseum.mjs",
     "artifact": "npm run build && node tools/make-artifact.mjs",
     "synergy": "esbuild tools/synergy.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/synergy.mjs --log-level=error && node node_modules/.cache/synergy.mjs",
-    "tft": "esbuild tools/tft.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/tft.mjs --log-level=error && node node_modules/.cache/tft.mjs"
+    "tft": "esbuild tools/tft.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/tft.mjs --log-level=error && node node_modules/.cache/tft.mjs",
+    "run": "esbuild tools/run.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/run.mjs --log-level=error && node node_modules/.cache/run.mjs"
   },
   "devDependencies": {
     "@types/three": "^0.185.4",
