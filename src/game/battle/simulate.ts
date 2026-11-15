@@ -369,6 +369,16 @@ function makeClone(f: Fighter, index: number): Fighter {
 }
 
 /** 開戦と同時に呼ぶぶん（「二分されし身体」） */
+/** 試作 dual: 役職を6つの職にまとめる */
+const SYN_CLASS: Record<string, string> = {
+  Tank: 'front', Guardian: 'front',
+  Breaker: 'brawler', Apex: 'brawler',
+  Sprinter: 'swift', Striker: 'swift',
+  Finisher: 'slayer', Technical: 'slayer',
+  Healer: 'support', Buffer: 'support',
+  Debuffer: 'hex', Special: 'hex',
+};
+
 function spawnClones(team: Fighter[]): Fighter[] {
   const out: Fighter[] = [];
   for (const f of team) {
@@ -442,6 +452,66 @@ export class BattleSim {
     if (rules.synergy) this.applySynergy(rules.synergy);
   }
 
+  /**
+   * 試作 dual: 属性（出自）と役職群（職）の2軸。1体が2つの特性を持つので、
+   * 途中まで揃った特性が重なり合う——TFT の盤面の悩みは、この重なりから出る。
+   */
+  private applyDualSynergy(): void {
+    const [e1, e2] = this.rules.synergySteps ?? [3, 5];
+    const [c1, c2] = this.rules.classSteps ?? [2, 4];
+    for (const side of [0, 1] as const) {
+      const team = this.fighters.filter((f) => f.side === side && !f.cloneOf);
+      const tally = (key: (f: Fighter) => string): Map<string, number> => {
+        const m = new Map<string, number>();
+        for (const f of team) m.set(key(f), (m.get(key(f)) ?? 0) + 1);
+        return m;
+      };
+      for (const [el, n] of tally((f) => f.element)) {
+        const tier = n >= e2 ? 2 : n >= e1 ? 1 : 0;
+        if (!tier) continue;
+        this.synergyTier[side][el] = tier;
+        for (const f of team) if (f.element === el) this.elementTrait(f, el, tier);
+      }
+      for (const [cl, n] of tally((f) => SYN_CLASS[f.role])) {
+        const tier = n >= c2 ? 2 : n >= c1 ? 1 : 0;
+        if (!tier) continue;
+        this.synergyTier[side][cl] = tier;
+        const two = tier === 2;
+        for (const f of team) {
+          if (cl === 'support') {
+            // 支援だけは味方全体に配る（持ち主ではなく、隊が受け取る）
+            const total = Math.round(f.maxHp * (two ? 0.16 : 0.08));
+            f.statuses.push({ kind: 'regen', turns: 99, value: Math.max(1, Math.round(total / 10)), pool: total, until: 10, source: f.uid + '|synergy' });
+            continue;
+          }
+          if (SYN_CLASS[f.role] !== cl) continue;
+          switch (cl) {
+            case 'front': f.mods.push({ kind: 'taken', value: two ? -0.25 : -0.12, turns: 9999, source: 'synergy' }); break;
+            case 'brawler': { const k = two ? 1.30 : 1.15; f.maxHp = Math.round(f.maxHp * k); f.hp = f.maxHp; break; }
+            case 'swift': f.ready += two ? 0.6 : 0.3; break;
+            case 'slayer': f.mods.push({ kind: 'atk', value: two ? 0.25 : 0.12, turns: 9999, source: 'synergy' }); break;
+            case 'hex': f.od = Math.min(100, f.od + (two ? 70 : 35)); break;
+          }
+        }
+      }
+    }
+  }
+
+  private elementTrait(f: Fighter, el: string, tier: number): void {
+    const two = tier === 2;
+    switch (el) {
+      case 'flame': f.mods.push({ kind: 'dealt', value: two ? 0.35 : 0.15, until: 15, turns: 0, source: 'synergy' }); break;
+      case 'aqua': {
+        const total = Math.round(f.maxHp * (two ? 0.30 : 0.15));
+        f.statuses.push({ kind: 'regen', turns: 99, value: Math.max(1, Math.round(total / 10)), pool: total, until: 10, source: f.uid + '|synergy' });
+        break;
+      }
+      case 'terra': f.shield = { amount: Math.round(f.def * (two ? 3.2 : 1.6)), turns: 6 }; break;
+      case 'gale': f.ready += two ? 0.4 : 0.2; break;
+      case 'null': f.od = Math.min(100, f.od + (two ? 60 : 30)); break;
+    }
+  }
+
   /** 試作シナジーの段。側ごと・属性ごとに 0/1/2（2体で1段、4体で2段） */
   readonly synergyTier: [Partial<Record<string, number>>, Partial<Record<string, number>>] = [{}, {}];
 
@@ -449,7 +519,8 @@ export class BattleSim {
    * 試作: 属性シナジー。開戦時に1度だけ数える（分身は数えない）。
    * 効くのはその属性の者だけ——TFT の「出自」と同じで、揃えた者が報われる。
    */
-  private applySynergy(mode: 'effect' | 'flat'): void {
+  private applySynergy(mode: 'effect' | 'flat' | 'dual'): void {
+    if (mode === 'dual') { this.applyDualSynergy(); return; }
     for (const side of [0, 1] as const) {
       const team = this.fighters.filter((f) => f.side === side && !f.cloneOf);
       const count = new Map<string, number>();

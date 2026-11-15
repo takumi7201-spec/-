@@ -19,7 +19,8 @@
     "cleantest": "esbuild tools/cleantest.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/cleantest.mjs --log-level=error && node node_modules/.cache/cleantest.mjs",
     "colosseum": "esbuild tools/colosseum.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/colosseum.mjs --log-level=error && node node_modules/.cache/colosseum.mjs",
     "artifact": "npm run build && node tools/make-artifact.mjs",
-    "synergy": "esbuild tools/synergy.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/synergy.mjs --log-level=error && node node_modules/.cache/synergy.mjs"
+    "synergy": "esbuild tools/synergy.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/synergy.mjs --log-level=error && node node_modules/.cache/synergy.mjs",
+    "tft": "esbuild tools/tft.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/tft.mjs --log-level=error && node node_modules/.cache/tft.mjs"
   },
   "devDependencies": {
     "@types/three": "^0.185.4",
