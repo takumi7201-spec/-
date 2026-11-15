@@ -377,6 +377,7 @@ const SYN_CLASS: Record<string, string> = {
   Finisher: 'slayer', Technical: 'slayer',
   Healer: 'support', Buffer: 'support',
   Debuffer: 'hex', Special: 'hex',
+  'All-round': 'brawler',
 };
 
 function spawnClones(team: Fighter[]): Fighter[] {

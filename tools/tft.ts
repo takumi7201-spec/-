@@ -24,7 +24,7 @@ const REAL = REVOS.filter((r) => !r.id.startsWith('exp-'));
 const CLASS: Record<string, string> = {
   Tank: 'front', Guardian: 'front', Breaker: 'brawler', Apex: 'brawler',
   Sprinter: 'swift', Striker: 'swift', Finisher: 'slayer', Technical: 'slayer',
-  Healer: 'support', Buffer: 'support', Debuffer: 'hex', Special: 'hex',
+  Healer: 'support', Buffer: 'support', Debuffer: 'hex', Special: 'hex', 'All-round': 'brawler',
 };
 const JA: Record<string, string> = {
   flame: '火', aqua: '水', terra: '土', gale: '風', null: '無',
