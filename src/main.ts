@@ -511,14 +511,10 @@ async function main(): Promise<void> {
       case 'mission': missionScreen.setData(data); ui.show('mission'); break;
       case 'news': newsScreen.setData(data); ui.show('news'); break;
       case 'shop': shopScreen.setData(data); ui.show('shop'); break;
+      // 戦いはランだけ。段・イベント・闘技はランに置き換えた
       case 'battle':
-        selectScreen.setData(data);
-        // 明示して開く。前に見ていた側が残ると、タブの名前と中身がずれる
-        ui.show('battleSelect', { mode: 'normal' });
-        break;
       case 'event':
-        selectScreen.setData(data);
-        ui.show('battleSelect', { mode: 'event' });
+        goRun();
         break;
       case 'mail': mailScreen.setData(data); ui.show('mail'); break;
       case 'unit': goUnit(); break;

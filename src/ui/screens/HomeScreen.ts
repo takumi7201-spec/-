@@ -4,10 +4,7 @@ import { banner, cardButton, coinMark, identity, plate, railButton, spaced } fro
 import type { SaveData } from '../../core/Save';
 import { expToNext, dropDecay } from '../../core/Save';
 import { revosIcon } from '../revosIcon';
-import { BIOMES } from '../../voxel/palette';
-import { stagePreview } from '../../game/party';
-import { STAGE_COUNT } from '../../game/data/stages';
-import { EVENTS } from '../../game/data/events';
+import { RUN_WINS } from '../../game/run/run';
 import { unclaimedCount } from '../../game/mail';
 import { missionRatio, nearestMission, readyCount } from '../../game/missions';
 import { unreadNews } from '../../game/news';
@@ -153,25 +150,14 @@ export class HomeScreen extends Screen {
       `調査番号 ${String(this.data.stats.runs).padStart(4, '0')} · ${titleOf(this.data)}`;
     this.coinEl.textContent = fmtNum(p.coins);
 
-    // ---- 帯。挑めるイベントのうち先頭、無ければ次の発掘地 ----
-    const open = EVENTS.filter(
-      (e) => this.data.stageProgress >= e.requires && !this.data.events.cleared.includes(e.id),
-    );
-    const cleared = EVENTS.filter((e) => this.data.events.cleared.includes(e.id)).length;
-    const pct = Math.round((cleared / Math.max(1, EVENTS.length)) * 100);
-    if (open.length > 0) {
-      this.bannerEl.set('記録の残響', open[0].name, `${pct}%`);
+    // ---- 帯。進行中のランか、新しいランへの誘い ----
+    const run = this.data.run;
+    if (run) {
+      this.bannerEl.set('ラン進行中', `${run.round}周目 · ${run.wins}勝 · ライフ ${run.lives}`, `${run.wins}/${RUN_WINS}`);
     } else {
-      const next = EVENTS.find((e) => !this.data.events.cleared.includes(e.id));
-      this.bannerEl.set('記録の残響', next ? `${next.name}（ステージ ${next.requires}）` : '記録は全て辿った', `${pct}%`);
+      this.bannerEl.set('ラン', '新しいランを始める', '開始');
     }
-    // 点は「他にも控えている」の合図。1件しか無いときは出さない
     clear(this.dotsEl);
-    if (open.length > 1) {
-      for (let i = 0; i < Math.min(4, open.length); i++) {
-        this.dotsEl.appendChild(h('i', { class: i === 0 ? 'is-on' : '' }));
-      }
-    }
 
     // ---- 右の色札 ----
     this.cards.get('news')?.badge(unreadNews(this.data));
@@ -194,11 +180,8 @@ export class HomeScreen extends Screen {
 
     // ---- 次の目標 ----
     // 発掘地は、いまの到達段が入る層を出す。行き先の名前が無いと目標にならない
-    const stage = Math.min(STAGE_COUNT, this.data.stageProgress + 1);
-    // 段の舞台は固定表から引く。ホームの予告と選択画面と実際の闘技場で、
-    // 読む場所を1つにしておく——別に持つと、片方だけ直したときに嘘になる
-    const pv = stagePreview(stage);
-    this.goalPlate.set(`ステージ ${stage} / ${STAGE_COUNT}`, BIOMES[pv.biome].name);
+    const rec = this.data.runRecord;
+    this.goalPlate.set(`ラン 最高 ${rec?.best ?? 0}勝`, `達成 ${rec?.clears ?? 0}回`);
 
     // ---- ミッション ----
     const near = nearestMission(this.data);
