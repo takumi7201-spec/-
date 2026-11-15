@@ -120,7 +120,7 @@ export const STAGES: StageDef[] = [
     hint: '特別許可区の個体が混じる。後衛が落ちにくい' },
 
   // ---- エンバーフィールド：ホロタイプが1体ずつ加わる最終層 ----
-  { n: 22, name: '灰の王', biome: 'emberfield', level: 25, clean: 86, grade: 4, power: 0.84,
+  { n: 22, name: '灰の王', biome: 'emberfield', level: 25, clean: 86, grade: 4, power: 0.74,
     foes: ['spinosaurus', 'yutyrannus', 'dimetrodon', 'goyocephale', 'carnotaurus'],
     hint: '炎の全盛り。水属性と火傷無効が効く' },
   { n: 23, name: '天翔', biome: 'emberfield', level: 25, clean: 87, grade: 4, power: 0.71,
