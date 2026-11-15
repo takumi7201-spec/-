@@ -121,6 +121,10 @@ export function rangeMap(defId: string, slot: number | null, board?: (RunUnit | 
     else addAb(ab);
   }
   if (d.fire.haste) reaches.push({ label: '加速', own: neighbors(at), foe: [] });
+  if (d.special === 'lonely') reaches.push({ label: '孤高：この緑の枠を空けておくと攻撃×3', own: neighbors(at), foe: [] });
+  if (d.special === 'devour') reaches.push({ label: '喰らう：この中でいちばん段の低い味方を、戦闘の後に喰らう', own: neighbors(at), foe: [] });
+  if (d.special === 'bloom') reaches.push({ label: '大地の恵み：戦闘の後、ここに盾を永続で配る', own: neighbors(at), foe: [] });
+  if (d.special === 'chain') reaches.push({ label: '号令：この中でいちばん溜まっている味方がもう1回発動', own: Array.from({ length: BOARD_SIZE }, (_, i) => i).filter((i) => i !== at), foe: [] });
   // 正面: 同じ列のいちばん前（相手の盤面は上の段が前列なので、図では下の段の側）
   if (d.fire.slow) reaches.push({ label: '遅延（正面の相手）', own: [], foe: [colOf(at)] });
   if (reaches.length === 0) return null;

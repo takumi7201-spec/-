@@ -80,6 +80,8 @@ export interface RunBattleResult {
   events: RunEvent[];
   /** uid ごとの与えたもの（削り・盾・回復の合計）。測定用 */
   output: Map<string, number>;
+  /** uid ごとの、この戦闘で回復した量（「大地の恵み」が見る） */
+  healed: Map<string, number>;
   /** opts.trace のときだけ。0.1秒ごとの様子 */
   frames: RunFrame[];
   maxHp: [number, number];
@@ -122,6 +124,7 @@ export function runBattle(
   const events: RunEvent[] = [];
   const growth: RunBattleResult['growth'] = [new Map(), new Map()];
   const output = new Map<string, number>();
+  const healed = new Map<string, number>();
   const frames: RunFrame[] = [];
   const snap = (): void => {
     if (!opts.trace) return;
@@ -199,13 +202,18 @@ export function runBattle(
     return i < 0 ? null : foe.units[i];
   };
 
-  const fire = (team: Team, foe: Team, l: Live): void => {
+  const fire = (team: Team, foe: Team, l: Live, depth = 0): void => {
     log({ t, type: 'fire', side: team.side, slot: l.slot });
     const v = (k: EffectKind): number => effectValue(l.def, l.unit, k, l.temp);
     const dmg = v('dmg');
+    // 「盾喰い」: 撃つ前に相手の盾をすべて剥がし、その量を一撃に足す
+    let eaten = 0;
+    if (l.def.special === 'shieldEat' && foe.shield > 0) { eaten = foe.shield; foe.shield = 0; }
     if (dmg > 0) {
-      let d = dmg;
+      let d = dmg + eaten;
       if (l.def.execute && foe.hp < foe.maxHp / 2) d *= l.def.execute;
+      // 「孤高」: 隣に味方がいないとき
+      if (l.def.special === 'lonely' && resolve(team, l, 'adj').length === 0) d *= 3;
       if (l.def.exploit && (foe.burn > 0 || foe.poison > 0)) d *= l.def.exploit;
       for (let i = 0; i < (l.def.hits ?? 1); i++) credit(l, strike(foe, d, !!l.def.pierce, 'dmg'));
     }
@@ -221,6 +229,7 @@ export function runBattle(
     if (heal > 0) {
       const got = Math.min(heal, team.maxHp - team.hp);
       team.hp += got; credit(l, got);
+      healed.set(l.unit.uid, (healed.get(l.unit.uid) ?? 0) + got);
       log({ t, type: 'gain', side: team.side, kind: 'heal', amount: got });
     }
     const slow = v('slow');
@@ -228,6 +237,22 @@ export function runBattle(
     const haste = v('haste');
     if (haste > 0) for (const x of resolve(team, l, 'adj')) x.charge += haste;
 
+    // 「深淵」: 相手に積まれた火傷と毒をふくらませる
+    if (l.def.special === 'abyss') {
+      foe.burn = foe.burn * 2;
+      foe.poison = Math.ceil(foe.poison * 1.5);
+    }
+    // 「号令」: いちばん溜まっている他の味方を、もう1回発動させる（号令どうしは連鎖させない）
+    if (l.def.special === 'chain' && depth === 0) {
+      let best: Live | null = null;
+      for (const x of team.units) {
+        if (!x || x === l || x.def.special === 'chain') continue;
+        const r = x.charge / cooldownOf(x.def, x.unit, x.temp);
+        if (!best || r > best.charge / cooldownOf(best.def, best.unit, best.temp)) best = x;
+      }
+      // 溜まりはそのまま。号令の1回は「おまけ」で、本来の発動は奪わない
+      if (best) fire(team, foe, best, 1);
+    }
     trigger(team, l, 'fire');
     for (const x of resolve(team, l, 'adj')) trigger(team, x, 'adjFire');
   };
@@ -280,7 +305,7 @@ export function runBattle(
   }
   log({ t, type: 'end', winner });
   return {
-    winner, seconds: t, hp: [teams[0].hp, teams[1].hp], growth, events, output, frames,
+    winner, seconds: t, hp: [teams[0].hp, teams[1].hp], growth, events, output, healed, frames,
     maxHp: [teams[0].maxHp, teams[1].maxHp],
   };
 }

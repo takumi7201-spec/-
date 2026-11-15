@@ -162,6 +162,9 @@ async function main(): Promise<void> {
       goLobby();
       return;
     }
+    // 段5の、戦闘の後の働き（喰らう・大地の恵み）を知らせる
+    for (const n of run.lastNotes ?? []) ui.toast(n, 'info', 3200);
+    run.lastNotes = [];
     writeSave(data);
     renderer.setScene(home.scene, home.camera);
     runScreen.setRun(run);

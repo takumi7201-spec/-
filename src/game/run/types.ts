@@ -61,6 +61,16 @@ export interface RunUnitDef {
   hits?: number;
   /** 相手に火傷か毒があると攻撃が この倍率 */
   exploit?: number;
+  /**
+   * 段5の固有の働き。
+   *   devour   … 戦闘の後、隣でいちばん段の低い味方を喰らい、その数値を永続で得る
+   *   bloom    … 戦闘の後、その戦闘で回復した量の1/5を、隣の味方の盾に永続で足す
+   *   chain    … 発動すると、いちばん溜まっている他の味方がもう1回発動する
+   *   lonely   … 隣に味方がいないとき攻撃×3
+   *   shieldEat… 発動の前に相手の盾をすべて剥がし、その量をこの一撃に足す
+   *   abyss    … 発動するたび、相手の火傷を2倍・毒を1.5倍にする
+   */
+  special?: 'devour' | 'bloom' | 'chain' | 'lonely' | 'shieldEat' | 'abyss';
 }
 
 /** ランの中の1体。育ちはここに残る */

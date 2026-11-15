@@ -88,16 +88,13 @@ export const RUN_UNITS: RunUnitDef[] = [
   { id: 'jobaria', tier: 4, cd: 6, fire: { shield: 6, poison: 2 }, abilities: [] },
 
   // ---- 段5 ----
-  { id: 'tylosaurus', tier: 5, cd: 5, fire: { dmg: 5 }, hits: 2, abilities: [] },
-  { id: 'pliosaurus-funkei', tier: 5, cd: 8, fire: { dmg: 14 },
-    abilities: [a('adjFire', 'self', 'charge', 0.6)] },
-  { id: 'quetzalcoatlus', tier: 5, cd: 6, fire: { dmg: 6 },
-    abilities: [a('fire', 'others', 'charge', 1)] },
-  { id: 'hatzegopteryx', tier: 5, cd: 6, fire: { dmg: 10 },
-    abilities: [a('fire', 'self', 'dmg', 2)] },
-  { id: 'tyrannosaurus-sue', tier: 5, cd: 8, fire: { dmg: 20 }, abilities: [] },
-  { id: 'brachiosaurus', tier: 5, cd: 6, fire: { heal: 8 },
-    abilities: [a('fire', 'allies', 'heal', 1)] },
+  // 段5は数値の大きさではなく、置き方と育て方を変える働きを持つ（types.ts の special）
+  { id: 'tylosaurus', tier: 5, cd: 5, fire: { dmg: 9 }, special: 'shieldEat', abilities: [] },
+  { id: 'pliosaurus-funkei', tier: 5, cd: 6, fire: { dmg: 6, poison: 2 }, special: 'abyss', abilities: [] },
+  { id: 'quetzalcoatlus', tier: 5, cd: 5, fire: { dmg: 6 }, special: 'chain', abilities: [] },
+  { id: 'hatzegopteryx', tier: 5, cd: 6, fire: { dmg: 12 }, special: 'lonely', abilities: [] },
+  { id: 'tyrannosaurus-sue', tier: 5, cd: 7, fire: { dmg: 18 }, special: 'devour', abilities: [] },
+  { id: 'brachiosaurus', tier: 5, cd: 6, fire: { heal: 10, shield: 3 }, special: 'bloom', abilities: [] },
 ];
 
 const BY_ID = new Map(RUN_UNITS.map((u) => [u.id, u]));

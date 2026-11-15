@@ -1,7 +1,9 @@
 import { KIT_TRAIT } from '../data/traits';
+import { getRevos } from '../data/revos';
+import { EFFECT_NAMES } from './describe';
 import { RUN_UNITS, runDef } from './units';
-import { runBattle, applyGrowth, type RunBattleResult } from './battle';
-import { BOARD_SIZE, starOf, neighbors, type AbilityDef, type RunUnit, type Stat } from './types';
+import { runBattle, applyGrowth, effectValue, type RunBattleResult } from './battle';
+import { BOARD_SIZE, EFFECT_KINDS, starOf, neighbors, type AbilityDef, type RunUnit, type Stat } from './types';
 
 /**
  * ランの進み方。ショップと、勝ち負けの後始末。
@@ -29,6 +31,8 @@ export interface RunState {
   pool: string[];
   rng: number;
   nextUid: number;
+  /** 直前の戦闘の後に起きたこと（段5の働きなど）。店の上に一度だけ出す */
+  lastNotes?: string[];
 }
 
 export function rand(s: { rng: number }): number {
@@ -153,6 +157,46 @@ export function move(s: RunState, from: number, to: number): void {
   s.board[to] = a;
 }
 
+/**
+ * 段5の、戦闘の後に働くもの。
+ *   大地の恵み … 回復した量の1/5を、隣の味方の盾に永続で足す
+ *   喰らう     … 隣でいちばん段の低い味方を喰らい、その数値を永続で得る（喰らった味方は消える）
+ * 起きたことを文で返す（画面の結果に出す）
+ */
+export function afterBattleSpecials(board: (RunUnit | null)[], healed: Map<string, number>): string[] {
+  const notes: string[] = [];
+  board.forEach((u, i) => {
+    if (!u || runDef(u.defId).special !== 'bloom') return;
+    const amt = Math.round((healed.get(u.uid) ?? 0) / 5);
+    if (amt <= 0) return;
+    for (const n of neighbors(i)) {
+      const t = board[n];
+      if (t) t.perm.shield = (t.perm.shield ?? 0) + amt;
+    }
+    notes.push(`${getRevos(u.defId).name}の大地の恵み：隣の味方の盾 +${amt}（永続）`);
+  });
+  board.forEach((u, i) => {
+    if (!u || runDef(u.defId).special !== 'devour') return;
+    let vi = -1;
+    for (const n of neighbors(i)) {
+      const t = board[n];
+      if (!t || runDef(t.defId).special === 'devour') continue;
+      if (vi < 0 || runDef(t.defId).tier < runDef(board[vi]!.defId).tier) vi = n;
+    }
+    if (vi < 0) return;
+    const victim = board[vi]!;
+    const vd = runDef(victim.defId);
+    const got: string[] = [];
+    for (const k of EFFECT_KINDS) {
+      const v = effectValue(vd, victim, k);
+      if (v > 0) { u.perm[k] = (u.perm[k] ?? 0) + v; got.push(`${EFFECT_NAMES[k]}+${Math.round(v * 10) / 10}`); }
+    }
+    board[vi] = null;
+    notes.push(`${getRevos(u.defId).name}が${getRevos(victim.defId).name}を喰らった（${got.join('・')}、永続）`);
+  });
+  return notes;
+}
+
 /** 戦闘の結果を書き戻し、次の周へ進める */
 export function finishBattle(s: RunState, res: RunBattleResult): void {
   for (const u of s.board) {
@@ -164,6 +208,7 @@ export function finishBattle(s: RunState, res: RunBattleResult): void {
     if (res.winner === 0) fireOutside(s, i, 'win');
     fireOutside(s, i, 'end');
   }
+  s.lastNotes = afterBattleSpecials(s.board, res.healed);
   if (res.winner === 0) s.wins++;
   else if (res.winner === 1) s.lives--;
   s.round++;
@@ -247,6 +292,7 @@ export function buildOpponent(pool: string[], round: number, seed: number, prefe
       if (won) fireOutside(s, i, 'win');
       fireOutside(s, i, 'end');
     }
+    afterBattleSpecials(s.board, res.healed);
   }
   return s.board;
 }

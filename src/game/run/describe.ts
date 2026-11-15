@@ -65,6 +65,14 @@ export function traitsText(defId: string): string[] {
   if (d.exploit) out.push(`相手に火傷か毒があると攻撃 ×${d.exploit}`);
   if (d.pierce) out.push('攻撃が盾を無視する');
   if (d.hits && d.hits > 1) out.push(`攻撃が${d.hits}回入る`);
+  switch (d.special) {
+    case 'devour': out.push('喰らう：戦闘の後、隣（上下左右）でいちばん段の低い味方を1体喰らい、その効果の数値をすべて永続で自分に足す。喰らった味方は盤面から消える'); break;
+    case 'bloom': out.push('大地の恵み：戦闘の後、その戦闘で回復した量の1/5を、隣（上下左右）の味方の盾に永続で足す'); break;
+    case 'chain': out.push('号令：発動すると、いちばん溜まっている他の味方がもう1回発動する（その味方の溜まりは減らない）'); break;
+    case 'lonely': out.push('孤高：隣（上下左右）に味方がいないとき、攻撃×3'); break;
+    case 'shieldEat': out.push('盾喰い：撃つ前に相手の盾をすべて剥がし、剥がした量をこの一撃の攻撃に足す'); break;
+    case 'abyss': out.push('深淵：発動するたび、相手に積まれた火傷を2倍、毒を1.5倍にする'); break;
+  }
   return out;
 }
 
