@@ -40,7 +40,12 @@ const JA: Record<string, string> = {
   front: '前衛', brawler: '闘士', swift: '迅速', slayer: '仕留', support: '支援', hex: '妨害',
 };
 const byId = new Map(REVOS.map((r) => [r.id, r]));
-const DUAL: BattleRules = { synergy: KIT ? 'kit' : 'dual', synergySteps: ESTEPS, classSteps: CSTEPS };
+/** 数の多い属性（土・水は11体）は敷居を上げる。`BIG=4,5` で指定、`BIG=` で無効 */
+const BIG = (process.env.BIG ?? '4,5').split(',').map(Number) as [number, number];
+const ELEMENT_STEPS: Record<string, [number, number]> = {};
+if (process.env.BIG !== '') for (const e of ELEMENTS) if (REAL.filter((r) => r.element === e).length >= 10) ELEMENT_STEPS[e] = BIG;
+const DUAL: BattleRules = { synergy: KIT ? 'kit' : 'dual', synergySteps: ESTEPS, classSteps: CSTEPS, elementSteps: ELEMENT_STEPS };
+const esteps = (e: string): [number, number] => ELEMENT_STEPS[e] ?? ESTEPS;
 const keyOf = (id: string, t: string): string => (ELEMENTS.includes(t) ? byId.get(id)!.element : second(id));
 
 function mkTeam(ids: string[], tag: string): TeamSetup {
@@ -93,7 +98,7 @@ function traits(ids: string[]): string[] {
     if (k2) cl.set(k2, (cl.get(k2) ?? 0) + 1);
   }
   const out: string[] = [];
-  for (const [k, n] of el) if (n >= ESTEPS[0]) out.push(`${k}:${n >= ESTEPS[1] ? 2 : 1}`);
+  for (const [k, n] of el) { const st = esteps(k); if (n >= st[0]) out.push(`${k}:${n >= st[1] ? 2 : 1}`); }
   for (const [k, n] of cl) { const st = steps2(k); if (n >= st[0]) out.push(`${k}:${n >= st[1] ? 2 : 1}`); }
   return out.sort();
 }
@@ -104,7 +109,7 @@ const pt = (x: number): string => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}`;
 async function main(): Promise<void> {
   const pool = new Pool(4);
   const t0 = Date.now();
-  console.log(`枠 ${TEAM}  属性の敷居 ${ESTEPS.join('/')}  2本目 ${KIT ? '効果特性（4体以上の特性は 2/4、他は 2/3）' : `職 ${CSTEPS.join('/')}`}`);
+  console.log(`枠 ${TEAM}  属性の敷居 ${ESTEPS.join('/')}（${Object.keys(ELEMENT_STEPS).map((e) => JA[e]).join('・') || 'なし'}は ${BIG.join('/')}）  2本目 ${KIT ? '効果特性（4体以上の特性は 2/4、他は 2/3）' : `職 ${CSTEPS.join('/')}`}`);
 
   async function evalVs(comps: string[][], gaunt: string[][], rules: BattleRules | null, seed0 = 777): Promise<number[]> {
     const js: Job[] = [];
@@ -132,7 +137,7 @@ async function main(): Promise<void> {
   const M = Math.round(60 * SCALE);
   const line: string[] = [];
   for (const t of [...ELEMENTS, ...CLASSES]) {
-    const steps = ELEMENTS.includes(t) ? ESTEPS : steps2(t);
+    const steps = ELEMENTS.includes(t) ? esteps(t) : steps2(t);
     const cells: string[] = [];
     for (const [tier, n] of [[1, steps[0]], [2, steps[1]]] as const) {
       if (n > TEAM) { cells.push('   —  '); continue; }

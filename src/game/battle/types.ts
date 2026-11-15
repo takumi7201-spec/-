@@ -121,6 +121,8 @@ export interface BattleRules {
   synergyOnly?: string[];
   /** 試作: 段の敷居（1段目・2段目の体数）。既定 [2, 4] */
   synergySteps?: [number, number];
+  /** 試作: 属性ごとの段の敷居（synergySteps より優先）。数の多い属性だけ重くする */
+  elementSteps?: Partial<Record<string, [number, number]>>;
 }
 
 export interface TeamSetup {

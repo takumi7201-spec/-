@@ -376,8 +376,10 @@ function makeClone(f: Fighter, index: number): Fighter {
 export const KIT_TRAIT: Record<string, string> = {
   yutyrannus: 'burn', dimetrodon: 'burn', goyocephale: 'burn', spinosaurus: 'burn',
   elasmosaurus: 'venom', jobaria: 'venom', smilodon: 'venom',
-  pikaia: 'weaken', paradoxides: 'weaken', irritator: 'weaken', albertaceratops: 'weaken', velociraptor: 'weaken', kronosaurus: 'weaken',
+  pikaia: 'weaken', paradoxides: 'weaken', irritator: 'weaken', velociraptor: 'weaken', kronosaurus: 'weaken',
   archelon: 'guard', triceratops: 'guard', microraptor: 'guard', stegosaurus: 'guard', ankylosaurus: 'guard',
+  // 角で押し返し、味方の防御を固める側。弱体と土の両方の芯になって偏ったので、こちらへ
+  albertaceratops: 'guard',
   maiasaura: 'mend', nipponites: 'mend', shonisaurus: 'mend', brachiosaurus: 'mend',
   pachycephalosaurus: 'echo', 'spinosaurus-1915': 'echo', quetzalcoatlus: 'echo', ophthalmosaurus: 'echo', 'pliosaurus-funkei': 'echo',
   pteranodon: 'rush', pliosaurus: 'rush', 'tyrannosaurus-1915': 'rush', ornithomimus: 'rush', carnotaurus: 'rush',
@@ -495,7 +497,8 @@ export class BattleSim {
         return m;
       };
       for (const [el, n] of tally((f) => f.element)) {
-        const tier = n >= e2 ? 2 : n >= e1 ? 1 : 0;
+        const [x1, x2] = this.rules.elementSteps?.[el] ?? [e1, e2];
+        const tier = n >= x2 ? 2 : n >= x1 ? 1 : 0;
         if (!tier || (this.rules.synergyOnly && !this.rules.synergyOnly.includes(el))) continue;
         this.synergyTier[side][el] = tier;
         for (const f of team) if (f.element === el) this.elementTrait(f, el, tier);
@@ -547,7 +550,7 @@ export class BattleSim {
     const s = actor.side;
     if (this.kitTier(actor, 'burn') && this.rng.chance(0.40)) this.applyBurn(target, ev, actor.uid);
     else if (this.kitTeam(s, 'burn') === 2 && !this.kitTier(actor, 'burn') && this.rng.chance(0.40)) this.applyBurn(target, ev, actor.uid);
-    if (this.kitTeam(s, 'venom') === 2 && !this.kitTier(actor, 'venom') && this.rng.chance(0.45)) this.applyPoison(target, ev, actor.uid);
+    if (this.kitTeam(s, 'venom') === 2 && !this.kitTier(actor, 'venom') && this.rng.chance(0.65)) this.applyPoison(target, ev, actor.uid);
     if (this.kitTeam(s, 'weaken') === 2 && !this.kitTier(actor, 'weaken')) {
       const has = target.mods.find((m) => m.source === 'kitweaken');
       if (has) has.turns = 3;
@@ -573,7 +576,7 @@ export class BattleSim {
       const own = KIT_TRAIT[f.defId] === k;
       switch (k) {
         case 'guard':
-          if (own) f.mods.push({ kind: 'taken', value: -0.08, turns: 9999, source: 'kit' });
+          if (own) f.mods.push({ kind: 'taken', value: -0.06, turns: 9999, source: 'kit' });
           if (tier === 2) {
             const amount = Math.round(f.def * 0.4) + (f.shield?.amount ?? 0);
             f.shield = { amount, turns: 6 };
@@ -1298,7 +1301,7 @@ export class BattleSim {
     const skill = skillMultiplier(actor.skillLevel);
     let mod = (1 + 0.35 * (clamp(actor.od, 100, 150) - 100) / 50) * skill;
     // 試作 kit: 守護・剛力の持ち主は必殺が重い
-    if (this.kitTier(actor, 'guard')) mod *= 1.3;
+    if (this.kitTier(actor, 'guard')) mod *= 1.2;
     if (this.kitTier(actor, 'might')) mod *= 1.05;
     // 試作 kit「共鳴」2段目: 誰かが撃つたび、仲間の必殺が溜まる
     if (this.kitTeam(actor.side, 'echo') === 2 && !actor.cloneOf) {
@@ -2006,6 +2009,8 @@ export class BattleSim {
     const boost = this.alive(target.side).some((a) => a.passive === 'earthbreath') ? 1.15 : 1;
     // 試作 kit「癒し」: 持ち主の回復は厚い
     if (this.kitTier(src, 'mend')) amount = Math.round(amount * 1.10);
+    // 2段目: 隊が受け取る回復そのものも厚くなる
+    if (this.kitTeam(target.side, 'mend') === 2) amount = Math.round(amount * 1.04);
     const before = target.hp;
     target.hp = Math.min(target.maxHp, target.hp + Math.round(amount * boost));
     // 試作 kit「癒し」2段目: 溢れた回復は盾になる（最大体力の 30% まで）
@@ -2013,7 +2018,7 @@ export class BattleSim {
       const spill = Math.round(amount * boost) - (target.hp - before);
       if (spill > 0) {
         const cur = target.shield?.amount ?? 0;
-        const next = Math.min(Math.round(target.maxHp * 0.3), cur + Math.round(spill * 0.35));
+        const next = Math.min(Math.round(target.maxHp * 0.3), cur + Math.round(spill * 0.6));
         if (next > cur) { target.shield = { amount: next, turns: 4 }; ev.push({ t: 'shield', uid: target.uid, amount: next }); }
       }
     }
