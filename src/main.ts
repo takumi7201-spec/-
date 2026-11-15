@@ -10,6 +10,7 @@ import { SettingsScreen } from './ui/screens/SettingsScreen';
 import { RunScreen } from './ui/screens/RunScreen';
 import { RunBattleScreen } from './ui/screens/RunBattleScreen';
 import { HomeScene } from './scenes/HomeScene';
+import { BattleScene } from './scenes/BattleScene';
 import { tabBar } from './ui/chrome';
 import { advanceHoloTime } from './fx/SpriteUnit';
 import { audio } from './core/Audio';
@@ -56,6 +57,8 @@ async function main(): Promise<void> {
 
   await progress(0.4, '拠点を組み立てています…');
   const home = new HomeScene(renderer.quality);
+  // 戦闘は以前の 3D の舞台に立たせる
+  const stage = new BattleScene(renderer.quality);
 
   // ---------------------------------------------------------------- 画面
 
@@ -66,6 +69,7 @@ async function main(): Promise<void> {
   const runScreen = new RunScreen();
   const runBattleScreen = new RunBattleScreen();
   for (const s of [title, homeScreen, newsScreen, settingsScreen, runScreen, runBattleScreen]) ui.register(s);
+  runBattleScreen.scene3d = stage;
 
   // ---------------------------------------------------------------- 遷移
 
@@ -95,6 +99,8 @@ async function main(): Promise<void> {
       data.runRecord.runs++;
       writeSave(data);
     }
+    // 店は地で覆うので、裏は拠点のままでよい
+    renderer.setScene(home.scene, home.camera);
     runScreen.setRun(data.run);
     ui.show('run');
   }
@@ -107,6 +113,9 @@ async function main(): Promise<void> {
     const foe = buildOpponent(RUN_ALL, run.round, (run.rng ^ (run.round * 2654435761)) >>> 0);
     const res = runBattle(run.board, foe, run.round, { events: true, trace: true });
     runFight = { res, foe };
+    stage.resize(renderer.aspect);
+    renderer.setScene(stage.scene, stage.camera);
+    renderer.invalidateShadows();
     ui.show('runBattle');
     audio.startMusic('battle');
     runBattleScreen.play(res, [run.board, foe], run.round);
@@ -133,6 +142,7 @@ async function main(): Promise<void> {
       return;
     }
     writeSave(data);
+    renderer.setScene(home.scene, home.camera);
     runScreen.setRun(run);
     ui.show('run');
   };
@@ -248,6 +258,7 @@ async function main(): Promise<void> {
       renderer.resize();
       const a = renderer.aspect;
       home.resize(a);
+      stage.resize(a);
       titleCam.aspect = a;
       titleCam.updateProjectionMatrix();
     }, 120) as unknown as number;
@@ -292,6 +303,8 @@ async function main(): Promise<void> {
       titleCam.position.x = Math.sin(now * 0.00012) * 9;
       titleCam.position.z = Math.cos(now * 0.00012) * 9;
       titleCam.lookAt(0, 1.2, 0);
+    } else if (ui.currentName === 'runBattle') {
+      stage.update(dt);
     } else {
       home.update(dt);
     }

@@ -3250,33 +3250,33 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
   display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 4px 0 12px;
 }
 /* 読ませる画面なので、3D を地で覆う（編成と同じ） */
-.screen--run::before, .screen--runBattle::before {
+.screen--run::before {
   content: ''; position: absolute; inset: 0; background: var(--ground); pointer-events: none;
 }
-.screen--run > *, .screen--runBattle > * { z-index: 1; }
+.screen--run > * { z-index: 1; }
 .deck--run { padding-top: 8px; }
 .deck--run .btn--primary { height: 56px; border-radius: 16px; font-size: 17px; letter-spacing: 0.16em; }
 .run-status {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
-  padding: 9px 12px; border-radius: 12px;
-  background: rgba(255, 253, 248, 0.8); box-shadow: 0 5px 14px rgba(72, 58, 36, 0.12);
-  font-size: 11px; font-weight: 700; color: var(--ink-soft);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: 10px 14px; border-radius: 14px;
+  background: rgba(255, 253, 248, 0.95); box-shadow: 0 5px 14px rgba(72, 58, 36, 0.14);
+  font-size: 13px; font-weight: 800; color: var(--ink);
 }
-.run-round b { font-size: 16px; color: var(--ink); }
+.run-round b { font-size: 20px; color: var(--ink); }
 .run-stat { display: inline-flex; align-items: center; gap: 4px; }
-.run-hp b { color: var(--ink); font-size: 13px; }
+.run-hp b { color: var(--ink); font-size: 16px; }
 .run-pips { display: inline-flex; gap: 2px; }
-.run-pips i { width: 7px; height: 7px; border-radius: 50%; background: rgba(72, 58, 36, 0.15); }
+.run-pips i { width: 9px; height: 9px; border-radius: 50%; background: rgba(72, 58, 36, 0.18); }
 .run-pips--win i.on { background: var(--hl-amber); }
-.run-pips--life i { border-radius: 2px; transform: rotate(45deg); width: 6px; height: 6px; margin: 0 1px; }
+.run-pips--life i { border-radius: 2px; transform: rotate(45deg); width: 8px; height: 8px; margin: 0 1px; }
 .run-pips--life i.on { background: #d5524a; }
-.run-label { margin-top: 2px; }
+.run-label { margin-top: 4px; font-size: 12px; color: var(--ink); }
 .run-board, .run-shop { display: grid; gap: 4px; }
 .run-board { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .run-shop { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .run-slot {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  min-width: 0; min-height: 124px; padding: 4px 3px 5px;
+  min-width: 0; min-height: 128px; padding: 5px 3px 6px;
   border: 0; border-radius: 10px; background: var(--paper-card); color: var(--ink);
   box-shadow: var(--lift-1); text-align: center;
 }
@@ -3291,34 +3291,34 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 .run-empty { font-size: 20px; color: var(--ink-faint); }
 .run-top { display: flex; width: 100%; justify-content: space-between; align-items: center; }
 .run-tier {
-  font-size: 8px; font-weight: 900; width: 12px; height: 12px; border-radius: 3px;
+  font-size: 10px; font-weight: 900; width: 15px; height: 15px; border-radius: 4px;
   display: grid; place-items: center; background: rgba(72, 58, 36, 0.12); color: var(--ink-soft);
 }
 .run-tier.tier-3 { background: #cfe3f1; } .run-tier.tier-4 { background: #e3d3f4; } .run-tier.tier-5 { background: #f6deaa; }
-.run-star { font-size: 8px; color: var(--hl-amber); letter-spacing: -1px; }
-.run-art { height: 34px; display: grid; place-items: center; }
-.run-icon { width: 34px; height: 34px; }
-.run-name { font-size: 9px; font-weight: 800; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.run-cd { font-size: 9px; color: var(--ink-faint); }
+.run-star { font-size: 11px; color: #c98a0c; letter-spacing: -1px; }
+.run-art { height: 40px; display: grid; place-items: center; }
+.run-icon { width: 40px; height: 40px; }
+.run-name { font-size: 11px; font-weight: 900; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-cd { font-size: 10px; font-weight: 800; color: var(--ink-soft); }
 .run-vals { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
 .run-val {
   display: inline-flex; align-items: center; gap: 1px;
-  font-size: 9px; font-weight: 900; padding: 0 3px; border-radius: 4px; line-height: 14px;
+  font-size: 11px; font-weight: 900; padding: 0 4px; border-radius: 5px; line-height: 17px;
   background: rgba(72, 58, 36, 0.08); color: var(--ink);
 }
-.run-val i { font-style: normal; font-size: 8px; opacity: 0.75; }
+.run-val i { font-style: normal; font-size: 9px; opacity: 0.8; }
 .run-val--dmg { background: #f3d6c9; } .run-val--burn { background: #f6c08f; } .run-val--poison { background: #d4e8b6; }
 .run-val--shield { background: #cfdcef; } .run-val--heal { background: #c9ecd9; }
 .run-val--slow { background: #e0d6f0; } .run-val--haste { background: #f4ecb8; } .run-val--strip { background: #e9d2d2; }
 .run-val.is-grown { box-shadow: inset 0 0 0 1.5px var(--pen-green); }
-.run-kit { font-size: 8px; font-weight: 800; color: var(--ink-faint); margin-top: auto; }
-.run-cost { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 900; }
-.run-coin { width: 10px; height: 10px; }
+.run-kit { display: none; }
+.run-cost { display: inline-flex; align-items: center; gap: 2px; margin-top: auto; font-size: 12px; font-weight: 900; }
+.run-coin { width: 12px; height: 12px; }
 .run-info {
   margin-top: 4px; padding: 10px 12px 12px; border-radius: 13px; min-height: 64px;
   background: rgba(255, 253, 248, 0.85); box-shadow: 0 5px 14px rgba(72, 58, 36, 0.12);
 }
-.run-hint { font-size: 11px; line-height: 1.6; color: var(--ink-soft); }
+.run-hint { font-size: 13px; line-height: 1.6; color: var(--ink); font-weight: 700; }
 .run-info-head { display: flex; align-items: center; gap: 8px; }
 .run-info-icon { width: 34px; height: 34px; flex: none; }
 .run-info-title { display: flex; flex-direction: column; min-width: 0; }
@@ -3335,59 +3335,69 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 .deck--run .run-fight { flex: 1; }
 
 /* ------------------------------------------------------------------ ラン（戦闘） */
+/* 真ん中は 3D の舞台。上下に体力と6体ぶんの細い札だけを置く */
 .screen--runBattle { display: flex; flex-direction: column; }
-.rb-head { display: flex; align-items: center; gap: 8px; padding: calc(var(--safe-t) + 14px) 16px 6px; }
-.rb-time { font-size: 13px; font-weight: 900; margin-right: auto; }
-.rb-stage { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 16px calc(var(--safe-b, 0px) + 20px); min-height: 0; }
+.rb-head { display: flex; align-items: center; gap: 8px; padding: calc(var(--safe-t) + 12px) 16px 6px; }
+.rb-head .btn {
+  background: rgba(255, 253, 248, 0.94); color: var(--ink); font-weight: 900;
+  box-shadow: 0 3px 10px rgba(30, 22, 12, 0.25);
+}
+.rb-time {
+  font-size: 14px; font-weight: 900; margin-right: auto; color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.rb-stage { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 0 12px calc(var(--safe-b) + 14px); min-height: 0; }
+.rb-side { display: flex; flex-direction: column; gap: 6px; }
 .rb-mid { flex: 1; min-height: 8px; }
-.rb-panel { position: relative; padding: 8px 12px 10px; border-radius: 12px; background: rgba(255, 253, 248, 0.85); box-shadow: 0 5px 14px rgba(72, 58, 36, 0.12); }
-.rb-panel-top { display: flex; align-items: center; gap: 6px; min-height: 18px; }
-.rb-who { font-size: 11px; font-weight: 900; margin-right: auto; }
-.rb-chip { font-size: 10px; font-weight: 900; padding: 0 5px; border-radius: 5px; line-height: 16px; }
+.rb-panel {
+  padding: 8px 12px 10px; border-radius: 14px;
+  background: rgba(255, 253, 248, 0.94); box-shadow: 0 6px 16px rgba(30, 22, 12, 0.28);
+}
+.rb-panel-top { display: flex; align-items: center; gap: 6px; min-height: 20px; }
+.rb-who { font-size: 13px; font-weight: 900; margin-right: auto; color: var(--ink); }
+.rb-chip { font-size: 12px; font-weight: 900; padding: 0 7px; border-radius: 6px; line-height: 20px; color: var(--ink); }
 .rb-chip:empty { display: none; }
 .rb-chip--shield { background: #cfdcef; } .rb-chip--burn { background: #f6c08f; } .rb-chip--poison { background: #d4e8b6; }
-.rb-hp { position: relative; height: 14px; margin-top: 5px; border-radius: 7px; background: rgba(72, 58, 36, 0.12); overflow: hidden; }
-.rb-hp-fill { position: absolute; inset: 0 auto 0 0; background: #6cc28b; transition: width 0.12s linear; }
-.rb-panel--foe .rb-hp-fill { background: #e0745f; }
-.rb-hp-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
-.rb-floats { position: absolute; inset: -6px 0 auto 0; height: 0; pointer-events: none; }
-.rb-float { position: absolute; top: 0; font-size: 14px; font-weight: 900; animation: rb-float 0.9s ease-out forwards; text-shadow: 0 1px 0 #fff; }
-.rb-float--dmg, .rb-float--storm { color: #c0392b; } .rb-float--burn { color: #d9771e; } .rb-float--poison { color: #5b8c2a; }
-.rb-float--shield { color: #3d6fb0; } .rb-float--heal { color: #2b9a5c; }
-@keyframes rb-float { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-26px); opacity: 0; } }
+.rb-hp { position: relative; height: 18px; margin-top: 6px; border-radius: 9px; background: rgba(72, 58, 36, 0.16); overflow: hidden; }
+.rb-hp-fill { position: absolute; inset: 0 auto 0 0; background: #4fb377; transition: width 0.12s linear; }
+.rb-panel--foe .rb-hp-fill { background: #d9573f; }
+.rb-hp-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
 .rb-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
 .rb-card {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 4px 3px 5px; min-height: 100px; border-radius: 10px;
-  background: var(--paper-card); box-shadow: var(--lift-1);
+  position: relative; display: flex; flex-direction: column; gap: 3px;
+  padding: 4px 4px 5px; border-radius: 10px;
+  background: rgba(255, 253, 248, 0.92); box-shadow: 0 3px 10px rgba(30, 22, 12, 0.22);
 }
-.rb-card.is-empty { background: rgba(255, 253, 248, 0.35); box-shadow: none; }
+.rb-card.is-empty { background: rgba(255, 253, 248, 0.25); box-shadow: none; min-height: 30px; }
 .rb-card.is-fire { animation: rb-fire 0.35s ease-out; }
 .rb-row--me .rb-card.is-fire { --dir: -1; } .rb-row--foe .rb-card.is-fire { --dir: 1; }
-@keyframes rb-fire { 40% { transform: translateY(calc(var(--dir) * 8px)) scale(1.06); } }
-.rb-star { font-size: 8px; color: var(--hl-amber); align-self: flex-end; }
-.rb-icon { width: 32px; height: 32px; }
-.rb-name { font-size: 9px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rb-vals { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
-.rb-bar { margin-top: auto; width: 100%; height: 4px; border-radius: 2px; background: rgba(72, 58, 36, 0.12); overflow: hidden; }
-.rb-bar-fill { display: block; height: 100%; background: var(--hl-amber); }
+@keyframes rb-fire { 40% { transform: translateY(calc(var(--dir) * 6px)) scale(1.06); } }
+.rb-card-top { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.rb-icon { width: 20px; height: 20px; flex: none; }
+.rb-name { font-size: 10px; font-weight: 900; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.rb-star { margin-left: auto; font-size: 9px; color: #c98a0c; flex: none; }
+.rb-vals { display: flex; flex-wrap: wrap; gap: 2px; }
+.rb-vals .run-val { font-size: 10px; }
+.rb-bar { width: 100%; height: 5px; border-radius: 3px; background: rgba(72, 58, 36, 0.15); overflow: hidden; }
+.rb-bar-fill { display: block; height: 100%; background: #e59a12; }
 .rb-grow {
-  position: absolute; top: -8px; left: 50%; transform: translateX(-50%); white-space: nowrap;
-  font-size: 9px; font-weight: 900; padding: 1px 4px; border-radius: 4px;
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%); white-space: nowrap; z-index: 2;
+  font-size: 10px; font-weight: 900; padding: 1px 5px; border-radius: 5px;
   background: var(--pen-green); color: #fff; animation: rb-float 1.1s ease-out forwards;
 }
-.rb-overlay { position: absolute; inset: 0; z-index: 5; display: none; place-items: center; background: rgba(40, 32, 20, 0.35); padding: 16px; }
+@keyframes rb-float { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, -22px); opacity: 0; } }
+.rb-overlay { position: absolute; inset: 0; z-index: 5; display: none; place-items: center; background: rgba(30, 22, 12, 0.45); padding: 16px; pointer-events: auto; }
 .rb-overlay.is-on { display: grid; }
 .rb-result {
   width: min(360px, 100%); display: flex; flex-direction: column; gap: 10px;
-  padding: 18px 16px 16px; border-radius: 16px; background: var(--paper-card); box-shadow: var(--lift-2);
+  padding: 20px 16px 16px; border-radius: 16px; background: var(--paper-card); box-shadow: var(--lift-2);
 }
-.rb-result-title { font-size: 26px; font-weight: 900; text-align: center; }
+.rb-result-title { font-size: 30px; font-weight: 900; text-align: center; }
 .rb-result--win .rb-result-title { color: #b8860b; } .rb-result--lose .rb-result-title { color: #a2453a; }
-.rb-result-sub { text-align: center; font-size: 11px; color: var(--ink-soft); margin-top: -6px; }
-.rb-growth { display: flex; flex-direction: column; gap: 4px; max-height: 40vh; overflow-y: auto; }
-.rb-growth-line { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; }
-.rb-growth-icon { width: 22px; height: 22px; flex: none; }
+.rb-result-sub { text-align: center; font-size: 12px; color: var(--ink-soft); margin-top: -6px; }
+.rb-growth { display: flex; flex-direction: column; gap: 5px; max-height: 40vh; overflow-y: auto; }
+.rb-growth-line { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.rb-growth-icon { width: 26px; height: 26px; flex: none; }
 
 /* ------------------------------------------------------------------ 広がるカード */
 /* 札から下の欄へ広がる。位置と大きさは expandCard.ts がばねで動かす */
@@ -3416,26 +3426,26 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 .xs-icon { width: 48px; height: 48px; flex: none; }
 .xs-title { display: flex; flex-direction: column; min-width: 0; }
 .xs-title b { font-size: 17px; font-weight: 900; }
-.xs-sub { font-size: 10px; color: var(--ink-soft); line-height: 1.5; }
+.xs-sub { font-size: 12px; color: var(--ink-soft); line-height: 1.5; font-weight: 700; }
 .xs-close { margin-left: auto; flex: none; width: 34px; height: 34px; padding: 0; border-radius: 50%; }
 .xs-actions { display: flex; gap: 8px; margin-top: 4px; }
 .xs-actions > .btn { flex: 1; height: 46px; border-radius: 14px; font-size: 14px; }
-.xs-label { font-size: 10px; letter-spacing: 0.18em; margin-top: 2px; }
+.xs-label { font-size: 12px; letter-spacing: 0.14em; margin-top: 2px; color: var(--ink); }
 .xs-table {
   display: grid; align-items: center; gap: 5px 10px;
   padding: 8px 10px; border-radius: 10px; background: rgba(72, 58, 36, 0.05);
 }
-.xs-th { font-size: 10px; font-weight: 900; color: var(--ink-soft); text-align: right; }
+.xs-th { font-size: 12px; font-weight: 900; color: var(--ink-soft); text-align: right; }
 .xs-th.is-up { color: var(--ink); }
-.xs-td { font-size: 13px; font-weight: 900; text-align: right; color: var(--ink-soft); }
+.xs-td { font-size: 16px; font-weight: 900; text-align: right; color: var(--ink); }
 .xs-td.is-up { color: var(--pen-green); }
-.xs-tk { font-size: 10px; font-weight: 800; color: var(--ink-soft); }
-.xs-table .run-val { justify-self: start; font-size: 10px; }
+.xs-tk { font-size: 12px; font-weight: 800; color: var(--ink-soft); }
+.xs-table .run-val { justify-self: start; font-size: 12px; }
 .xs-lines { display: flex; flex-direction: column; gap: 3px; }
-.xs-help { font-size: 10.5px; line-height: 1.55; color: var(--ink-soft); }
-.xs-trait { font-size: 11px; line-height: 1.55; color: var(--ink-soft); }
-.xs-ab { font-size: 11.5px; line-height: 1.55; font-weight: 800; }
-.xs-grown { font-size: 11px; line-height: 1.55; font-weight: 800; color: var(--pen-green); }
+.xs-help { font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); }
+.xs-trait { font-size: 13px; line-height: 1.6; color: var(--ink); }
+.xs-ab { font-size: 13.5px; line-height: 1.6; font-weight: 800; }
+.xs-grown { font-size: 13px; line-height: 1.6; font-weight: 800; color: var(--pen-green); }
 
 /* 横長の画面では中央に寄せる。表の列が離れすぎて読みにくい */
 body[data-layout='wide'] .run-body { left: 18vw; right: 18vw; }
