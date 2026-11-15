@@ -15,14 +15,14 @@ export type Role =
   | 'Apex' | 'Special';
 
 export type PassiveId =
-  | 'subsidence' | 'embers' | 'deeppressure' | 'vanguard' | 'sediment'
+  | 'subsidence' | 'embers' | 'undertow' | 'vanguard' | 'sediment'
   | 'heatreflect' | 'tide' | 'shearwind' | 'immutable' | 'resonance'
-  | 'traction' | 'overheat' | 'pursuit' | 'deepreign'
-  | 'oldtyrant' | 'archivesail'
+  | 'traction' | 'overheat' | 'pursuit' | 'tidecall'
+  | 'quickening' | 'archivesail'
   | 'skygrasp' | 'platescreen' | 'greatbeak'
   | 'islandapex' | 'earthbreath' | 'warlord'
   | 'firstbite' | 'greateye' | 'twinhorn' | 'runningcharge' | 'scytheclaw' | 'venomgland'
-  | 'primordial' | 'carapace' | 'irritate' | 'jetwake' | 'packrun'
+  | 'primordial' | 'carapace' | 'irritate' | 'stinger' | 'packrun'
   | 'sailheat' | 'unreadable' | 'cannibal' | 'fourwings'
   | 'sabertooth' | 'goodmother' | 'firstnerve' | 'compoundeye' | 'twinbite'
   | 'vetulibody' | 'headwind' | 'truestrike' | 'venomire';
@@ -247,8 +247,8 @@ export const REVOS: RevosDef[] = [
     element: 'aqua', role: 'Technical',
     hp: 1361, atk: 125, def: 96, spd: 104, basicPower: 86,
     passive: {
-      id: 'jetwake', name: '噴射',
-      desc: '下がった直後の一撃 +25%。寄られるほど強く撃ち返す。',
+      id: 'stinger', name: '刺胞',
+      desc: '通常攻撃の命中時 30% で毒を1つ重ねる。毒を受けている相手への与ダメージ +20%。',
     },
     od: {
       id: 'straightbore', name: '直角の螺旋',
@@ -367,7 +367,7 @@ export const REVOS: RevosDef[] = [
   {
     id: 'kronosaurus', name: 'クロノサウルス', en: 'Kronosaurus', element: 'aqua', role: 'Breaker',
     hp: 1754, atk: 175, def: 106, spd: 78, basicPower: 100,
-    passive: { id: 'deeppressure', name: '深圧', desc: '自分より 速度 が 20 以上高い相手への与ダメージ +14%。' },
+    passive: { id: 'undertow', name: '底引き', desc: '速度 が下がっている相手への与ダメージ +28%。渦に呑んだ獲物を逃さない。' },
     od: { id: 'vortexfang', name: '渦潮牙', desc: '単体に大ダメージ ＋ 対象の 速度 −20%（3行動）。', power: 165 },
     sprite: 'kronosaurus',
     build: { archetype: 'aquatic', seed: 3033, bulk: 1.15, scale: 1.08 },
@@ -477,7 +477,7 @@ export const REVOS: RevosDef[] = [
   {
     id: 'pliosaurus-funkei', name: 'プリオサウルス フンケイ', short: 'フンケイ', en: 'Pliosaurus funkei', element: 'aqua', role: 'Apex',
     hp: 1051, atk: 106, def: 112, spd: 98, basicPower: 88,
-    passive: { id: 'deepreign', name: '制海', desc: '自分が生きている間、敵全体の 必殺 獲得 −12%。' },
+    passive: { id: 'tidecall', name: '潮呼び', desc: '味方が必殺を撃つたび、自分の 必殺 +12。仲間の大技に乗って、自分の大技を早める。' },
     od: { id: 'abyssalmaw', name: '絶海断', desc: '敵全体に大ダメージ。シールドを貫通する。', power: 104 },
     sprite: 'pliosaurus-funkei',
     build: { archetype: 'aquatic', seed: 14151, bulk: 1.24, scale: 1.14, spikes: true },
@@ -488,7 +488,7 @@ export const REVOS: RevosDef[] = [
     id: 'tyrannosaurus-1915', name: 'ティラノサウルス 1915', short: 'ティラノ1915',
     en: 'Tyrannosaurus (1915)', element: 'gale', role: 'Striker',
     hp: 1217, atk: 131, def: 92, spd: 110, basicPower: 90,
-    passive: { id: 'oldtyrant', name: '旧き暴君', desc: '自分より 体力 割合が高い敵への与ダメージ +16%。傷のない相手から順に潰す。' },
+    passive: { id: 'quickening', name: '急き足', desc: '行動するたび 速度 +4%（最大 +20%、戦闘中持続）。動くほど速くなる。' },
     od: { id: 'galemaw', name: '烈風顎', desc: '単体に大ダメージ ＋ 自分の次の行動を早める。', power: 160 },
     sprite: 'tyrannosaurus-1915',
     build: { archetype: 'theropod', seed: 15161, bulk: 1.02, scale: 1.04 },

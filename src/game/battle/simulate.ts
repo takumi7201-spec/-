@@ -375,7 +375,7 @@ function makeClone(f: Fighter, index: number): Fighter {
  */
 export const KIT_TRAIT: Record<string, string> = {
   yutyrannus: 'burn', dimetrodon: 'burn', goyocephale: 'burn', spinosaurus: 'burn',
-  elasmosaurus: 'venom', jobaria: 'venom', smilodon: 'venom',
+  elasmosaurus: 'venom', jobaria: 'venom', smilodon: 'venom', orthoceras: 'venom',
   pikaia: 'weaken', paradoxides: 'weaken', irritator: 'weaken', velociraptor: 'weaken', kronosaurus: 'weaken',
   archelon: 'guard', triceratops: 'guard', microraptor: 'guard', stegosaurus: 'guard', ankylosaurus: 'guard',
   // 角で押し返し、味方の防御を固める側。弱体と土の両方の芯になって偏ったので、こちらへ
@@ -383,7 +383,7 @@ export const KIT_TRAIT: Record<string, string> = {
   maiasaura: 'mend', nipponites: 'mend', shonisaurus: 'mend', brachiosaurus: 'mend',
   pachycephalosaurus: 'echo', 'spinosaurus-1915': 'echo', quetzalcoatlus: 'echo', ophthalmosaurus: 'echo', 'pliosaurus-funkei': 'echo',
   pteranodon: 'rush', pliosaurus: 'rush', 'tyrannosaurus-1915': 'rush', ornithomimus: 'rush', carnotaurus: 'rush',
-  anomalocaris: 'hunt', iguanodon: 'hunt', dimorphodon: 'hunt', concavenator: 'hunt', majungasaurus: 'hunt', tyrannosaurus: 'hunt', orthoceras: 'hunt',
+  anomalocaris: 'hunt', iguanodon: 'hunt', dimorphodon: 'hunt', concavenator: 'hunt', majungasaurus: 'hunt', tyrannosaurus: 'hunt',
   xidazoon: 'pack', coelophysis: 'pack',
   'tyrannosaurus-sue': 'might', therizinosaurus: 'might', diatryma: 'might', hatzegopteryx: 'might', tylosaurus: 'might',
 };
@@ -1153,6 +1153,14 @@ export class BattleSim {
   private onActionPassives(f: Fighter, ev: BattleEvent[]): void {
     // 一度でも動いたか。開幕を突く技が見る
     f.stacks.acted = 1;
+    // 「急き足」: 行動のたびに速くなる
+    if (f.passive === 'quickening') {
+      const st = f.stacks.quick ?? 0;
+      if (st < 5) {
+        f.stacks.quick = st + 1;
+        this.addMod(f, { kind: 'spd', value: 0.04, turns: 999, source: 'quickening' }, ev, '急き足');
+      }
+    }
     // 「堆積」: 行動のたびに DEF が伸びる
     if (f.passive === 'sediment') {
       const st = f.stacks.sediment ?? 0;
@@ -1276,6 +1284,7 @@ export class BattleSim {
       // 帆そのものも焼く。支援役だが、自分の一撃で火種を作れないと働き始められない
       if (p === 'sailheat' && this.rng.chance(0.45)) this.applyBurn(target, ev, actor.uid);
       if (p === 'venomgland' && this.rng.chance(0.45)) this.applyPoison(target, ev, actor.uid);
+      if (p === 'stinger' && this.rng.chance(0.30)) this.applyPoison(target, ev, actor.uid);
       // 「原始の神経」: 当てた相手の平衡を狂わせる
       if (p === 'firstnerve' && this.rng.chance(0.5)) this.applyDizzy(target, ev, actor.uid);
       // 「断牙」: 牙が通った傷は塞がらない。自分で血を流させ、自分でそこを衝く
@@ -1303,6 +1312,8 @@ export class BattleSim {
     // 試作 kit: 守護・剛力の持ち主は必殺が重い
     if (this.kitTier(actor, 'guard')) mod *= 1.2;
     if (this.kitTier(actor, 'might')) mod *= 1.05;
+    // 「潮呼び」: 仲間の大技に乗って、自分の大技を早める
+    if (!actor.cloneOf) for (const a of this.alive(actor.side)) if (a !== actor && a.passive === 'tidecall') this.gainOd(a, 12, ev);
     // 試作 kit「共鳴」2段目: 誰かが撃つたび、仲間の必殺が溜まる
     if (this.kitTeam(actor.side, 'echo') === 2 && !actor.cloneOf) {
       for (const a of this.alive(actor.side)) if (a !== actor) this.gainOd(a, 5, ev);
@@ -1826,8 +1837,8 @@ export class BattleSim {
     if (slay && def.hp < def.maxHp * 0.5) buff *= slay === 2 ? 1.35 : 1.18;
 
     const pa = atk.passive;
-    // 「噴射」: 下がった直後の一撃だけ重い
-    if (pa === 'jetwake' && this.clockV - atk.retreatedAt < 1.2) buff *= 1.25;
+    // 「刺胞」: 毒の回った相手に重く刺さる
+    if (pa === 'stinger' && def.statuses.some((st) => st.kind === 'poison')) buff *= 1.20;
     // 「甲羅」: 半分を切ってから硬くなる
     if (def.passive === 'carapace' && def.hp / def.maxHp < 0.5) buff *= 0.78;
 
@@ -1835,7 +1846,8 @@ export class BattleSim {
     if (atk.role === 'Breaker' && isWall(def.role)) buff *= BREAKER_VS_WALL;
     if (atk.role === 'Sprinter' && isBackliner(def.role)) buff *= RAIDER_VS_BACK;
 
-    if (pa === 'deeppressure' && def.spd >= atk.spd + 20) buff *= 1.14;
+    // 「底引き」: 足の鈍った相手を逃さない
+    if (pa === 'undertow' && this.modSum(def, 'spd') < 0) buff *= 1.28;
     // 「四枚の翼」: 割って入った一撃は、羽根で殺して受ける
     if (def.passive === 'fourwings' && def.stacks.covering) buff *= 0.72;
     // 「初手の牙」: まだ一度も噛んでいない相手に強い
@@ -1869,8 +1881,6 @@ export class BattleSim {
     // 「断層牽引」: 前線に出ていない相手に強い
     if (pa === 'traction' && !this.engaged(def)) buff *= 1.34;
     if (pa === 'overheat') buff *= 1 + 0.25 * (1 - atk.hp / atk.maxHp);
-    // 「旧き暴君」: まだ削れていない相手を先に潰す
-    if (pa === 'oldtyrant' && def.hp / def.maxHp > atk.hp / atk.maxHp) buff *= 1.16;
     // 「地盤沈下」: 前線で受け止めている間は硬い
     if (def.passive === 'subsidence' && this.engaged(def)) buff *= 0.85;
 
@@ -2092,8 +2102,6 @@ export class BattleSim {
     if (!f.alive) return;
     // 前線で殴り合っている者ほど早く溜まる
     let mul = (this.engaged(f) ? 1.2 : 1) * (this.rules.tempo ?? 1);
-    // 「制海」: 海の主が生きている間、向かいの側は必殺技が溜まりにくい
-    if (this.alive(other(f.side)).some((e) => e.passive === 'deepreign')) mul *= 0.88;
     // 「大喙」: 通常攻撃が重いぶん、必殺技の出番が遅い
     if (f.passive === 'greatbeak') mul *= 0.8;
     // 試作 kit「共鳴」: 持ち主は必殺が早い

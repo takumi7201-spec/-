@@ -184,7 +184,7 @@ export interface Fighter {
   rootedUntil: number;
   /** この時刻までは敵の狙いを自分へ集める（滑空の壁） */
   tauntUntil: number;
-  /** 直前に下がった時刻。噴射がここを見る */
+  /** 直前に下がった時刻 */
   retreatedAt: number;
   /** 「堆積」など戦闘中の永続蓄積 */
   stacks: Record<string, number>;
