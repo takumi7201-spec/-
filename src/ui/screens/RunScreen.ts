@@ -40,11 +40,8 @@ export class RunScreen extends Screen {
   private shopEl!: HTMLElement;
   private infoEl!: HTMLElement;
   private xcard!: ExpandCard;
-  /** マウスを乗せている札。乗せて見るだけで、押せる操作は出さない */
-  private hover: Pick = null;
   /** 押して開いたポップアップが出ているか。閉じて選んだままなら「置き先を選ぶ」状態 */
   private popup = false;
-  private hoverTimer = 0;
   private boardSlots: HTMLElement[] = [];
   private shopSlots: (HTMLElement | null)[] = [];
   private rerollBtn!: HTMLButtonElement;
@@ -116,7 +113,7 @@ export class RunScreen extends Screen {
       const slot = button('', () => this.tapBoard(i), {
         class: `run-slot ${u ? '' : 'is-empty'} ${sel ? 'is-sel' : ''} ${this.dropHint(i) ? 'is-drop' : ''}`,
       });
-      if (u) { slot.append(...this.cardFace(u)); this.hoverable(slot, { from: 'board', i }); }
+      if (u) slot.append(...this.cardFace(u));
       else slot.append(h('span', { class: 'run-empty', text: '＋' }));
       this.boardEl.appendChild(slot);
       this.boardSlots[i] = slot;
@@ -133,7 +130,6 @@ export class RunScreen extends Screen {
         class: `run-slot run-slot--shop ${sel ? 'is-sel' : ''} ${stack ? 'is-stack' : ''}`,
       });
       card.append(...this.cardFace(shopUnit(id)), h('span', { class: 'run-cost' }, coinMark('run-coin'), String(BUY_COST)));
-      this.hoverable(card, { from: 'shop', i });
       this.shopEl.appendChild(card);
       this.shopSlots[i] = card;
     });
@@ -168,20 +164,6 @@ export class RunScreen extends Screen {
     ];
   }
 
-  /** マウスで乗せたら少し待って広げる。指（タッチ）はタップで開くので、ここでは見ない */
-  private hoverable(el: HTMLElement, at: NonNullable<Pick>): void {
-    el.addEventListener('pointerenter', (e) => {
-      if (e.pointerType !== 'mouse') return;
-      clearTimeout(this.hoverTimer);
-      this.hoverTimer = window.setTimeout(() => { this.hover = at; this.renderInfo(); }, 140);
-    });
-    el.addEventListener('pointerleave', (e) => {
-      if (e.pointerType !== 'mouse') return;
-      clearTimeout(this.hoverTimer);
-      if (this.hover?.from === at.from && this.hover.i === at.i) { this.hover = null; this.renderInfo(); }
-    });
-  }
-
   private slotOf(at: Pick): HTMLElement | null {
     if (!at) return null;
     return at.from === 'board' ? this.boardSlots[at.i] ?? null : this.shopSlots[at.i] ?? null;
@@ -200,14 +182,14 @@ export class RunScreen extends Screen {
    */
   private renderInfo(): void {
     const r = this.run;
-    // 押して開いたもの（操作つき）が先。無ければ乗せている札（見るだけ）
-    const at = this.pick && this.popup ? this.pick : !this.pick ? this.hover : null;
+    // 開くのはクリック・タップしたときだけ
+    const at = this.pick && this.popup ? this.pick : null;
     const u = this.unitAt(at);
     const from = this.slotOf(at);
     clear(this.infoEl);
     if (at && u && from) {
       this.lastShown = at;
-      const modal = at === this.pick;
+      const modal = true;
       this.xcard.show(`${at.from}:${at.i}:${u.defId}:${u.copies}:${modal}`, from, this.sheet(u, at, modal), modal);
     } else {
       this.xcard.hide(this.slotOf(this.lastShown));
@@ -219,7 +201,7 @@ export class RunScreen extends Screen {
         : '動かす先の枠を押す。同じ枠を押すとやめる。'
       : r.board.every((x) => !x)
         ? '店の札を押すと中身が出る。「買う」で盤面へ。同じユニットを3体重ねると★2になる。'
-        : '札を押す（マウスなら乗せる）と中身が出る。';
+        : '札を押すと中身が出る。';
     this.infoEl.append(h('div', { class: 'run-hint', text: hint }));
   }
   private lastShown: Pick = null;
