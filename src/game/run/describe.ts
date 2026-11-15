@@ -24,8 +24,8 @@ export const EFFECT_HELP: Record<EffectKind, string> = {
   poison: '相手に毒を積む。2秒ごとに積んだ数ぶん削る。減らず、盾を通る',
   shield: '自分の側に盾を積む。攻撃と火傷を先に受け止める',
   heal: '自分の側の体力を戻す',
-  slow: '正面の相手の溜まりを、その秒数ぶん戻す',
-  haste: '両隣の味方の溜まりを、その秒数ぶん進める',
+  slow: '正面（同じ列のいちばん前）の相手の溜まりを、その秒数ぶん戻す',
+  haste: '隣（上下左右）の味方の溜まりを、その秒数ぶん進める',
   strip: '相手の盾を削る',
 };
 
@@ -47,7 +47,7 @@ function fmt(v: number): string {
 export function abilityText(defId: string, ab: AbilityDef): string {
   const kin = KIT_TRAIT[defId];
   const TO: Record<AbilityDef['to'], string> = {
-    self: '自分の', adj: '両隣の', left: '左隣の', right: '右隣の',
+    self: '自分の', adj: '隣（上下左右）の', left: '左隣の', right: '右隣の',
     allies: '味方全員の', others: '他の味方全員の',
     kin: `同じ系統（${kin ? KIT_TRAITS[kin].name : '—'}）の味方の`,
   };

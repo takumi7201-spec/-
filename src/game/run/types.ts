@@ -73,7 +73,42 @@ export interface RunUnit {
   perm: Partial<Record<Stat, number>>;
 }
 
-export const BOARD_SIZE = 6;
+/**
+ * 盤面は横2×縦3の6マス。上の段が前列（相手の側）。
+ * 隣・正面・画面の並びはすべてこの2つから決まるので、形を変えるときはここだけ直す
+ */
+export const BOARD_COLS = 2;
+export const BOARD_ROWS = 3;
+export const BOARD_SIZE = BOARD_COLS * BOARD_ROWS;
+
+export const colOf = (slot: number): number => slot % BOARD_COLS;
+export const rowOf = (slot: number): number => Math.floor(slot / BOARD_COLS);
+
+/** 隣の枠。上下左右の4方向（斜めは隣ではない） */
+export function neighbors(slot: number, to: 'adj' | 'left' | 'right' = 'adj'): number[] {
+  const c = colOf(slot), r = rowOf(slot);
+  const out: number[] = [];
+  if ((to === 'adj' || to === 'left') && c > 0) out.push(slot - 1);
+  if ((to === 'adj' || to === 'right') && c < BOARD_COLS - 1) out.push(slot + 1);
+  if (to === 'adj' && r > 0) out.push(slot - BOARD_COLS);
+  if (to === 'adj' && r < BOARD_ROWS - 1) out.push(slot + BOARD_COLS);
+  return out;
+}
+
+/**
+ * 正面の相手の枠。同じ列のいちばん前（上の段）。その列が空なら、
+ * いちばん近い列の前から
+ */
+export function facingSlot(occupied: (i: number) => boolean, slot: number): number {
+  const c = colOf(slot);
+  let best = -1, bd = Infinity;
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    if (!occupied(i)) continue;
+    const d = Math.abs(colOf(i) - c) * 10 + rowOf(i);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
 
 export function starOf(u: RunUnit): 1 | 2 | 3 {
   return u.copies >= 9 ? 3 : u.copies >= 3 ? 2 : 1;

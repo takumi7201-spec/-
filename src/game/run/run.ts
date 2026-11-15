@@ -1,7 +1,7 @@
 import { KIT_TRAIT } from '../data/traits';
 import { RUN_UNITS, runDef } from './units';
 import { runBattle, applyGrowth, type RunBattleResult } from './battle';
-import { BOARD_SIZE, starOf, type AbilityDef, type RunUnit, type Stat } from './types';
+import { BOARD_SIZE, starOf, neighbors, type AbilityDef, type RunUnit, type Stat } from './types';
 
 /**
  * ランの進み方。ショップと、勝ち負けの後始末。
@@ -94,9 +94,8 @@ function applyOutside(s: RunState, slot: number, ab: AbilityDef): void {
   let targets: RunUnit[] = [];
   switch (ab.to) {
     case 'self': targets = [self]; break;
-    case 'left': targets = [at(slot - 1)].filter((x): x is RunUnit => !!x); break;
-    case 'right': targets = [at(slot + 1)].filter((x): x is RunUnit => !!x); break;
-    case 'adj': targets = [at(slot - 1), at(slot + 1)].filter((x): x is RunUnit => !!x); break;
+    case 'left': case 'right': case 'adj':
+      targets = neighbors(slot, ab.to).map(at).filter((x): x is RunUnit => !!x); break;
     case 'allies': targets = s.board.filter((x): x is RunUnit => !!x); break;
     case 'others': targets = s.board.filter((x): x is RunUnit => !!x && x !== self); break;
     case 'kin': {

@@ -1,5 +1,6 @@
 import type { QualityTier } from './Quality';
 import type { RunState } from '../game/run/run';
+import { BOARD_SIZE } from '../game/run/types';
 
 /**
  * セーブデータ。
@@ -73,7 +74,7 @@ export function load(): SaveData {
         coins: typeof old.player?.coins === 'number' ? old.player.coins : base.player.coins,
         level: typeof old.player?.level === 'number' ? old.player.level : 1,
       },
-      run: keepRun ? old.run ?? null : null,
+      run: keepRun ? padBoard(old.run ?? null) : null,
       runRecord: { ...base.runRecord!, ...(old.runRecord ?? {}) },
       news: { read: old.news?.read ?? [] },
       stats: { playSeconds: old.stats?.playSeconds ?? 0 },
@@ -86,6 +87,13 @@ export function load(): SaveData {
   } catch {
     return defaultSave();
   }
+}
+
+/** 盤面の枠数に合わせる。足りなければ空き枠を足す */
+function padBoard(run: RunState | null): RunState | null {
+  if (!run) return null;
+  while (run.board.length < BOARD_SIZE) run.board.push(null);
+  return run;
 }
 
 export function save(data: SaveData): void {

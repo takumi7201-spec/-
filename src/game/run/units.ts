@@ -46,7 +46,7 @@ export const RUN_UNITS: RunUnitDef[] = [
   { id: 'archelon', tier: 3, cd: 6, fire: { shield: 8 },
     abilities: [a('start', 'self', 'charge', 3)] },
   // 隣の火傷を育てる。火傷役と並べるほど伸びる
-  { id: 'dimetrodon', tier: 3, cd: 5, fire: { burn: 2 },
+  { id: 'dimetrodon', tier: 3, cd: 7, fire: { burn: 2 },
     abilities: [a('fire', 'adj', 'burn', 1, true)] },
   { id: 'majungasaurus', tier: 3, cd: 5, fire: { dmg: 7 },
     abilities: [a('win', 'self', 'dmg', 1, true)] },

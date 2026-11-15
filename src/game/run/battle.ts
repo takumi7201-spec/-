@@ -1,7 +1,7 @@
 import { KIT_TRAIT } from '../data/traits';
 import { runDef } from './units';
 import {
-  BOARD_SIZE, EFFECT_KINDS, starOf,
+  BOARD_SIZE, EFFECT_KINDS, starOf, neighbors, facingSlot,
   type AbilityDef, type EffectKind, type RunUnit, type RunUnitDef, type Stat, type Target,
 } from './types';
 
@@ -150,9 +150,8 @@ export function runBattle(
     const live = (x: Live | null | undefined): x is Live => !!x;
     switch (to) {
       case 'self': return [self];
-      case 'left': return [us[self.slot - 1]].filter(live);
-      case 'right': return [us[self.slot + 1]].filter(live);
-      case 'adj': return [us[self.slot - 1], us[self.slot + 1]].filter(live);
+      case 'left': case 'right': case 'adj':
+        return neighbors(self.slot, to).map((i) => us[i]).filter(live);
       case 'allies': return us.filter(live);
       case 'others': return us.filter(live).filter((x) => x !== self);
       case 'kin': {
@@ -194,15 +193,10 @@ export function runBattle(
     return amount;
   };
 
-  /** 正面の相手。同じ枠が空なら、いちばん近い枠 */
+  /** 正面の相手。同じ列のいちばん前 */
   const facing = (foe: Team, slot: number): Live | null => {
-    let best: Live | null = null, bd = Infinity;
-    for (const u of foe.units) {
-      if (!u) continue;
-      const d = Math.abs(u.slot - slot);
-      if (d < bd) { bd = d; best = u; }
-    }
-    return best;
+    const i = facingSlot((k) => !!foe.units[k], slot);
+    return i < 0 ? null : foe.units[i];
   };
 
   const fire = (team: Team, foe: Team, l: Live): void => {

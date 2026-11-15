@@ -5,7 +5,7 @@ import { getRevos, revosShortName } from '../../game/data/revos';
 import { runDef } from '../../game/run/units';
 import { DT, type RunBattleResult, type RunEvent } from '../../game/run/battle';
 import { EFFECT_GLYPH, EFFECT_NAMES, fmt, starOf } from '../../game/run/describe';
-import { BOARD_SIZE, type RunUnit, type Stat, type EffectKind } from '../../game/run/types';
+import { BOARD_SIZE, BOARD_COLS, colOf, rowOf, facingSlot, type RunUnit, type Stat, type EffectKind } from '../../game/run/types';
 import type { BattleScene, Fighter } from '../../scenes/BattleScene';
 import type { BiomeId } from '../../voxel/palette';
 import { revosIcon } from '../revosIcon';
@@ -28,10 +28,13 @@ interface Panel { hpFill: HTMLElement; hpText: HTMLElement; shield: HTMLElement;
 /** 2周ごとに舞台を変える */
 const STAGES: BiomeId[] = ['canyon', 'tidehollow', 'frostpeak', 'emberfield', 'permitzone'];
 
-/** 枠の横位置。6体を一列に並べる */
-const laneX = (slot: number): number => (slot - (BOARD_SIZE - 1) / 2) * 1.12;
-/** 手前（自分）と奥（相手）の列。手前を少し寄せて、画面の下側も使う */
-const ROW_Z: [number, number] = [5.4, -0.4];
+/** 枠の位置。横は列、奥行きは段。前列（上の段）がいちばん相手に近い */
+const laneX = (slot: number): number => (colOf(slot) - (BOARD_COLS - 1) / 2) * 2.2;
+/** 前列の奥行きと、段ごとの下がり幅。自分は手前へ、相手は奥へ下がる */
+const FRONT_Z: [number, number] = [2.6, -0.4];
+const ROW_STEP = 1.45;
+const laneZ = (side: 0 | 1, slot: number): number =>
+  FRONT_Z[side] + (side === 0 ? 1 : -1) * rowOf(slot) * ROW_STEP;
 
 export class RunBattleScreen extends Screen {
   private res!: RunBattleResult;
@@ -124,7 +127,7 @@ export class RunBattleScreen extends Screen {
     for (const side of [0, 1] as const) {
       this.boards[side].forEach((u, i) => {
         if (!u) return;
-        const x = laneX(i), z = ROW_Z[side];
+        const x = laneX(i), z = laneZ(side, i);
         // ★が上がるほど体を少し大きく。重ねた手応えを舞台でも見せる
         const size = 0.74 + 0.08 * (starOf(u) - 1);
         fighters.push({ uid: uidOf(side, i), defId: u.defId, side, x, z, px: x, pz: z, size });
@@ -202,18 +205,18 @@ export class RunBattleScreen extends Screen {
     while (this.evIdx < ev.length && ev[this.evIdx].t <= f.t + 1e-9) this.show(ev[this.evIdx++]);
   }
 
-  /** 正面の相手の枠。同じ枠が空なら、いちばん近い枠 */
+  /** 正面の相手の枠。同じ列のいちばん前（戦闘の規則と同じ） */
   private facing(side: 0 | 1, slot: number): string | null {
     const foe = this.boards[1 - side];
-    let best = -1, bd = Infinity;
-    foe.forEach((u, i) => { if (u && Math.abs(i - slot) < bd) { bd = Math.abs(i - slot); best = i; } });
-    return best < 0 ? null : uidOf((1 - side) as 0 | 1, best);
+    const i = facingSlot((k) => !!foe[k], slot);
+    return i < 0 ? null : uidOf((1 - side) as 0 | 1, i);
   }
 
   /** その側のまん中あたりの体。火傷・毒・砂嵐のように、誰が受けたでもない削りを出す場所 */
   private middleOf(side: 0 | 1): string | null {
     const b = this.boards[side];
-    const order = [2, 3, 1, 4, 0, 5];
+    // 前列から、左右の順に
+    const order = Array.from({ length: BOARD_SIZE }, (_, i) => i);
     for (const i of order) if (b[i]) return uidOf(side, i);
     return null;
   }

@@ -11,7 +11,7 @@ import {
   unitValues, unitCooldown, abilityText, traitsText, shopUnit, starOf, fmt,
   EFFECT_GLYPH, EFFECT_NAMES, EFFECT_HELP,
 } from '../../game/run/describe';
-import { BOARD_SIZE, type RunUnit } from '../../game/run/types';
+import { BOARD_SIZE, rowOf, type RunUnit } from '../../game/run/types';
 import { revosIcon } from '../revosIcon';
 import { ExpandCard } from '../expandCard';
 import { effectValue } from '../../game/run/battle';
@@ -113,8 +113,11 @@ export class RunScreen extends Screen {
       const slot = button('', () => this.tapBoard(i), {
         class: `run-slot ${u ? '' : 'is-empty'} ${sel ? 'is-sel' : ''} ${this.dropHint(i) ? 'is-drop' : ''}`,
       });
-      if (u) slot.append(...this.cardFace(u));
-      else slot.append(h('span', { class: 'run-empty', text: '＋' }));
+      slot.dataset.slot = String(i);
+      // 上の段が前列。どこが相手に近いかを枠に書いておく
+      if (rowOf(i) === 0) slot.classList.add('is-front');
+      if (u) { slot.append(...this.cardFace(u)); this.draggable(slot, { from: 'board', i }); }
+      else slot.append(h('span', { class: 'run-empty', text: rowOf(i) === 0 ? '前列' : '＋' }));
       this.boardEl.appendChild(slot);
       this.boardSlots[i] = slot;
     }
@@ -130,6 +133,7 @@ export class RunScreen extends Screen {
         class: `run-slot run-slot--shop ${sel ? 'is-sel' : ''} ${stack ? 'is-stack' : ''}`,
       });
       card.append(...this.cardFace(shopUnit(id)), h('span', { class: 'run-cost' }, coinMark('run-coin'), String(BUY_COST)));
+      this.draggable(card, { from: 'shop', i });
       this.shopEl.appendChild(card);
       this.shopSlots[i] = card;
     });
@@ -151,17 +155,94 @@ export class RunScreen extends Screen {
         h('i', { text: EFFECT_GLYPH[v.kind] }), fmt(v.value)));
     }
     const kit = KIT_TRAIT[u.defId];
+    // 顔と中身を分けて置く。盤面（横長の札）は横に、店（縦長の札）は縦に流す
     return [
-      h('span', { class: 'run-top' },
-        h('span', { class: `run-tier tier-${d.tier}`, text: String(d.tier) }),
-        h('span', { class: 'run-star', text: '★'.repeat(star) }),
-      ),
       h('span', { class: 'run-art' }, revosIcon(u.defId, 'run-icon')),
-      h('span', { class: 'run-name', text: revosShortName(u.defId) }),
-      h('span', { class: 'run-cd num', text: `${fmt(unitCooldown(u))}s` }),
-      vals,
-      kit ? h('span', { class: 'run-kit', text: KIT_TRAITS[kit].name }) : h('span'),
+      h('span', { class: 'run-info-col' },
+        h('span', { class: 'run-top' },
+          h('span', { class: `run-tier tier-${d.tier}`, text: String(d.tier) }),
+          h('span', { class: 'run-name', text: revosShortName(u.defId) }),
+          h('span', { class: 'run-star', text: '★'.repeat(star) }),
+        ),
+        h('span', { class: 'run-cd num', text: `${fmt(unitCooldown(u))}秒${kit ? ` · ${KIT_TRAITS[kit].name}` : ''}` }),
+        vals,
+      ),
     ];
+  }
+
+  /**
+   * ドラッグで動かす。
+   *
+   * 押して少し動かしたらドラッグに切り替え、札の写しを指に付ける。盤面の枠の上で
+   * 離すと、盤面の札なら入れ替え、店の札ならその枠へ買う（同じユニットなら重なる）。
+   * 動かさずに離したときは、ふつうのタップとして扱う（中身のポップアップ）。
+   */
+  private draggable(el: HTMLElement, at: NonNullable<Pick>): void {
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const sx = e.clientX, sy = e.clientY;
+      let ghost: HTMLElement | null = null;
+      let over: HTMLElement | null = null;
+      const offX = sx - el.getBoundingClientRect().left, offY = sy - el.getBoundingClientRect().top;
+      const move = (ev: PointerEvent): void => {
+        if (!ghost) {
+          if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) return;
+          // ドラッグ開始。ポップアップは閉じ、選択も外す
+          ghost = el.cloneNode(true) as HTMLElement;
+          ghost.classList.add('run-ghost');
+          ghost.style.width = `${el.offsetWidth}px`;
+          ghost.style.height = `${el.offsetHeight}px`;
+          document.body.appendChild(ghost);
+          el.classList.add('is-dragging');
+          this.pick = null; this.popup = false;
+          this.xcard.hide(el);
+          audio.uiTap();
+        }
+        ghost.style.transform = `translate(${ev.clientX - offX}px, ${ev.clientY - offY}px) rotate(-3deg) scale(1.05)`;
+        const under = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('.run-board .run-slot') ?? null;
+        if (under !== over) {
+          over?.classList.remove('is-over');
+          over = under;
+          over?.classList.add('is-over');
+        }
+      };
+      const up = (): void => {
+        removeEventListener('pointermove', move);
+        removeEventListener('pointerup', up);
+        removeEventListener('pointercancel', up);
+        if (!ghost) return;
+        ghost.remove();
+        el.classList.remove('is-dragging');
+        over?.classList.remove('is-over');
+        // 直後に来るクリックは、ドラッグの終わりなので捨てる
+        this.swallowClick = true;
+        setTimeout(() => { this.swallowClick = false; }, 0);
+        const to = over ? Number(over.dataset.slot) : NaN;
+        if (Number.isNaN(to)) { this.render(); return; }
+        this.dropOn(at, to);
+      };
+      addEventListener('pointermove', move);
+      addEventListener('pointerup', up);
+      addEventListener('pointercancel', up);
+    });
+  }
+  private swallowClick = false;
+
+  /** ドラッグを枠 to の上で離した */
+  private dropOn(at: NonNullable<Pick>, to: number): void {
+    const r = this.run;
+    if (at.from === 'board') {
+      if (at.i !== to) { move(r, at.i, to); audio.uiConfirm(); this.onChange?.(); }
+    } else if (!buy(r, at.i, to)) {
+      audio.uiError();
+      this.ui.toast(r.gold < BUY_COST ? 'コインが足りない' : 'その枠には置けない', 'warn');
+    } else {
+      audio.uiConfirm();
+      this.onChange?.();
+    }
+    this.pick = null;
+    this.popup = false;
+    this.render();
   }
 
   private slotOf(at: Pick): HTMLElement | null {
@@ -200,8 +281,8 @@ export class RunScreen extends Screen {
       ? this.pick.from === 'shop' ? '置く枠を押す（同じユニットの枠なら重なる）。もう一度店の札を押すとやめる。'
         : '動かす先の枠を押す。同じ枠を押すとやめる。'
       : r.board.every((x) => !x)
-        ? '店の札を押すと中身が出る。「買う」で盤面へ。同じユニットを3体重ねると★2になる。'
-        : '札を押すと中身が出る。';
+        ? '店の札を盤面へドラッグして買う（押せば中身が出る）。同じユニットを3体重ねると★2になる。'
+        : '札を押すと中身が出る。盤面の札はドラッグで入れ替え、店の札は盤面へドラッグして買える。';
     this.infoEl.append(h('div', { class: 'run-hint', text: hint }));
   }
   private lastShown: Pick = null;
@@ -288,6 +369,7 @@ export class RunScreen extends Screen {
   }
 
   private tapBoard(i: number): void {
+    if (this.swallowClick) return;
     const r = this.run;
     // 置き先を選んでいる最中（ポップアップは閉じて、選んだまま）
     if (this.pick && !this.popup) {
@@ -311,6 +393,7 @@ export class RunScreen extends Screen {
   }
 
   private tapShop(i: number): void {
+    if (this.swallowClick) return;
     audio.uiTap();
     // 置き先を選んでいる最中に同じ札を押したらやめる
     if (this.pick?.from === 'shop' && this.pick.i === i && !this.popup) { this.pick = null; this.render(); return; }

@@ -3272,7 +3272,7 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 .run-pips--life i.on { background: #d5524a; }
 .run-label { margin-top: 4px; font-size: 12px; color: var(--ink); }
 .run-board, .run-shop { display: grid; gap: 4px; }
-.run-board { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.run-board { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .run-shop { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .run-slot {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -3449,3 +3449,34 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 
 /* 横長の画面では中央に寄せる。表の列が離れすぎて読みにくい */
 body[data-layout='wide'] .run-body { left: 18vw; right: 18vw; }
+
+/* ------------------------------------------------------------------ 盤面（横2×縦3）とドラッグ */
+/* 盤面の札は横長。顔を左、中身を右に置く */
+.run-board .run-slot {
+  flex-direction: row; align-items: center; gap: 8px; min-height: 76px; padding: 8px 10px; text-align: left;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.run-board .run-slot.is-empty { justify-content: center; }
+.run-board .run-slot.is-front { box-shadow: inset 0 -3px 0 rgba(217, 87, 63, 0.35), var(--lift-1); }
+.run-board .run-slot.is-front.is-empty { box-shadow: inset 0 0 0 1.5px rgba(217, 87, 63, 0.3); }
+.run-board .run-empty { font-size: 13px; font-weight: 800; }
+.run-board .run-art { height: 48px; width: 48px; flex: none; }
+.run-board .run-icon { width: 48px; height: 48px; }
+.run-info-col { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.run-board .run-top { justify-content: flex-start; gap: 4px; }
+.run-board .run-name { font-size: 13px; flex: 1; text-align: left; }
+.run-board .run-cd { font-size: 11px; }
+.run-board .run-vals { justify-content: flex-start; }
+/* 店の札は縦長。中身を縦に流す */
+.run-slot--shop { touch-action: none; user-select: none; -webkit-user-select: none; }
+.run-slot--shop .run-info-col { align-items: center; }
+.run-slot--shop .run-top { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+.run-slot--shop .run-name { order: 3; width: 100%; text-align: center; }
+.run-slot--shop .run-cd { font-size: 9.5px; text-align: center; }
+/* ドラッグ中 */
+.run-ghost {
+  position: fixed; left: 0; top: 0; z-index: 1000; pointer-events: none; margin: 0;
+  box-shadow: 0 14px 30px rgba(30, 22, 12, 0.35) !important; opacity: 0.95;
+}
+.run-slot.is-dragging { opacity: 0.35; }
+.run-board .run-slot.is-over { box-shadow: inset 0 0 0 3px var(--hl-amber), var(--lift-2); transform: scale(1.03); }
