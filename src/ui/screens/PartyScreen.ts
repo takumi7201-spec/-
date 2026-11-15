@@ -9,6 +9,7 @@ import { PARTY_SIZE, partyPower } from '../../game/party';
 import { revosIcon } from '../revosIcon';
 import { screenHead, plate, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
+import { tallyTraits, KIT_TRAIT, KIT_TRAITS, ELEMENT_TRAITS, type ActiveTrait } from '../../game/data/traits';
 
 /**
  * 編成。
@@ -24,6 +25,7 @@ export class PartyScreen extends Screen {
   private rosterEl!: HTMLElement;
   private totalEl!: HTMLElement;
   private tacticEl!: HTMLElement;
+  private traitEl!: HTMLElement;
   private order: (string | null)[] = Array(PARTY_SIZE).fill(null);
   private selected: string | null = null;
   private powerPlate = plate('戦力', { tone: 'amber' });
@@ -61,11 +63,14 @@ export class PartyScreen extends Screen {
     this.slotsEl = h('div', { class: 'party-field' });
     this.totalEl = h('div', { class: 'party-total' });
     this.tacticEl = h('div', { class: 'party-tactics' });
+    this.traitEl = h('div', { class: 'party-traits' });
     this.rosterEl = h('div', { class: 'party-roster' });
 
     const body = h('div', { class: 'party-body' },
       this.slotsEl,
       this.totalEl,
+      h('div', { class: 'label party-label', text: spaced('シナジー') }),
+      this.traitEl,
       h('div', { class: 'label party-label', text: spaced('立ち回り') }),
       this.tacticEl,
       h('div', { class: 'label party-label', text: spaced('手持ち') }),
@@ -157,6 +162,20 @@ export class PartyScreen extends Screen {
       party: { ...this.data.party, order: this.order.filter((x): x is string => !!x) },
     })));
 
+    // ---- 特性 ----
+    // 揃えると何が起きるかを、組みながら読めるようにする。立っていない特性も
+    // 「あと何体」で並べる——次の1体を選ぶ理由はそこにある
+    clear(this.traitEl);
+    const members = this.order.flatMap((uid) => {
+      const u = this.unitOf(uid);
+      return u ? [{ defId: u.defId, element: getRevos(u.defId).element }] : [];
+    });
+    const traits = tallyTraits(members);
+    if (traits.length === 0) {
+      this.traitEl.appendChild(h('div', { class: 'dim', text: '枠にユニットを置くと、揃ったシナジーがここに出る。' }));
+    }
+    for (const t of traits) this.traitEl.appendChild(this.traitRow(t));
+
     // ---- 立ち回り ----
     // 狙いと立ち位置は役職が決める。選ばせる代わりに、何をするかを読ませる
     clear(this.tacticEl);
@@ -189,13 +208,50 @@ export class PartyScreen extends Screen {
       const hpBar = bar('bar--slim', u.clean / 100);
       card.append(
         revosIcon(u.defId, 'roster-icon'),
-        h('span', { class: `chip chip--${d.element}`, text: ELEMENT_NAMES[d.element] }),
+        h('span', { class: 'roster-chips' },
+          h('span', { class: `chip chip--${d.element}`, text: ELEMENT_NAMES[d.element] }),
+          KIT_TRAIT[d.id] ? h('span', { class: 'chip chip--trait', text: KIT_TRAITS[KIT_TRAIT[d.id]].name }) : '',
+        ),
         h('span', { class: 'roster-name', text: revosShortName(d.id) }),
         h('span', { class: 'roster-sub num', text: `Lv${u.level} ${cleanRank(u.clean)}` }),
         hpBar.el,
       );
       this.rosterEl.appendChild(card);
     }
+  }
+
+  /** 特性1つぶんの行。段の粒と、いま効いている（または次に効く）中身 */
+  private traitRow(t: ActiveTrait): HTMLElement {
+    const info = t.kind === 'kit' ? KIT_TRAITS[t.id as keyof typeof KIT_TRAITS] : ELEMENT_TRAITS[t.id as keyof typeof ELEMENT_TRAITS];
+    const pips = h('span', { class: 'trait-pips' });
+    for (let i = 1; i <= t.steps[1]; i++) {
+      const isStep = i === t.steps[0] || i === t.steps[1];
+      pips.appendChild(h('i', { class: `${i <= t.count ? 'on' : ''} ${isStep ? 'step' : ''}` }));
+    }
+    const lines = h('div', { class: 'trait-lines' });
+    info.tiers.forEach((txt, i) => {
+      if (txt === '—') return;
+      // 立っていない特性は、次に届く段だけ。並べると画面が説明で埋まる
+      if (t.tier === 0 && i > 0) return;
+      const need = t.steps[i];
+      const live = t.tier >= i + 1;
+      lines.appendChild(h('div', { class: `trait-line ${live ? 'is-live' : ''}` },
+        h('span', { class: 'trait-need num', text: String(need) }),
+        h('span', { text: txt }),
+      ));
+    });
+    const next = t.tier === 0 ? t.steps[0] - t.count : t.tier === 1 ? t.steps[1] - t.count : 0;
+    const status = t.tier === 0 ? `あと${next}体` : t.tier === 1 && info.tiers[1] !== '—' ? `2段目まで あと${next}体` : '';
+    return h('div', { class: `trait-row tier-${t.tier} trait--${t.kind}` },
+      h('div', { class: 'trait-head' },
+        t.kind === 'element' ? h('i', { class: `dot dot--${t.id}` }) : h('i', { class: 'trait-mark' }),
+        h('span', { class: 'trait-name', text: info.name }),
+        h('span', { class: 'trait-count num', text: `${t.count}/${t.steps[t.tier >= 1 && info.tiers[1] !== '—' ? 1 : 0]}` }),
+        pips,
+        status ? h('span', { class: 'trait-status', text: status }) : '',
+      ),
+      lines,
+    );
   }
 
   /** 枠に並んでいる順。詳細を払って隣の枠へ移るのに使う */

@@ -35,7 +35,7 @@ function mkTeam(ids: string[], tag: string): TeamSetup {
 }
 
 function fight(j: Job): number {
-  const rules: BattleRules = j.mode === 'off' ? {} : { synergy: j.mode, synergySteps: STEPS };
+  const rules: BattleRules = j.mode === 'off' ? { synergy: 'off' } : { synergy: j.mode, synergySteps: STEPS };
   const sim = new BattleSim(j.seed, mkTeam(j.a, 'a'), mkTeam(j.b, 'b'), rules);
   sim.runToEnd();
   return sim.result().winner;

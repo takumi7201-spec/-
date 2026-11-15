@@ -55,7 +55,7 @@ function mkTeam(ids: string[], tag: string): TeamSetup {
   };
 }
 function fight(j: Job): number {
-  const sim = new BattleSim(j.seed, mkTeam(j.a, 'a'), mkTeam(j.b, 'b'), j.rules ?? {});
+  const sim = new BattleSim(j.seed, mkTeam(j.a, 'a'), mkTeam(j.b, 'b'), j.rules ?? { synergy: 'off' });
   sim.runToEnd();
   return sim.result().winner;
 }

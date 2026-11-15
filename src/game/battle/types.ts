@@ -112,9 +112,11 @@ export interface BattleRules {
    * 試作: 属性シナジー（TFT 風）。同じ属性が 2 / 4 体そろうと、その属性の者に効く。
    *   effect … 属性ごとに違う効き方（火傷・再生・盾・先手・必殺）
    *   flat   … 比較用。どの属性も与ダメ倍率を足すだけ
-   * 未指定なら無効。本編の戦闘には入れていない（tools/synergy.ts で測るだけ）
+   *   kit  … 本編。属性＋効果特性（src/game/data/traits.ts）
+   *   off  … シナジー無し。道具が「無しとの差」を測るのに使う
+   * 未指定なら kit
    */
-  synergy?: 'effect' | 'flat' | 'dual' | 'kit';
+  synergy?: 'off' | 'effect' | 'flat' | 'dual' | 'kit';
   /** 試作 dual: 役職の段の敷居。既定 [2, 4] */
   classSteps?: [number, number];
   /** 試作 dual: この特性だけを効かせる（特性ごとの伸びを切り分けて測る） */

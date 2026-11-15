@@ -1,4 +1,6 @@
 import { getRevos } from '../data/revos';
+import { KIT_TRAIT, kitSteps, TRAIT_NUM as TN } from '../data/traits';
+export { KIT_TRAIT, kitSteps };
 import {
   elementFactor,
   type BattleEvent, type BattleRules, type Fighter, type FighterSnapshot, type Mod, type ModKind,
@@ -369,30 +371,6 @@ function makeClone(f: Fighter, index: number): Fighter {
 }
 
 /** 開戦と同時に呼ぶぶん（「二分されし身体」） */
-/**
- * 試作 kit: 効果特性。ユニットが持つ効き目の系統で分ける。
- * 1段目は持ち主の効き目を引き上げ、2段目はその効き目を仲間にも付ける。
- */
-export const KIT_TRAIT: Record<string, string> = {
-  yutyrannus: 'burn', dimetrodon: 'burn', goyocephale: 'burn', spinosaurus: 'burn',
-  elasmosaurus: 'venom', jobaria: 'venom', smilodon: 'venom', orthoceras: 'venom',
-  pikaia: 'weaken', paradoxides: 'weaken', irritator: 'weaken', velociraptor: 'weaken', kronosaurus: 'weaken',
-  archelon: 'guard', triceratops: 'guard', microraptor: 'guard', stegosaurus: 'guard', ankylosaurus: 'guard',
-  // 角で押し返し、味方の防御を固める側。弱体と土の両方の芯になって偏ったので、こちらへ
-  albertaceratops: 'guard',
-  maiasaura: 'mend', nipponites: 'mend', shonisaurus: 'mend', brachiosaurus: 'mend',
-  pachycephalosaurus: 'echo', 'spinosaurus-1915': 'echo', quetzalcoatlus: 'echo', ophthalmosaurus: 'echo', 'pliosaurus-funkei': 'echo',
-  pteranodon: 'rush', pliosaurus: 'rush', 'tyrannosaurus-1915': 'rush', ornithomimus: 'rush', carnotaurus: 'rush',
-  anomalocaris: 'hunt', iguanodon: 'hunt', dimorphodon: 'hunt', concavenator: 'hunt', majungasaurus: 'hunt', tyrannosaurus: 'hunt',
-  xidazoon: 'pack', coelophysis: 'pack',
-  'tyrannosaurus-sue': 'might', therizinosaurus: 'might', diatryma: 'might', hatzegopteryx: 'might', tylosaurus: 'might',
-};
-const KIT_SIZE = new Map<string, number>();
-for (const k of Object.values(KIT_TRAIT)) KIT_SIZE.set(k, (KIT_SIZE.get(k) ?? 0) + 1);
-/** 段の敷居。4体以上いる特性は 2/4、それより少ない特性は 2/3 */
-export function kitSteps(k: string): [number, number] {
-  return (KIT_SIZE.get(k) ?? 0) >= 4 ? [2, 4] : [2, 3];
-}
 /** 弱体の出どころになる特性・必殺の id（持ち主を探すのに使う） */
 const WEAKEN_SOURCES = new Set([
   'irritate', 'falsejaw', 'twinhorn', 'hornrout', 'shearwind', 'erosionstorm', 'vortexfang', 'nervejam',
@@ -463,7 +441,8 @@ export class BattleSim {
 
   constructor(seed: number, teamA: TeamSetup, teamB: TeamSetup, rules: BattleRules = {}) {
     this.rng = new Prng(seed);
-    this.rules = rules;
+    // シナジーは本編では常に効く。道具だけが 'off' で外して比べる
+    this.rules = { ...rules, synergy: rules.synergy ?? 'kit' };
     this.timeLimit = rules.timeLimit ?? MAX_TIME;
     const a = buildFighters(teamA, 0);
     const b = buildFighters(teamB, 1);
@@ -479,7 +458,7 @@ export class BattleSim {
       if (f.passive === 'vanguard') f.ready += 0.35;
     });
     this.syncHeadwind();
-    if (rules.synergy) this.applySynergy(rules.synergy);
+    if (this.rules.synergy && this.rules.synergy !== 'off') this.applySynergy(this.rules.synergy);
   }
 
   /**
@@ -548,13 +527,13 @@ export class BattleSim {
   private kitOnHit(actor: Fighter, target: Fighter, ev: BattleEvent[]): void {
     if (!target.alive) return;
     const s = actor.side;
-    if (this.kitTier(actor, 'burn') && this.rng.chance(0.40)) this.applyBurn(target, ev, actor.uid);
-    else if (this.kitTeam(s, 'burn') === 2 && !this.kitTier(actor, 'burn') && this.rng.chance(0.40)) this.applyBurn(target, ev, actor.uid);
-    if (this.kitTeam(s, 'venom') === 2 && !this.kitTier(actor, 'venom') && this.rng.chance(0.65)) this.applyPoison(target, ev, actor.uid);
+    if (this.kitTier(actor, 'burn') && this.rng.chance(TN.burnChance)) this.applyBurn(target, ev, actor.uid);
+    else if (this.kitTeam(s, 'burn') === 2 && !this.kitTier(actor, 'burn') && this.rng.chance(TN.burnChance)) this.applyBurn(target, ev, actor.uid);
+    if (this.kitTeam(s, 'venom') === 2 && !this.kitTier(actor, 'venom') && this.rng.chance(TN.venomChance)) this.applyPoison(target, ev, actor.uid);
     if (this.kitTeam(s, 'weaken') === 2 && !this.kitTier(actor, 'weaken')) {
       const has = target.mods.find((m) => m.source === 'kitweaken');
-      if (has) has.turns = 3;
-      else this.addMod(target, { kind: 'atk', value: -0.08, turns: 3, source: 'kitweaken' }, ev, 'ATK低下');
+      if (has) has.turns = TN.weakenTurns;
+      else this.addMod(target, { kind: 'atk', value: TN.weakenAtk, turns: TN.weakenTurns, source: 'kitweaken' }, ev, 'ATK低下');
     }
   }
 
@@ -576,16 +555,16 @@ export class BattleSim {
       const own = KIT_TRAIT[f.defId] === k;
       switch (k) {
         case 'guard':
-          if (own) f.mods.push({ kind: 'taken', value: -0.06, turns: 9999, source: 'kit' });
+          if (own) f.mods.push({ kind: 'taken', value: TN.guardTaken, turns: 9999, source: 'kit' });
           if (tier === 2) {
-            const amount = Math.round(f.def * 0.4) + (f.shield?.amount ?? 0);
+            const amount = Math.round(f.def * TN.guardShield) + (f.shield?.amount ?? 0);
             f.shield = { amount, turns: 6 };
           }
           break;
         case 'rush':
           if (own) {
-            f.mods.push({ kind: 'spd', value: 0.08, turns: 9999, source: 'kit' });
-            f.ready += 0.2;
+            f.mods.push({ kind: 'spd', value: TN.rushSpd, turns: 9999, source: 'kit' });
+            f.ready += TN.rushReady;
           }
           break;
         case 'pack':
@@ -598,7 +577,7 @@ export class BattleSim {
 
   /** 試作 kit「群れ」: 分身を本体の 56% にする（素は半分） */
   private strengthenClone(c: Fighter, owner: Fighter): void {
-    const k = 0.56;
+    const k = TN.packScale;
     c.maxHp = Math.max(1, Math.round(owner.maxHp * k));
     c.hp = c.maxHp;
     c.atk = Math.max(1, Math.round(owner.atk * k));
@@ -610,15 +589,15 @@ export class BattleSim {
   private elementTrait(f: Fighter, el: string, tier: number): void {
     const two = tier === 2;
     switch (el) {
-      case 'flame': f.mods.push({ kind: 'dealt', value: two ? 0.20 : 0.09, until: 15, turns: 0, source: 'synergy' }); break;
+      case 'flame': f.mods.push({ kind: 'dealt', value: TN.flameDealt[two ? 1 : 0], until: TN.flameUntil, turns: 0, source: 'synergy' }); break;
       case 'aqua': {
-        const total = Math.round(f.maxHp * (two ? 0.30 : 0.16));
-        f.statuses.push({ kind: 'regen', turns: 99, value: Math.max(1, Math.round(total / 10)), pool: total, until: 10, source: f.uid + '|synergy' });
+        const total = Math.round(f.maxHp * TN.aquaRegen[two ? 1 : 0]);
+        f.statuses.push({ kind: 'regen', turns: 99, value: Math.max(1, Math.round(total / TN.aquaSeconds)), pool: total, until: TN.aquaSeconds, source: f.uid + '|synergy' });
         break;
       }
-      case 'terra': f.shield = { amount: Math.round(f.def * (two ? 1.9 : 0.9)), turns: 6 }; break;
-      case 'gale': f.mods.push({ kind: 'spd', value: two ? 0.14 : 0.045, turns: 9999, source: 'synergy' }); break;
-      case 'null': f.od = Math.min(100, f.od + (two ? 40 : 6)); break;
+      case 'terra': f.shield = { amount: Math.round(f.def * TN.terraShield[two ? 1 : 0]), turns: 6 }; break;
+      case 'gale': f.mods.push({ kind: 'spd', value: TN.galeSpd[two ? 1 : 0], turns: 9999, source: 'synergy' }); break;
+      case 'null': f.od = Math.min(100, f.od + TN.nullOd[two ? 1 : 0]); break;
     }
   }
 
@@ -1310,13 +1289,13 @@ export class BattleSim {
     const skill = skillMultiplier(actor.skillLevel);
     let mod = (1 + 0.35 * (clamp(actor.od, 100, 150) - 100) / 50) * skill;
     // 試作 kit: 守護・剛力の持ち主は必殺が重い
-    if (this.kitTier(actor, 'guard')) mod *= 1.2;
-    if (this.kitTier(actor, 'might')) mod *= 1.05;
+    if (this.kitTier(actor, 'guard')) mod *= TN.guardOd;
+    if (this.kitTier(actor, 'might')) mod *= TN.mightOd;
     // 「潮呼び」: 仲間の大技に乗って、自分の大技を早める
     if (!actor.cloneOf) for (const a of this.alive(actor.side)) if (a !== actor && a.passive === 'tidecall') this.gainOd(a, 12, ev);
     // 試作 kit「共鳴」2段目: 誰かが撃つたび、仲間の必殺が溜まる
     if (this.kitTeam(actor.side, 'echo') === 2 && !actor.cloneOf) {
-      for (const a of this.alive(actor.side)) if (a !== actor) this.gainOd(a, 5, ev);
+      for (const a of this.alive(actor.side)) if (a !== actor) this.gainOd(a, TN.echoShare, ev);
     }
     const power = odPower(actor) * mod;
     const enemies = this.alive(other(actor.side));
@@ -1803,8 +1782,8 @@ export class BattleSim {
     // 支援役（回復・支援）は割り引かない。後ろに下がるのは役目で、得ではない
     if (f.role === 'Technical' || f.role === 'Debuffer') p *= RANGED_BASIC;
     // 試作 kit「剛力」: 持ち主の一撃は重く、2段目は全員の一撃が重い
-    if (this.kitTier(f, 'might')) p *= 1.07;
-    if (this.kitTeam(f.side, 'might') === 2) p *= 1.05;
+    if (this.kitTier(f, 'might')) p *= TN.mightBasic;
+    if (this.kitTeam(f.side, 'might') === 2) p *= TN.mightTeam;
     return p;
   }
 
@@ -1830,8 +1809,8 @@ export class BattleSim {
     // 場の効果。その属性の攻撃が、敵味方の別なく通りやすくなる
     buff *= this.rules.elementDealt?.[atk.element] ?? 1;
     // 試作 kit「狩猟」: 持ち主は後衛か手負いに、2段目は全員が後衛に重く入る
-    if (this.kitTier(atk, 'hunt') && (isBackliner(def.role) || def.hp < def.maxHp * 0.5)) buff *= 1.15;
-    if (this.kitTeam(atk.side, 'hunt') === 2 && isBackliner(def.role)) buff *= 1.10;
+    if (this.kitTier(atk, 'hunt') && (isBackliner(def.role) || def.hp < def.maxHp * 0.5)) buff *= TN.huntOwn;
+    if (this.kitTeam(atk.side, 'hunt') === 2 && isBackliner(def.role)) buff *= TN.huntTeam;
     // 試作「仕留め」: 体力が半分を切った相手に重く入る
     const slay = this.synTier(atk, 'slayer');
     if (slay && def.hp < def.maxHp * 0.5) buff *= slay === 2 ? 1.35 : 1.18;
@@ -2018,9 +1997,9 @@ export class BattleSim {
     // 「大地の伊吹」: 味方が受け取る回復を底上げする。誰が撃った回復でも効く
     const boost = this.alive(target.side).some((a) => a.passive === 'earthbreath') ? 1.15 : 1;
     // 試作 kit「癒し」: 持ち主の回復は厚い
-    if (this.kitTier(src, 'mend')) amount = Math.round(amount * 1.10);
+    if (this.kitTier(src, 'mend')) amount = Math.round(amount * TN.mendHeal);
     // 2段目: 隊が受け取る回復そのものも厚くなる
-    if (this.kitTeam(target.side, 'mend') === 2) amount = Math.round(amount * 1.04);
+    if (this.kitTeam(target.side, 'mend') === 2) amount = Math.round(amount * TN.mendTeam);
     const before = target.hp;
     target.hp = Math.min(target.maxHp, target.hp + Math.round(amount * boost));
     // 試作 kit「癒し」2段目: 溢れた回復は盾になる（最大体力の 30% まで）
@@ -2028,7 +2007,7 @@ export class BattleSim {
       const spill = Math.round(amount * boost) - (target.hp - before);
       if (spill > 0) {
         const cur = target.shield?.amount ?? 0;
-        const next = Math.min(Math.round(target.maxHp * 0.3), cur + Math.round(spill * 0.6));
+        const next = Math.min(Math.round(target.maxHp * TN.mendSpillCap), cur + Math.round(spill * TN.mendSpill));
         if (next > cur) { target.shield = { amount: next, turns: 4 }; ev.push({ t: 'shield', uid: target.uid, amount: next }); }
       }
     }
@@ -2067,7 +2046,7 @@ export class BattleSim {
       this.addMod(by, { kind: 'atk', value: 0.10, turns: 999, source: 'cannibal' }, ev, 'ATK上昇');
     }
     // 試作 kit「疾風」2段目: 誰でも、仕留めた勢いで次へ入る
-    if (by !== target && by.alive && by.passive !== 'pursuit' && this.kitTeam(by.side, 'rush') === 2) by.ready += 0.25;
+    if (by !== target && by.alive && by.passive !== 'pursuit' && this.kitTeam(by.side, 'rush') === 2) by.ready += TN.rushKill;
     // 「追い波」: 仕留めた側が、その勢いのまま次の行動に入る
     if (by !== target && by.alive && by.passive === 'pursuit') {
       by.ready += 0.38;
@@ -2105,7 +2084,7 @@ export class BattleSim {
     // 「大喙」: 通常攻撃が重いぶん、必殺技の出番が遅い
     if (f.passive === 'greatbeak') mul *= 0.8;
     // 試作 kit「共鳴」: 持ち主は必殺が早い
-    if (this.kitTier(f, 'echo')) mul *= 1.10;
+    if (this.kitTier(f, 'echo')) mul *= TN.echoGain;
     // 試作「妨害」: 必殺の溜まりが早い
     const hex = this.synTier(f, 'hex');
     if (hex) mul *= hex === 2 ? 1.22 : 1.10;
@@ -2124,7 +2103,7 @@ export class BattleSim {
     if (this.rules.synergy === 'kit' && WEAKEN_SOURCES.has(mod.source)) {
       const owner = this.fighters.find((x) => x.side !== f.side && (x.passive === mod.source || x.odId === mod.source));
       if (owner && this.kitTier(owner, 'weaken')) {
-        mod = { ...mod, value: mod.value * 1.2, turns: mod.turns >= 999 ? mod.turns : mod.turns + 1 };
+        mod = { ...mod, value: mod.value * TN.weakenAmp, turns: mod.turns >= 999 ? mod.turns : mod.turns + 1 };
       }
     }
     f.mods.push(mod);
@@ -2161,9 +2140,9 @@ export class BattleSim {
     if (existing) {
       // 試作 kit「蝕毒」: 持ち主の毒は 5 つまで重なる
       const src = this.byUid.get(source);
-      const cap = src && this.kitTier(src, 'venom') ? 5 : POISON_MAX_STACK;
+      const cap = src && this.kitTier(src, 'venom') ? TN.venomCap : POISON_MAX_STACK;
       // 持ち主の毒は一度に2つ重なる
-      const add = src && this.kitTier(src, 'venom') ? 2 : 1;
+      const add = src && this.kitTier(src, 'venom') ? TN.venomPer : 1;
       existing.value = Math.max(existing.value, Math.min(cap * POISON_PER_STACK, existing.value + POISON_PER_STACK * add));
       existing.turns = POISON_TURNS;
     } else {
@@ -2242,7 +2221,7 @@ export class BattleSim {
     const existing = target.statuses.find((s) => s.kind === 'burn');
     // 試作 kit「灼熱」: 持ち主の火傷は深く焼く
     const src = this.byUid.get(source);
-    const hot = src && this.kitTier(src, 'burn') ? 0.065 : 0.04;
+    const hot = src && this.kitTier(src, 'burn') ? TN.burnDeep : TN.burnBase;
     if (existing) { existing.turns = Math.max(existing.turns, 3); existing.value = Math.max(existing.value, hot); }
     else target.statuses.push({ kind: 'burn', turns: 3, value: hot, source });
     ev.push({ t: 'status', uid: target.uid, kind: 'burn', applied: true });

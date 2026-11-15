@@ -1,3 +1,4 @@
+import { KIT_TRAIT, KIT_TRAITS, ELEMENT_TRAITS, ELEMENT_STEPS, kitSteps } from '../../game/data/traits';
 import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
 import { effectRow } from '../effectIcons';
@@ -96,6 +97,7 @@ export class DetailScreen extends Screen {
   private statsLegend!: HTMLElement;
   private engraveEl!: HTMLElement;
   private passiveEl!: HTMLElement;
+  private synEl!: HTMLElement;
   private odEl!: HTMLElement;
   private habitatEl!: HTMLElement;
   private habitatLabel!: HTMLElement;
@@ -138,6 +140,7 @@ export class DetailScreen extends Screen {
     this.engraveEl = h('div', { class: 'det-engrave' });
     this.passiveEl = h('div', { class: 'det-skill det-skill--passive' });
     this.odEl = h('div', { class: 'det-skill det-skill--od' });
+    this.synEl = h('div', { class: 'det-skill det-skill--syn' });
     this.habitatEl = h('div', { class: 'det-habitat' });
     this.habitatLabel = h('div', { class: 'det-habitat-label' });
     this.equipBtn = button('編成する', () => { audio.uiConfirm(); this.p?.onEquip?.(); },
@@ -160,6 +163,7 @@ export class DetailScreen extends Screen {
       this.engraveEl,
       this.passiveEl,
       this.odEl,
+      this.synEl,
       h('div', { class: 'det-foot' },
         h('div', { class: 'det-habitat-main' },
           this.habitatLabel,
@@ -297,6 +301,31 @@ export class DetailScreen extends Screen {
     );
     const oBuffs = effectRow(r.od.desc);
     if (oBuffs) this.odEl.appendChild(oBuffs);
+
+    // シナジー。属性と効果特性の2つ。揃えたら何が起きるかを、段の敷居つきで
+    clear(this.synEl);
+    this.synEl.appendChild(h('div', { class: 'det-skill-head' },
+      h('span', { class: 'det-skill-tag', text: spaced('シナジー') }),
+    ));
+    const synRow = (name: string, steps: [number, number], tiers: [string, string], mark: HTMLElement): HTMLElement => {
+      const row = h('div', { class: 'det-syn' },
+        h('div', { class: 'det-syn-head' }, mark, h('span', { class: 'det-syn-name', text: name })),
+      );
+      tiers.forEach((txt, i) => {
+        if (txt === '—') return;
+        row.appendChild(h('div', { class: 'det-syn-line' },
+          h('span', { class: 'det-syn-need num', text: `${steps[i]}体` }),
+          h('span', { text: txt }),
+        ));
+      });
+      return row;
+    };
+    const kit = KIT_TRAIT[r.id];
+    if (kit) {
+      this.synEl.appendChild(synRow(KIT_TRAITS[kit].name, kitSteps(kit), KIT_TRAITS[kit].tiers, h('i', { class: 'trait-mark' })));
+    }
+    const el = ELEMENT_TRAITS[r.element];
+    this.synEl.appendChild(synRow(el.name, ELEMENT_STEPS, el.tiers, h('i', { class: `dot dot--${r.element}` })));
 
     /*
      * 効き目を、この個体の数字で出す。

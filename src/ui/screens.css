@@ -818,6 +818,41 @@ body[data-layout='wide'] .clean-tools { grid-template-columns: repeat(3, 140px);
 .party-total .total-elems { display: flex; gap: 3px; }
 .party-total .total-elems .dot { width: 9px; height: 9px; border-radius: 2px; }
 
+/* 特性。揃った数を粒で、効いている段を濃く。立っていない特性は薄く「あと何体」 */
+.party-traits { display: flex; flex-direction: column; gap: 7px; }
+.trait-row {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 9px 12px 10px;
+  background: rgba(255, 253, 248, 0.8);
+  border-radius: 13px;
+  box-shadow: 0 5px 14px rgba(72, 58, 36, 0.12);
+}
+.trait-row.tier-0 { background: rgba(255, 253, 248, 0.45); box-shadow: none; }
+.trait-row.tier-2 { box-shadow: inset 0 0 0 2px var(--hl-amber), 0 5px 14px rgba(72, 58, 36, 0.12); }
+.trait-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.trait-head .dot { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.trait-mark { width: 10px; height: 10px; flex: none; transform: rotate(45deg); border-radius: 2px; background: var(--ink-soft); }
+.trait-row.tier-0 .trait-mark { background: var(--ink-faint); }
+.trait-name { font-size: 12px; font-weight: 800; }
+.trait-row.tier-0 .trait-name { color: var(--ink-soft); }
+.trait-count { font-size: 11px; color: var(--ink-soft); }
+.trait-pips { display: flex; gap: 3px; }
+.trait-pips i { width: 7px; height: 7px; border-radius: 50%; background: rgba(72, 58, 36, 0.14); }
+.trait-pips i.step { box-shadow: 0 0 0 1.5px rgba(72, 58, 36, 0.28); }
+.trait-pips i.on { background: var(--hl-amber); }
+.trait-status { margin-left: auto; flex: none; font-size: 10px; font-weight: 800; color: var(--ink-faint); }
+.trait-lines { display: flex; flex-direction: column; gap: 3px; }
+.trait-line { display: flex; gap: 7px; font-size: 11px; line-height: 1.55; color: var(--ink-faint); }
+.trait-line.is-live { color: var(--ink); }
+.trait-need {
+  flex: none; width: 15px; height: 15px; margin-top: 1px; border-radius: 4px;
+  display: grid; place-items: center; font-size: 10px; font-weight: 800;
+  background: rgba(72, 58, 36, 0.08); color: var(--ink-faint);
+}
+.trait-line.is-live .trait-need { background: var(--hl-amber); color: var(--ink); }
+.roster-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.chip--trait { --el: var(--ink-soft); }
+
 /* 立ち回り。選ばせずに読ませる——狙いと立ち位置は役職が決める */
 .party-tactics { display: flex; flex-direction: column; gap: 8px; }
 .tactic-row {
@@ -1857,6 +1892,14 @@ body[data-layout='wide'] .inv { width: 300px; max-height: calc(100dvh - 210px); 
 .det-skill { border-radius: 14px; padding: 12px 14px 13px; }
 .det-skill--passive { background: rgba(63, 194, 190, 0.14); }
 .det-skill--od { background: linear-gradient(120deg, rgba(245, 166, 35, 0.2), rgba(255, 197, 89, 0.14)); }
+.det-skill--syn { background: rgba(72, 58, 36, 0.06); display: flex; flex-direction: column; gap: 8px; }
+.det-skill--syn .det-skill-tag { color: var(--ink-soft); }
+.det-syn { display: flex; flex-direction: column; gap: 3px; }
+.det-syn-head { display: flex; align-items: center; gap: 7px; }
+.det-syn-head .dot { width: 10px; height: 10px; border-radius: 2px; }
+.det-syn-name { font-size: 13px; font-weight: 900; }
+.det-syn-line { display: flex; gap: 8px; font-size: 11.5px; line-height: 1.6; }
+.det-syn-need { flex: none; min-width: 26px; font-size: 10px; font-weight: 800; color: var(--ink-soft); padding-top: 2px; }
 .det-skill-head { display: flex; align-items: baseline; gap: 8px; }
 .det-skill-tag { font-size: 10px; font-weight: 900; letter-spacing: 0.22em; }
 .det-skill--passive .det-skill-tag { color: #1f7b78; }
