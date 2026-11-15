@@ -117,6 +117,8 @@ export interface BattleRules {
   synergy?: 'effect' | 'flat' | 'dual';
   /** 試作 dual: 役職の段の敷居。既定 [2, 4] */
   classSteps?: [number, number];
+  /** 試作 dual: この特性だけを効かせる（特性ごとの伸びを切り分けて測る） */
+  synergyOnly?: string[];
   /** 試作: 段の敷居（1段目・2段目の体数）。既定 [2, 4] */
   synergySteps?: [number, number];
 }

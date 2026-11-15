@@ -469,47 +469,52 @@ export class BattleSim {
       };
       for (const [el, n] of tally((f) => f.element)) {
         const tier = n >= e2 ? 2 : n >= e1 ? 1 : 0;
-        if (!tier) continue;
+        if (!tier || (this.rules.synergyOnly && !this.rules.synergyOnly.includes(el))) continue;
         this.synergyTier[side][el] = tier;
         for (const f of team) if (f.element === el) this.elementTrait(f, el, tier);
       }
       for (const [cl, n] of tally((f) => SYN_CLASS[f.role])) {
         const tier = n >= c2 ? 2 : n >= c1 ? 1 : 0;
-        if (!tier) continue;
+        if (!tier || (this.rules.synergyOnly && !this.rules.synergyOnly.includes(cl))) continue;
         this.synergyTier[side][cl] = tier;
-        const two = tier === 2;
+        /*
+         * 職の効きは、開戦時の一度きりではなく戦闘中ずっと回るものにする。
+         * 一度きりの上乗せ（先手・再生・最大体力）はほぼ効かないと測れた。
+         * 前衛だけはここで被ダメを下げ、残りは各所の hook（synTier）が見る。
+         */
+        if (cl !== 'front') continue;
         for (const f of team) {
-          if (cl === 'support') {
-            // 支援だけは味方全体に配る（持ち主ではなく、隊が受け取る）
-            const total = Math.round(f.maxHp * (two ? 0.16 : 0.08));
-            f.statuses.push({ kind: 'regen', turns: 99, value: Math.max(1, Math.round(total / 10)), pool: total, until: 10, source: f.uid + '|synergy' });
-            continue;
-          }
-          if (SYN_CLASS[f.role] !== cl) continue;
-          switch (cl) {
-            case 'front': f.mods.push({ kind: 'taken', value: two ? -0.25 : -0.12, turns: 9999, source: 'synergy' }); break;
-            case 'brawler': { const k = two ? 1.30 : 1.15; f.maxHp = Math.round(f.maxHp * k); f.hp = f.maxHp; break; }
-            case 'swift': f.ready += two ? 0.6 : 0.3; break;
-            case 'slayer': f.mods.push({ kind: 'atk', value: two ? 0.25 : 0.12, turns: 9999, source: 'synergy' }); break;
-            case 'hex': f.od = Math.min(100, f.od + (two ? 70 : 35)); break;
-          }
+          if (SYN_CLASS[f.role] !== 'front') continue;
+          f.mods.push({ kind: 'taken', value: tier === 2 ? -0.12 : -0.05, turns: 9999, source: 'synergy' });
         }
       }
     }
   }
 
+  /**
+   * 試作 dual: その個体が持つ特性の段。職は持ち主だけ、支援は隊全体に効く。
+   * 分身は特性を持たない。
+   */
+  private synTier(f: Fighter, key: string): number {
+    if (this.rules.synergy !== 'dual' || f.cloneOf) return 0;
+    const t = this.synergyTier[f.side][key] ?? 0;
+    if (t === 0) return 0;
+    if (key === 'support') return t;
+    return SYN_CLASS[f.role] === key ? t : 0;
+  }
+
   private elementTrait(f: Fighter, el: string, tier: number): void {
     const two = tier === 2;
     switch (el) {
-      case 'flame': f.mods.push({ kind: 'dealt', value: two ? 0.35 : 0.15, until: 15, turns: 0, source: 'synergy' }); break;
+      case 'flame': f.mods.push({ kind: 'dealt', value: two ? 0.20 : 0.09, until: 15, turns: 0, source: 'synergy' }); break;
       case 'aqua': {
-        const total = Math.round(f.maxHp * (two ? 0.30 : 0.15));
+        const total = Math.round(f.maxHp * (two ? 0.36 : 0.20));
         f.statuses.push({ kind: 'regen', turns: 99, value: Math.max(1, Math.round(total / 10)), pool: total, until: 10, source: f.uid + '|synergy' });
         break;
       }
-      case 'terra': f.shield = { amount: Math.round(f.def * (two ? 3.2 : 1.6)), turns: 6 }; break;
-      case 'gale': f.ready += two ? 0.4 : 0.2; break;
-      case 'null': f.od = Math.min(100, f.od + (two ? 60 : 30)); break;
+      case 'terra': f.shield = { amount: Math.round(f.def * (two ? 2.3 : 1.1)), turns: 6 }; break;
+      case 'gale': f.mods.push({ kind: 'spd', value: two ? 0.14 : 0.045, turns: 9999, source: 'synergy' }); break;
+      case 'null': f.od = Math.min(100, f.od + (two ? 40 : 6)); break;
     }
   }
 
@@ -1151,6 +1156,9 @@ export class BattleSim {
     if (dealt > 0) {
       const p = actor.passive;
       this.tickIslandApex(actor, ev);
+      // 試作「迅速」: 当てるたびに次の手が早まる
+      const swift = this.synTier(actor, 'swift');
+      if (swift) actor.ready += swift === 2 ? 0.18 : 0.16;
       // 「帆の放熱」: 味方に1体でも居れば、火傷が付きやすくなる
       const sail = this.alive(actor.side).some((a) => a.passive === 'sailheat') ? 0.2 : 0;
       if (p === 'embers' && this.rng.chance(0.32 + sail)) this.applyBurn(target, ev, actor.uid);
@@ -1693,6 +1701,9 @@ export class BattleSim {
     let buff = (1 + this.modSum(atk, 'dealt')) * (1 + this.modSum(def, 'taken'));
     // 場の効果。その属性の攻撃が、敵味方の別なく通りやすくなる
     buff *= this.rules.elementDealt?.[atk.element] ?? 1;
+    // 試作「仕留め」: 体力が半分を切った相手に重く入る
+    const slay = this.synTier(atk, 'slayer');
+    if (slay && def.hp < def.maxHp * 0.5) buff *= slay === 2 ? 1.35 : 1.18;
 
     const pa = atk.passive;
     // 「噴射」: 下がった直後の一撃だけ重い
@@ -1806,6 +1817,10 @@ export class BattleSim {
       t: 'damage', uid: target.uid, from: atk.uid,
       amount, crit, eff, hp: target.hp, shielded,
     });
+
+    // 試作「闘士」: 与えた分を自分に還す
+    const brawl = this.synTier(atk, 'brawler');
+    if (brawl && remaining > 0 && atk.alive) this.heal(atk, atk, Math.round(remaining * (brawl === 2 ? 0.16 : 0.09)), ev);
 
     // 被弾で OD が溜まる（負けている側が巻き返せる仕組み）
     if (remaining > 0) this.gainOd(target, 24 * (remaining / target.maxHp), ev);
@@ -1946,6 +1961,9 @@ export class BattleSim {
     if (this.alive(other(f.side)).some((e) => e.passive === 'deepreign')) mul *= 0.88;
     // 「大喙」: 通常攻撃が重いぶん、必殺技の出番が遅い
     if (f.passive === 'greatbeak') mul *= 0.8;
+    // 試作「妨害」: 必殺の溜まりが早い
+    const hex = this.synTier(f, 'hex');
+    if (hex) mul *= hex === 2 ? 1.22 : 1.10;
     // 「掌握する空」: 空を握りきっている間、味方の必殺技が早く回る
     if (this.alive(f.side).some((a) => a.passive === 'skygrasp' && (a.stacks.sky ?? 0) >= 3)) {
       mul *= 1.2;
@@ -2075,6 +2093,9 @@ export class BattleSim {
     const now = this.clockV;
     if (now >= (this.regenAt.get(f.uid) ?? Infinity)) {
       this.regenAt.set(f.uid, now + REGEN_TICK);
+      // 試作「支援」: 隊全体が、戦闘中ずっと少しずつ癒える
+      const sup = this.synTier(f, 'support');
+      if (sup && f.hp < f.maxHp) this.heal(f, f, Math.round(f.maxHp * (sup === 2 ? 0.010 : 0.004)), ev);
       for (const s of f.statuses) {
         if (s.kind !== 'regen') continue;
         const left = s.pool ?? 0;
