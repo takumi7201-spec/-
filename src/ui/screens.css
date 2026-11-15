@@ -3388,3 +3388,41 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 .rb-growth { display: flex; flex-direction: column; gap: 4px; max-height: 40vh; overflow-y: auto; }
 .rb-growth-line { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; }
 .rb-growth-icon { width: 22px; height: 22px; flex: none; }
+
+/* ------------------------------------------------------------------ 広がるカード */
+/* 札から下の欄へ広がる。位置と大きさは expandCard.ts がばねで動かす */
+.xcard {
+  position: absolute; z-index: 3; transform-origin: 0 0; will-change: transform, opacity;
+  border-radius: 16px; background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-2), inset 0 0 0 1.5px rgba(72, 58, 36, 0.08);
+}
+.xcard[hidden] { display: none; }
+/* 乗せて見ているだけのときは押せない。下の札の出入りを邪魔しない */
+.xcard.is-static { pointer-events: none; }
+.xcard-inner { padding: 12px 14px 14px; }
+.xs { display: flex; flex-direction: column; gap: 8px; }
+.xs-head { display: flex; align-items: center; gap: 9px; }
+.xs-icon { width: 40px; height: 40px; flex: none; }
+.xs-title { display: flex; flex-direction: column; min-width: 0; }
+.xs-title b { font-size: 15px; font-weight: 900; }
+.xs-sub { font-size: 10px; color: var(--ink-soft); line-height: 1.5; }
+.xs-actions { margin-left: auto; display: flex; gap: 6px; flex: none; }
+.xs-label { font-size: 10px; letter-spacing: 0.18em; margin-top: 2px; }
+.xs-table {
+  display: grid; align-items: center; gap: 5px 10px;
+  padding: 8px 10px; border-radius: 10px; background: rgba(72, 58, 36, 0.05);
+}
+.xs-th { font-size: 10px; font-weight: 900; color: var(--ink-soft); text-align: right; }
+.xs-th.is-up { color: var(--ink); }
+.xs-td { font-size: 13px; font-weight: 900; text-align: right; color: var(--ink-soft); }
+.xs-td.is-up { color: var(--pen-green); }
+.xs-tk { font-size: 10px; font-weight: 800; color: var(--ink-soft); }
+.xs-table .run-val { justify-self: start; font-size: 10px; }
+.xs-lines { display: flex; flex-direction: column; gap: 3px; }
+.xs-help { font-size: 10.5px; line-height: 1.55; color: var(--ink-soft); }
+.xs-trait { font-size: 11px; line-height: 1.55; color: var(--ink-soft); }
+.xs-ab { font-size: 11.5px; line-height: 1.55; font-weight: 800; }
+.xs-grown { font-size: 11px; line-height: 1.55; font-weight: 800; color: var(--pen-green); }
+
+/* 横長の画面では中央に寄せる。表の列が離れすぎて読みにくい */
+body[data-layout='wide'] .run-body { left: 18vw; right: 18vw; }
