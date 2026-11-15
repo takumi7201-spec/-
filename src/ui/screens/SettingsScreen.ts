@@ -5,8 +5,8 @@ import type { QualityTier } from '../../core/Quality';
 import { screenHead, plate, spaced } from '../chrome';
 import { audio } from '../../core/Audio';
 
-export type SettingKey = 'hand' | 'audio' | 'quality' | 'battle' | 'shake';
-export type SettingsWhere = 'profile' | 'title' | 'debug' | 'wipe';
+export type SettingKey = 'audio' | 'quality';
+export type SettingsWhere = 'title' | 'wipe';
 
 /**
  * 設定。
@@ -74,14 +74,8 @@ export class SettingsScreen extends Screen {
 
     clear(this.bodyEl);
     const rows: (HTMLElement | null)[] = [
-      h('div', { class: 'set-group-label', text: spaced('操作') }),
-      this.row('利き手', '移動をどちらの親指に置くか', [
-        { value: true, label: '右で移動' },
-        { value: false, label: '左で移動' },
-      ], s.swapSides, (v) => { s.swapSides = v; this.onChange?.('hand'); }),
-
       h('div', { class: 'set-group-label', text: spaced('音') }),
-      this.row('効果音', '掘る音・当たる音', VOLUMES, round2(s.sfx), (v) => { s.sfx = v; this.onChange?.('audio'); }),
+      this.row('効果音', '押す音・当たる音', VOLUMES, round2(s.sfx), (v) => { s.sfx = v; this.onChange?.('audio'); }),
       this.row('BGM', '場面ごとの曲', VOLUMES, round2(s.bgm), (v) => { s.bgm = v; this.onChange?.('audio'); }),
 
       h('div', { class: 'set-group-label', text: spaced('画面') }),
@@ -91,27 +85,9 @@ export class SettingsScreen extends Screen {
         { value: 'medium', label: 'ふつう' },
         { value: 'high', label: '綺麗' },
       ], s.quality, (v) => { s.quality = v; this.onChange?.('quality'); }),
-      this.row('画面の揺れ', '被弾や撃破でカメラを揺らす', [
-        { value: false, label: 'ふつう' },
-        { value: true, label: '抑える' },
-      ], s.reducedShake, (v) => { s.reducedShake = v; this.onChange?.('shake'); }),
-
-      h('div', { class: 'set-group-label', text: spaced('バトル') }),
-      this.row<1 | 2 | 3>('速度', '開くたびに選び直さない', [
-        { value: 1, label: '×1' },
-        { value: 2, label: '×2' },
-        { value: 3, label: '×3' },
-      ], s.battleSpeed, (v) => { s.battleSpeed = v; this.onChange?.('battle'); }),
-      this.row('必殺技', '満ちたら自動で撃つか、押すまで溜めるか', [
-        { value: true, label: '自動' },
-        { value: false, label: '手動' },
-      ], s.autoOd, (v) => { s.autoOd = v; this.onChange?.('battle'); }),
-
       h('div', { class: 'set-group-label', text: spaced('その他') }),
-      this.link('記録', '掘った数・戦績・プレイ時間', () => this.onGo?.('profile')),
       this.link('タイトルへ戻る', '進行は保存済み', () => this.onGo?.('title')),
-      s.debug === true ? this.link('デバッグ', '検証用の配布と切り替え', () => this.onGo?.('debug')) : null,
-      this.link('セーブを消す', '手持ち・図鑑・記録がすべて消える', () => this.onGo?.('wipe'), true),
+      this.link('セーブを消す', 'ランの記録と進行中のランが消える', () => this.onGo?.('wipe'), true),
     ];
     for (const r of rows) if (r) this.bodyEl.appendChild(r);
   }

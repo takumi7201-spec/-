@@ -1,5 +1,6 @@
 import type { ElementId } from '../../voxel/palette';
-import type { Archetype } from '../../voxel/CreatureBuilder';
+/** 立体の体つき。立体の組み立ては外したが、データには残っている */
+type Archetype = string;
 
 /**
  * ローンチ・ロスター 19体。

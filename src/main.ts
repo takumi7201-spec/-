@@ -2,75 +2,24 @@ import './ui/style.css';
 import './ui/screens.css';
 import * as THREE from 'three';
 import { GameRenderer } from './core/GameRenderer';
-import { InputManager } from './core/Input';
 import { UIRoot } from './ui/UIRoot';
 import { TitleScreen } from './ui/screens/TitleScreen';
 import { HomeScreen } from './ui/screens/HomeScreen';
-import { DigScreen } from './ui/screens/DigScreen';
-import { CleanScreen } from './ui/screens/CleanScreen';
-import { BattleScreen } from './ui/screens/BattleScreen';
-import { PartyScreen } from './ui/screens/PartyScreen';
-import { DexScreen } from './ui/screens/DexScreen';
-import { ResultScreen, type ResultData } from './ui/screens/ResultScreen';
-import { DigScene } from './scenes/DigScene';
-import { CleanScene } from './scenes/CleanScene';
-import { BattleScene } from './scenes/BattleScene';
-import { HomeScene } from './scenes/HomeScene';
-import { BattlePlayer } from './game/battle/BattlePlayer';
-import {
-  buildTeamSetup, buildEnemyTeam, grantStarters, addFossil, mergeFossil,
-  teamAnchor, stagePreview, effectiveParty, PARTY_SIZE,
-} from './game/party';
-import { STAGE_COUNT } from './game/data/stages';
-import {
-  buildRival, colosseumCoins, rateDelta, tierOf, COLOSSEUM_FLOOR, type Rival,
-} from './game/data/colosseum';
-import { tabBar } from './ui/chrome';
-import {
-  AUTO_UNLOCK_STAGE, autoCleanLevel, autoCleanScore, autoCleanUnlocked, autoCleanUses,
-} from './game/autoClean';
-import { unclaimedCount } from './game/mail';
-import { readyCount } from './game/missions';
-import { rollEngraving, engraveName, engraveText } from './game/engraving';
-import { Rng } from './voxel/VoxelPainter';
-import { advanceHoloTime } from './fx/SpriteUnit';
-import { buildEventTeam, type EventDef } from './game/data/events';
-import { BattleSelectScreen, stageCoins } from './ui/screens/BattleSelectScreen';
-import { MailScreen } from './ui/screens/MailScreen';
-import { DigSelectScreen } from './ui/screens/DigSelectScreen';
-import { MissionScreen } from './ui/screens/MissionScreen';
 import { NewsScreen } from './ui/screens/NewsScreen';
-import { ShopScreen } from './ui/screens/ShopScreen';
-import { UnitScreen } from './ui/screens/UnitScreen';
-import { RosterScreen } from './ui/screens/RosterScreen';
-import { TransferScreen } from './ui/screens/TransferScreen';
 import { SettingsScreen } from './ui/screens/SettingsScreen';
-import { CleanChoiceScreen } from './ui/screens/CleanChoiceScreen';
-import { grantLogin, grantStaffMail } from './game/mail';
-import { DebugScreen } from './ui/screens/DebugScreen';
-import { StockScreen } from './ui/screens/StockScreen';
-import { ColosseumScreen } from './ui/screens/ColosseumScreen';
-import { RankingScreen } from './ui/screens/RankingScreen';
-import { ProfileScreen } from './ui/screens/ProfileScreen';
-import { DetailScreen, type DetailEntry } from './ui/screens/DetailScreen';
-import { REVOS, getRevos } from './game/data/revos';
-import {
-  BOSS_TIERS, BOSS_TIME, DAILY_REPLAY_COINS,
-  bossFor, bossState, buildBossTeam, buildDailyTeam, dailyReward, dailyRuleFor, dailyState,
-  rollBossFossil, rollDailyFossil, rotationBadge,
-} from './game/data/rotation';
-import { audio } from './core/Audio';
-import {
-  load as loadSave, save as writeSave, defaultSave, dropDecay, addExp, addPlayerExp,
-  countToday, rollDaily, clearSave, todayKey,
-  type SaveData, type OwnedRevos,
-} from './core/Save';
-import type { BiomeId } from './voxel/palette';
 import { RunScreen } from './ui/screens/RunScreen';
 import { RunBattleScreen } from './ui/screens/RunBattleScreen';
-import { RUN_UNITS, runDef } from './game/run/units';
+import { HomeScene } from './scenes/HomeScene';
+import { tabBar } from './ui/chrome';
+import { advanceHoloTime } from './fx/SpriteUnit';
+import { audio } from './core/Audio';
+import {
+  load as loadSave, save as writeSave, defaultSave, clearSave, type SaveData,
+} from './core/Save';
+import { RUN_UNITS } from './game/run/units';
 import { newRun, buildOpponent, finishBattle, isOver, RUN_WINS, type RunState } from './game/run/run';
 import { runBattle, type RunBattleResult } from './game/run/battle';
+import { unreadNews } from './game/news';
 
 const boot = document.getElementById('boot')!;
 const bootBar = document.getElementById('boot-bar-fill')!;
@@ -83,17 +32,12 @@ function progress(p: number, label: string): Promise<void> {
   return new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 }
 
-function label(defId: string): string {
-  return REVOS.find((r) => r.id === defId)?.name ?? defId;
-}
-
 async function main(): Promise<void> {
   const canvas = document.getElementById('gl') as HTMLCanvasElement;
   const uiEl = document.getElementById('ui')!;
 
   await progress(0.08, 'レンダラを初期化しています…');
   const renderer = new GameRenderer(canvas);
-  const input = new InputManager(canvas);
   const ui = new UIRoot(uiEl);
 
   renderer.onFlash = (hex, s) => ui.flash(`#${hex}`, s);
@@ -104,190 +48,52 @@ async function main(): Promise<void> {
   await progress(0.2, 'セーブデータを読み込んでいます…');
   let data: SaveData = loadSave();
 
-  /**
-   * 画質。
-   *
-   * 保存には入っていたのに、どこからも読んでいなかった——保存されているのに
-   * 変えられない値は、無いのと同じ。おまかせなら端末の判定に任せ、
-   * 自分で選んだときだけその段に固定する。
-   *
-   * 場面を組む前に通す。粒子の上限は場面の構築時に焼き込まれるので、
-   * 後から変えたぶんは描画の経路にだけ効き、粒の量は次の起動から。
-   */
+  // 画質。おまかせなら端末の判定に任せ、自分で選んだときだけその段に固定する
   const applyQuality = (): void => {
     if (data.settings.quality !== 'auto') renderer.setQuality(data.settings.quality);
   };
   applyQuality();
 
-  await progress(0.34, '拠点を組み立てています…');
+  await progress(0.4, '拠点を組み立てています…');
   const home = new HomeScene(renderer.quality);
-  const dig = new DigScene(renderer.quality);
-  const clean = new CleanScene(renderer.quality);
-  const battle = new BattleScene(renderer.quality);
-  battle.reducedShake = data.settings.reducedShake;
-
-  let player: BattlePlayer | null = null;
-  let runFossils: { defId: string; rarity: number }[] = [];
-  /**
-   * いま潜っている層。持ち帰った化石にどこで掘ったかを書くのに使う。
-   * 以前は解放済みの先頭の層を書いていたので、どこで掘っても
-   * 「ソルト・キャニオン」になっていた
-   */
-  let runBiome: BiomeId = 'canyon';
-  /**
-   * この周回の締めをもう走らせたか。
-   *
-   * 引き上げは3か所から起きる——最後の化石を掘った（1.6秒後）、
-   * スタミナが尽きた（1.2秒後）、自分で戻るを押した（即時）。
-   * どれも同じ締めを呼ぶので、最後の1点を掘った直後に戻るを押すと、
-   * 予約済みのタイマーと手押しの2回ぶんが走り、持ち帰った化石が
-   * ストックに二重に積まれていた（周回数とEXPも二重）。
-   */
-  let runClosed = false;
-  /** 挑戦中のイベント。通常バトルなら null */
-  let activeEvent: EventDef | null = null;
-  /** 直前に挑んだイベント。リザルトの「もう一度」で同じ相手へ戻す */
-  let lastEvent: EventDef | null = null;
-  /**
-   * 挑戦中の日替わり・週替わり。日付を持たせておく——戦っている最中に日が
-   * 変わっても、報酬は挑んだ日のぶんとして数える
-   */
-  type Special =
-    | { kind: 'daily' | 'boss'; date: string }
-    /**
-     * コロシアム。挑んだ時点で組んだ相手を丸ごと控える。
-     *
-     * 相手は押した瞬間に決まるので、戦う相手と結果に出す名前は同じ1つの
-     * 組み立てから採る——別々に組むと、名前だけ違う相手と戦うことになる
-     */
-    | { kind: 'colosseum'; rival: Rival };
-  let activeSpecial: Special | null = null;
-  let lastSpecial: Special | null = null;
-  /**
-   * 挑戦中の段。通常戦でどの段を選んだかは進行度と一致しない——
-   * 到達済みの段へ戻れるようにしたので、勝っても進めない戦いがある
-   */
-  let activeStage = 1;
-  let lastStage = 1;
-  /** 直前の周回の成果。リザルトで見せる */
-  let pendingResult: ResultData | null = null;
-
-  // イベント専用の個体は地層に埋まっていない。発掘の抽選から外す。
-  // 特別許可区の個体も、通常の層からは出ない
-  const speciesPool = REVOS.filter((r) => !r.eventOnly && !r.permitOnly).map((r) => ({
-    id: r.id,
-    rarity: r.rarity,
-    weight: r.rarity === 1 ? 10 : r.rarity === 2 ? 6 : r.rarity === 3 ? 3 : 1,
-  }));
-  /**
-   * 特別許可区の抽選。
-   *
-   * 通常の層と違い、低レアの重みを落として上を厚くする。チケットを1枚
-   * 切って降りる以上、★1 ばかり出ては割に合わない。ニッポニテスはここにしか
-   * 居ないので、重みを他の★4より厚くして「ここへ来た理由」を返す。
-   */
-  const PERMIT_RARITY_SCALE = 1.8;
-  const PERMIT_FLOOR = 4;
-  /**
-   * ホロタイプ（★5）はこの区画でしか出ない。通常と同じ確率のままだと
-   * 券を数十枚切っても1体も掘れないので、上の段だけ別に厚くする
-   */
-  const PERMIT_HOLOTYPE_SCALE = 3.5;
-  const permitPool = REVOS.filter((r) => !r.eventOnly).map((r) => ({
-    id: r.id,
-    rarity: r.rarity,
-    // ★5 は同じ段の中では等しく。★4 の中ではニッポニテス（ここだけの個体）を厚く
-    weight: r.rarity === 5 ? 1
-      : r.permitOnly ? 5
-      : r.rarity === 1 ? 2 : r.rarity === 2 ? 3 : r.rarity === 3 ? 4 : 3,
-  }));
 
   // ---------------------------------------------------------------- 画面
 
   const title = new TitleScreen();
   const homeScreen = new HomeScreen();
-  const digScreen = new DigScreen(dig);
-  const cleanScreen = new CleanScreen(clean);
-  const battleScreen = new BattleScreen();
-  const partyScreen = new PartyScreen();
-  const dexScreen = new DexScreen();
-  const selectScreen = new BattleSelectScreen();
-  const mailScreen = new MailScreen();
-  const digSelectScreen = new DigSelectScreen();
-  const missionScreen = new MissionScreen();
   const newsScreen = new NewsScreen();
-  const shopScreen = new ShopScreen();
-  const unitScreen = new UnitScreen();
-  const rosterScreen = new RosterScreen();
-  const transferScreen = new TransferScreen();
   const settingsScreen = new SettingsScreen();
-  const cleanChoiceScreen = new CleanChoiceScreen();
-  const debugScreen = new DebugScreen();
-  const stockScreen = new StockScreen();
-  const colosseumScreen = new ColosseumScreen();
-  const rankingScreen = new RankingScreen();
-  const profileScreen = new ProfileScreen();
-  const resultScreen = new ResultScreen();
-  const detailScreen = new DetailScreen();
   const runScreen = new RunScreen();
   const runBattleScreen = new RunBattleScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, cleanChoiceScreen, stockScreen, colosseumScreen, rankingScreen, profileScreen, debugScreen, detailScreen, resultScreen, runScreen, runBattleScreen]) {
-    ui.register(s);
-  }
-
-  input.onStickChange = (a, ox, oy, dx, dy) => digScreen.setStick(a, ox, oy, dx, dy);
-
-  // 右半分で移動・左半分で視点。主アクションも移動と反対側の親指へ寄せる
-  const applyHand = (): void => {
-    input.setSwapSides(data.settings.swapSides);
-    document.body.dataset.hand = data.settings.swapSides ? 'left' : 'right';
-  };
-  applyHand();
+  for (const s of [title, homeScreen, newsScreen, settingsScreen, runScreen, runBattleScreen]) ui.register(s);
 
   // ---------------------------------------------------------------- 遷移
 
-  /**
-   * 受信箱への配布。
-   *
-   * 起動時だけでなく拠点へ戻るたびに確かめる——開きっぱなしで日を
-   * またいだときに、次の起動まで届かないのは事故に見える。
-   */
-  function deliverMail(announce: boolean): void {
-    // 運営ぶんを先に積んでからログインを積む。どちらも先頭へ差し込むので、
-    // この順なら「今日のぶん」が受信箱の一番上に来る
-    const gotStaff = grantStaffMail(data);
-    const gotLogin = grantLogin(data);
-    if (gotLogin || gotStaff > 0) {
-      writeSave(data);
-      if (announce) {
-        ui.toast(gotLogin ? `ログインボーナスが届いた（${data.login.streak} 日目）` : '運営から便りが届いた', 'info', 3000);
-      }
-    }
+  function goHome(): void {
+    // 拠点に立たせるのは、進行中のランの左端。ランが無ければ全体から1体
+    const face = data.run?.board.find((u) => u)?.defId ?? RUN_UNITS[0].id;
+    home.setGuest(face);
+    home.resize(renderer.aspect);
+    renderer.setScene(home.scene, home.camera);
+    renderer.invalidateShadows();
+    homeScreen.setData(data);
+    ui.show('home');
+    audio.startMusic('calm');
   }
+
+  function goSettings(): void { settingsScreen.setData(data); ui.show('settings'); }
 
   // ---------------------------------------------------------------- ラン
 
-  /**
-   * 店に並ぶユニット。段1は誰でも、段2から上は図鑑で見つけたものだけ——
-   * 発掘が、ランで使える駒を増やす役目になる
-   */
-  function runPool(): string[] {
-    const known = new Set([...data.dex, ...data.roster.map((r) => r.defId)]);
-    return RUN_UNITS.filter((u) => u.tier === 1 || known.has(u.id)).map((u) => u.id);
-  }
-  /** 相手は全ユニットから組む（よそのプレイヤーの盤面という扱い） */
   const RUN_ALL = RUN_UNITS.map((u) => u.id);
   let runFight: { res: RunBattleResult; foe: RunState['board'] } | null = null;
 
   function goRun(): void {
     if (!data.run) {
-      data.run = newRun(runPool(), (Date.now() >>> 0) ^ 0x5eed);
+      data.run = newRun(RUN_ALL, (Date.now() >>> 0) ^ 0x5eed);
       data.runRecord = { best: 0, clears: 0, runs: 0, ...data.runRecord };
       data.runRecord.runs++;
       writeSave(data);
-    } else {
-      // 図鑑が増えていれば、続きの店にも並ぶようにする
-      data.run.pool = runPool();
     }
     runScreen.setRun(data.run);
     ui.show('run');
@@ -302,10 +108,12 @@ async function main(): Promise<void> {
     const res = runBattle(run.board, foe, run.round, { events: true, trace: true });
     runFight = { res, foe };
     ui.show('runBattle');
+    audio.startMusic('battle');
     runBattleScreen.play(res, [run.board, foe], run.round);
   };
   runBattleScreen.onNext = () => {
     const run = data.run;
+    audio.startMusic('calm');
     if (!run || !runFight) { goHome(); return; }
     finishBattle(run, runFight.res);
     runFight = null;
@@ -328,823 +136,75 @@ async function main(): Promise<void> {
     runScreen.setRun(run);
     ui.show('run');
   };
-  void runDef;
-
-  function goHome(): void {
-    // 開きっぱなしで 4 時を越えることがある。起動時にしか見ていないと、
-    // 日課が前日のまま止まったまま遊び続けることになる
-    if (rollDaily(data)) writeSave(data);
-    deliverMail(true);
-    home.setGuest(data.party.order?.[0]
-      ? data.roster.find((r) => r.uid === data.party.order?.[0])?.defId ?? data.roster[0]?.defId ?? null
-      : data.roster[0]?.defId ?? null);
-    home.resize(renderer.aspect);
-    renderer.setScene(home.scene, home.camera);
-    renderer.invalidateShadows();
-    homeScreen.setData(data);
-    ui.show('home');
-    audio.startMusic('calm');
-  }
-
-  async function startRun(biome: BiomeId): Promise<void> {
-    const permit = biome === 'permitzone';
-    if (permit) {
-      if ((data.player.tickets ?? 0) <= 0) {
-        ui.toast('特別許可証が足りない', 'warn');
-        return;
-      }
-      data.player.tickets = (data.player.tickets ?? 0) - 1;
-    }
-    runFossils = [];
-    runClosed = false;
-    runBiome = biome;
-    /*
-     * 潜行した回数は、降りた時点で数える。
-     *
-     * 以前は「持ち帰ったとき」に数えていたので、掘ったのに何も出なかった
-     * 周回が記録から丸ごと消えていた。プロフィールに出す以上、空振りも
-     * 潜行のうち。一方 daily.runs はドロップ逓減の基準なので、
-     * こちらは成果のある周回に紐づけたまま動かさない。
-     */
-    data.stats.runs++;
-    data.stats.biomeRuns[biome] = (data.stats.biomeRuns[biome] ?? 0) + 1;
-    countToday(data, 'dig');
-    // 降りた時点で書く。周回の終わりまで待つと、途中で閉じたぶんが
-    // 記録からも日課からも消える——降りた事実は成果と別に残す
-    writeSave(data);
-    boot.classList.remove('hidden');
-    await progress(0.35, 'エリアを生成しています…');
-    const seed = (Date.now() ^ (data.daily.runs * 7919)) >>> 0;
-    /*
-     * 特別許可区は逓減しない。1回ぶんの券を切って降りる場所なので、
-     * 「今日もう何周したか」で目減りさせると、券の価値が日によって変わる。
-     * レアの出かたを 1.8 倍に厚くし、さらに毎回かならず ★4 以上を1点埋める
-     * ——抽選の重みは同じレア度の中でしか働かないので、厚さは倍率と
-     * 最低保証の2つで作る。
-     */
-    dig.load(
-      biome, seed, permit ? permitPool : speciesPool,
-      permit ? PERMIT_RARITY_SCALE : dropDecay(data.daily.runs),
-      permit ? PERMIT_FLOOR : 2,
-      permit ? PERMIT_HOLOTYPE_SCALE : 1,
-    );
-    await progress(0.85, 'メッシュを構築しています…');
-    dig.resize(renderer.aspect);
-    renderer.setScene(dig.scene, dig.camera);
-    renderer.invalidateShadows();
-    await progress(1, '準備完了');
-    ui.show('dig');
-    audio.startMusic('dig');
-    setTimeout(() => boot.classList.add('hidden'), 240);
-  }
-
-  async function startClean(defId: string, rarity: number): Promise<void> {
-    boot.classList.remove('hidden');
-    await progress(0.5, '母岩を切り出しています…');
-    clean.resize(renderer.aspect);
-    renderer.setScene(clean.scene, clean.camera);
-    await progress(1, '');
-    ui.show('clean', { defId, rarity, seed: (Date.now() ^ 0x51ed) >>> 0 });
-    audio.startMusic('calm');
-    setTimeout(() => boot.classList.add('hidden'), 200);
-  }
-
-  /**
-   * いま挑める相手を1人だけ用意する。
-   *
-   * 相手はレートと戦績から決まるので、札が予告したものと必ず同じになる。
-   * 名前とレートだけ控えて渡す——結果の画面で「誰に勝ったのか」を出す
-   */
-  function nextColosseumSpecial(): Special {
-    const setup = buildTeamSetup(data.roster, data.party.order);
-    const anchor = setup ? teamAnchor(setup) : { level: 1, clean: 60, size: 1 };
-    const r = buildRival(data.colosseum, anchor, effectiveParty(data).map((u) => u.defId));
-    // 出てきた顔ぶれを数える。闘技場の「環境」はここに溜まる
-    for (const m of r.team.members) {
-      data.colosseum.met[m.defId] = (data.colosseum.met[m.defId] ?? 0) + 1;
-    }
-    return { kind: 'colosseum', rival: r };
-  }
-
-  async function startBattle(
-    ev: EventDef | null = null, stage = data.stageProgress + 1, special: Special | null = null,
-  ): Promise<void> {
-    const mine = buildTeamSetup(data.roster, data.party.order);
-    if (!mine) { ui.toast('編成できるリヴォスがいない', 'bad'); goHome(); return; }
-    activeEvent = ev;
-    lastEvent = ev;
-    activeSpecial = special;
-    lastSpecial = special;
-    activeStage = Math.max(1, Math.min(STAGE_COUNT, stage));
-    lastStage = activeStage;
-    boot.classList.remove('hidden');
-    await progress(0.4, ev ? '記録を読み出しています…'
-      : special?.kind === 'boss' ? '巨獣の気配を探っています…'
-        : special?.kind === 'colosseum' ? '対戦相手を呼び出しています…'
-          : '闘技場を生成しています…');
-    const seed = (Date.now() ^ (activeStage * 104729)) >>> 0;
-    // 段ごとに舞台を変える。選択画面が予告した地層と実際の闘技場を一致させる
-    const daily = special?.kind === 'daily' ? dailyRuleFor(special.date) : null;
-    const boss = special?.kind === 'boss' ? bossFor(special.date) : null;
-    // コロシアムの相手は、札が予告したものと同じ種から組む
-    // 相手は挑んだ時点で組み終わっている。ここでは組み直さない
-    const colo = special?.kind === 'colosseum' ? special.rival : null;
-    const coloTier = tierOf(data.colosseum.rate);
-    // コロシアムだけ舞台の作りが違う。円の床と観客席で囲った特設の闘技場
-    if (colo) battle.buildColosseum(coloTier.biome, seed);
-    else {
-      battle.buildArena(
-        ev ? ev.biome : daily ? daily.biome : boss ? boss.biome : stagePreview(activeStage).biome,
-        seed,
-      );
-    }
-    const foes = ev ? buildEventTeam(ev, mine.members.length)
-      : daily && special?.kind === 'daily' ? buildDailyTeam(special.date, data.stageProgress, teamAnchor(mine))
-      : boss ? buildBossTeam(boss, teamAnchor(mine))
-        : colo ? colo.team
-          : buildEnemyTeam(activeStage);
-    const rules = daily ? daily.rules : boss ? { timeLimit: BOSS_TIME } : {};
-    player = new BattlePlayer(seed, mine, foes, battle, rules);
-    battleScreen.setPlayer(player);
-    player.speed = data.settings.battleSpeed;
-    // 設定に入っていたのに、どこからも読んでいなかった。
-    // 自動なら満ちた時点で撃ち、手動ならタップまで溜める
-    player.sim.autoOd = data.settings.autoOd;
-    await progress(0.9, 'リヴォスを復元しています…');
-    battle.resize(renderer.aspect);
-    renderer.setScene(battle.scene, battle.camera);
-    renderer.invalidateShadows();
-    // 誰と当たったかは、出ていってから分かる。開幕の帯で名乗らせる
-    battleScreen.intro = colo ? `${colo.name}` : null;
-    player.start();
-    ui.show('battle');
-    audio.startMusic('battle');
-    await progress(1, '');
-    setTimeout(() => boot.classList.add('hidden'), 200);
-  }
-
-  function showResult(r: ResultData): void {
-    pendingResult = r;
-    renderer.setScene(home.scene, home.camera);
-    ui.show('result', r);
-  }
 
   // ---------------------------------------------------------------- 配線
 
   title.onStart = (fresh) => {
     if (fresh) data = defaultSave();
-    grantStarters(data);
     writeSave(data);
     goHome();
   };
-  title.onBattle = () => { grantStarters(data); writeSave(data); void startBattle(); };
-  // タイトルからも同じ設定の面へ。押すたびに左右が入れ替わるだけの
-  // ボタンだったので、何が変わったかはトーストでしか分からなかった
   title.onSettings = () => goSettings();
-  title.setHasSave(data.stats.runs > 0 || data.roster.length > 0);
+  title.setHasSave(!!data.run || (data.runRecord?.runs ?? 0) > 0 || data.stats.playSeconds > 0);
 
   homeScreen.onGo = (where) => {
-    switch (where) {
-      // 掘るのと削るのはひと続きの作業。同じ面で選ばせる
-      case 'dig': digSelectScreen.setData(data); ui.show('digSelect'); break;
-      case 'clean': stockScreen.setData(data); ui.show('stock'); break;
-      case 'mission': missionScreen.setData(data); ui.show('mission'); break;
-      case 'news': newsScreen.setData(data); ui.show('news'); break;
-      case 'shop': shopScreen.setData(data); ui.show('shop'); break;
-      // 戦いはランだけ。段・イベント・闘技はランに置き換えた
-      case 'battle':
-      case 'event':
-        goRun();
-        break;
-      case 'mail': mailScreen.setData(data); ui.show('mail'); break;
-      case 'unit': goUnit(); break;
-      case 'settings': goSettings(); break;
-      case 'profile': profileBack = goHome; profileScreen.setData(data); ui.show('profile'); break;
-    }
+    if (where === 'battle') goRun();
+    else if (where === 'news') { newsScreen.setData(data); ui.show('news'); }
+    else goSettings();
   };
+  newsScreen.onBack = () => goHome();
+  newsScreen.onRead = () => { writeSave(data); homeScreen.setData(data); };
 
-  /** ユニットの入口。手持ちに関わる面はすべてここから枝分かれする */
-  function goUnit(): void { unitScreen.setData(data); ui.show('unit'); }
-  function goSettings(): void { settingsScreen.setData(data); ui.show('settings'); }
-
-  /**
-   * 下タブ。
-   *
-   * 画面ごとに置かず、UIレイヤに1枚だけ置いて出し入れする。図鑑も編成も
-   * 付け替えも「ユニット」の下に居るので、そこへ潜っても札は点いたまま、
-   * 別の枠へ一手で移れる。行き先はここ1か所で決める。
-   */
-  const tabGo = (where: 'home' | 'dig' | 'battle' | 'unit' | 'settings'): void => {
-    if (where === 'home') { goHome(); return; }
-    if (where === 'dig') { digSelectScreen.setData(data); ui.show('digSelect'); return; }
-    if (where === 'battle') { goRun(); return; }
-    if (where === 'unit') { goUnit(); return; }
-    goSettings();
+  /** 下タブ。拠点・ラン・設定の3つ */
+  const tabGo = (where: 'home' | 'battle' | 'settings'): void => {
+    if (where === 'home') goHome();
+    else if (where === 'battle') goRun();
+    else goSettings();
   };
-  const tabs = tabBar([
+  ui.mountTabs(tabBar([
     { key: 'home', icon: '⌂', label: '拠点', onTap: () => tabGo('home') },
-    { key: 'dig', icon: '⛏', label: '発掘', onTap: () => tabGo('dig') },
-    { key: 'battle', icon: '⚔', label: 'バトル', onTap: () => tabGo('battle') },
-    { key: 'unit', icon: '◈', label: 'ユニット', onTap: () => tabGo('unit') },
+    { key: 'battle', icon: '⚔', label: 'ラン', onTap: () => tabGo('battle') },
     { key: 'settings', icon: '⚙', label: '設定', onTap: () => tabGo('settings') },
-  ]);
-  ui.mountTabs(tabs);
+  ]));
 
-  /*
-   * 横に払って隣の枠へ。
-   *
-   * 面の中にタブがある画面（バトル・ミッション・使用率）は、まず自分の
-   * タブを送る。送るものが無ければここへ落ちてきて、下タブを隣へ動かす。
-   * 潜行中・戦闘中・精錬中は枠そのものを持たないので、ここへは来ない。
-   */
-  const TAB_ORDER = ['home', 'dig', 'battle', 'unit', 'settings'] as const;
-  /**
-   * 枠の入口にいるときだけ横へ動かす。
-   *
-   * 枠の下へ潜った面（編成・図鑑・一覧・未精錬・使用率…）で横に払ったら、
-   * 別の枠へ飛ぶより、その面の中で何も起きないほうがいい——潜った先から
-   * 横へ飛ぶと、戻る道を1つ飛ばして別の場所に出ることになる
-   */
-  const TAB_ROOTS = new Set(['home', 'digSelect', 'battleSelect', 'unit', 'settings']);
+  // 横に払って隣の枠へ。枠の入口にいるときだけ動かす
+  const TAB_ORDER = ['home', 'battle', 'settings'] as const;
+  const TAB_ROOTS = new Set(['home', 'run', 'settings']);
   ui.onSwipeNav = (dir, tab, screen) => {
     if (!TAB_ROOTS.has(screen)) return;
     const i = TAB_ORDER.indexOf(tab as typeof TAB_ORDER[number]);
-    if (i < 0) return;
-    const next = TAB_ORDER[i + dir];
+    const next = i < 0 ? undefined : TAB_ORDER[i + dir];
     if (!next) return;
     audio.uiTap();
     tabGo(next);
   };
-
-  /**
-   * 札に貼る報せ。
-   *
-   * 画面が変わるたびに貼り直す。画面側から書かせると、更新した画面に
-   * 居るあいだしか正しくならない——札は常駐しているので、数も常駐させる。
-   */
-  const refreshTabs = (): void => {
-    ui.tabBadge('unit', data.roster.length > 0 && effectiveParty(data).length < Math.min(PARTY_SIZE, data.roster.length) ? 1 : 0);
-    ui.tabBadge('home', unclaimedCount(data) + readyCount(data));
-    ui.tabBadge('dig', data.stock.length);
-    // 今日の戦場・今週の巨獣に手を付けていなければ、バトルの札に知らせる
-    ui.tabBadge('battle', data.roster.length > 0 ? rotationBadge(data, todayKey()) : 0);
-  };
+  const refreshTabs = (): void => { ui.tabBadge('home', unreadNews(data)); };
   ui.onShow = () => refreshTabs();
   refreshTabs();
 
-  unitScreen.onGo = (where) => {
-    switch (where) {
-      case 'roster': rosterScreen.setData(data); ui.show('roster'); break;
-      case 'party': partyScreen.setData(data); ui.show('party'); break;
-      case 'dex': dexScreen.setData(data); ui.show('dex'); break;
-      case 'transfer': transferScreen.setData(data); ui.show('transfer'); break;
-    }
-  };
-
-  rosterScreen.onBack = () => goUnit();
-  rosterScreen.onPrefChange = () => writeSave(data);
-  /** 手持ちの1体を詳細の1件にする。同じ種の所持数はここでまとめて数える */
-  const ownedEntry = (u: OwnedRevos): DetailEntry => ({
-    defId: u.defId,
-    unit: u,
-    owned: data.roster.filter((o) => o.defId === u.defId),
-  });
-
-  rosterScreen.onDetail = (defId, unit) => {
-    ui.show('detail', {
-      ...ownedEntry(unit),
-      defId,
-      // 一覧が並べていた順をそのまま渡す。払うと隣の個体へ移る
-      list: rosterScreen.visibleList().map(ownedEntry),
-      back: () => { rosterScreen.setData(data); ui.show('roster'); },
-    });
-  };
-
-  transferScreen.onBack = () => goUnit();
-  transferScreen.onDone = () => {
-    writeSave(data);
-    homeScreen.setData(data);
-    unitScreen.setData(data);
-    partyScreen.setData(data);
-  };
-
   settingsScreen.onChange = (key) => {
     const s = data.settings;
-    if (key === 'hand') applyHand();
-    else if (key === 'audio') audio.setVolumes(s.sfx, s.bgm);
+    if (key === 'audio') audio.setVolumes(s.sfx, s.bgm);
     else if (key === 'quality') applyQuality();
-    else if (key === 'shake') battle.reducedShake = s.reducedShake;
-    else if (key === 'battle' && player) {
-      player.speed = s.battleSpeed;
-      player.sim.autoOd = s.autoOd;
-    }
     writeSave(data);
   };
   settingsScreen.onGo = (where) => {
-    if (where === 'profile') { profileBack = goSettings; profileScreen.setData(data); ui.show('profile'); return; }
     if (where === 'title') { ui.show('title'); return; }
-    if (where === 'debug') { openDebug(); return; }
     void wipeSave();
   };
 
-  /**
-   * セーブの消去。
-   *
-   * 取り返しがつかないので、確認は一度だけ、文面で何が消えるかを書く。
-   * 消したあとはタイトルへ戻す——消えた手持ちを拠点で見せても仕方がない。
-   */
+  /** セーブの消去。消したあとはタイトルへ戻す */
   async function wipeSave(): Promise<void> {
-    const ok = await ui.confirm(
-      'セーブを消す',
-      '手持ち・図鑑・記録・コインがすべて消える。元には戻せない。',
-      '消す', true,
-    );
+    const ok = await ui.confirm('セーブを消す', 'ランの記録と進行中のランが消える。元には戻せない。', '消す', true);
     if (!ok) return;
     clearSave();
     data = defaultSave();
     writeSave(data);
-    // 起動時に1度だけ渡している画面は、差し替えた保存を自分では知らない
-    digScreen.setSave(data);
-    applyHand();
     applyQuality();
-    battle.reducedShake = data.settings.reducedShake;
     title.setHasSave(false);
     ui.toast('セーブを消した', 'warn', 2600);
     ui.show('title');
   }
-
-  // 詳細は1枚の画面。どこから開いたかを覚えて、閉じたらそこへ戻す
-  dexScreen.onDetail = (defId) => {
-    const mine = data.roster.filter((u) => u.defId === defId);
-    ui.show('detail', {
-      defId,
-      owned: mine,
-      // 図鑑は種の並び。絞り込みも並べ替えも効いた順で行き来する
-      list: dexScreen.visibleList().map((id) => ({
-        defId: id,
-        owned: data.roster.filter((u) => u.defId === id),
-      })),
-      back: () => { dexScreen.setData(data); ui.show('dex'); },
-      // 持っていない個体を編成へ送っても置けない。導線ごと出さない。
-      // 払って移った先の所持は詳細側が見るので、ここでは渡すだけ
-      onEquip: () => { partyScreen.setData(data); ui.show('party'); },
-    });
-  };
-  dexScreen.onPrefChange = () => writeSave(data);
-  partyScreen.onDetail = (defId, unit) => {
-    ui.show('detail', {
-      ...ownedEntry(unit),
-      defId,
-      list: partyScreen.visibleList().map(ownedEntry),
-      back: () => { partyScreen.setData(data); ui.show('party'); },
-    });
-  };
-
-  digScreen.setSave(data);
-  // 崩した量は記録だけ。保存は周回の終わりにまとめて走るので、ここでは書かない
-  dig.events.onDig = (_slot, _pos, removed) => { data.stats.voxelsDug += removed; };
-  digScreen.onCollectFossil = (n) => {
-    if (n.kind === 'fossil') {
-      runFossils.push({ defId: n.speciesId, rarity: n.rarity });
-      data.stats.found++;
-      data.stats.bestRarity = Math.max(data.stats.bestRarity, n.rarity);
-    } else data.player.coins += 40 + n.rarity * 20;
-  };
-  digScreen.onExit = () => {
-    audio.uiBack();
-    dig.setMode('explore');
-    // 途中で抜けても拾ったものは失わせない
-    if (runFossils.length > 0) { digScreen.onFinish?.(); return; }
-    // 手ぶらで戻る場合も、崩した量は書いておく。ここを書かずに帰ると、
-    // 掘っただけで何も見つからなかった時間が記録から丸ごと消える
-    writeSave(data);
-    goHome();
-  };
-  digScreen.onFinish = () => {
-    // 締めは1周に1回。2回目以降は、同じ化石をもう一度ストックへ積むだけ
-    if (runClosed) return;
-    runClosed = true;
-    data.daily.runs++;
-    addPlayerExp(data, 40 + runFossils.length * 20);
-    if (runFossils.length === 0) {
-      writeSave(data);
-      ui.toast('収穫なし', 'warn');
-      setTimeout(goHome, 1000);
-      return;
-    }
-    // 持ち帰ったぶんはすべてストックへ。どれから削るかは一覧で選ぶ
-    for (const f of runFossils) {
-      data.stock.push({ defId: f.defId, rarity: f.rarity, biome: runBiome });
-    }
-    // 積み終えたら控えを空にする。万一もう一度ここへ来ても積むものが無い
-    runFossils = [];
-    writeSave(data);
-    stockScreen.setData(data);
-    ui.show('stock');
-  };
-
-  /**
-   * 精錬の後始末。
-   *
-   * 同じ種をすでに持っているなら、重ねるか別個体として迎えるかを選ばせる。
-   * 黙って吸わせると、クリーン度 96 の2体目を削り上げても手元に残るのは
-   * 数字が1つ動いた1体だけで、削った時間の行き先が見えない。
-   */
-  cleanScreen.onFinish = (score, defId) => {
-    data.stats.fossils++;
-    data.stats.bestClean = Math.max(data.stats.bestClean, score.clean);
-    if (score.rank === 'S') data.stats.sRanks++;
-    countToday(data, 'clean');
-    addPlayerExp(data, 60 + Math.round(score.clean * 0.6));
-
-    // 刻印は削り上げたこの瞬間に決まる。出るかどうかも等級もクリーン度次第
-    const engraving = rollEngraving(score.clean, new Rng((Date.now() ^ (score.clean * 2654435761)) >>> 0));
-    const owned = data.roster.filter((r) => r.defId === defId);
-
-    const finish = (isNew: boolean, note: { label: string; value: string }): void => {
-      writeSave(data);
-      showResult({
-        title: '精錬完了',
-        subtitle: `${label(defId)} の化石`,
-        good: score.rank !== 'D',
-        rows: [
-          { label: 'ランク', value: score.rank, kind: 'rank' },
-          { label: 'クリーン度', value: `${score.clean}`, kind: 'exp' },
-          { label: '岩の除去', value: `${Math.round(score.rockRatio * 100)}%` },
-          // 損傷は点を引かず上限を下げる。引かれた点ではなく、届かなくなった天井を出す
-          { label: '骨の損傷', value: score.boneDamage > 0 ? `上限 ${score.cap}` : 'なし' },
-          ...(engraving
-            ? [{ label: engraveName(engraving), value: engraveText(engraving), kind: 'new' as const }]
-            : []),
-          isNew
-            ? { label: '新種を入手', value: label(defId), kind: 'new' as const }
-            : { ...note, kind: 'new' as const },
-          ...(data.stock.length > 0
-            ? [{ label: '未精錬のストック', value: `${data.stock.length} 個` }]
-            : []),
-        ],
-      });
-    };
-
-    if (owned.length === 0) {
-      const { isNew } = addFossil(data, defId, score.clean, engraving ?? undefined);
-      finish(isNew, { label: label(defId), value: '加入' });
-      return;
-    }
-
-    ui.show('cleanChoice', {
-      defId,
-      clean: score.clean,
-      engraving: engraving ?? undefined,
-      owned,
-      onMerge: (targetUid: string, takeEngraving: boolean) => {
-        const u = mergeFossil(data, targetUid, score.clean, engraving ?? undefined, takeEngraving);
-        finish(false, {
-          label: `${label(defId)} に重ねた`,
-          value: `技Lv ${u?.skillLevel ?? 1} · クリーン度 ${u?.clean ?? score.clean}`,
-        });
-      },
-      onKeep: () => {
-        addFossil(data, defId, score.clean, engraving ?? undefined);
-        finish(false, {
-          label: `${label(defId)} を迎えた`,
-          value: `${data.roster.filter((r) => r.defId === defId).length} 体目`,
-        });
-      },
-    });
-  };
-
-  battleScreen.onFinish = (winner) => {
-    data.stats.battles++;
-    if (player) {
-      const t = player.tally;
-      data.stats.damage += t.damage;
-      data.stats.bestHit = Math.max(data.stats.bestHit, t.bestHit);
-      data.stats.kos += t.kos;
-      data.stats.odFired += t.odFired;
-      countToday(data, 'od', t.odFired);
-    }
-    countToday(data, 'battle');
-    // 出撃回数。誰を連れて行きがちかは、勝敗と別に残しておく
-    for (const uid of buildTeamSetup(data.roster, data.party.order)?.members.map((m) => m.defId) ?? []) {
-      data.stats.sorties[uid] = (data.stats.sorties[uid] ?? 0) + 1;
-    }
-    const ev = activeEvent;
-    activeEvent = null;
-    const sp = activeSpecial;
-    activeSpecial = null;
-    const rows: ResultData['rows'] = [];
-
-    // 巨獣は勝ち負けではなく、どこまで削ったかで決まる。段の報酬は勝敗に関わらず渡す
-    let bossFrac = 0;
-    if (sp?.kind === 'boss' && player) {
-      const foe = player.sim.fighters.find((f) => f.side === 1);
-      if (foe) bossFrac = Math.min(1, 1 - foe.hp / foe.maxHp);
-      const boss = bossFor(sp.date);
-      const st = bossState(data, sp.date);
-      const next = { week: st.week, best: Math.max(st.best, bossFrac), claimed: [...st.claimed] };
-      rows.push({
-        label: '与ダメージ',
-        value: `${Math.floor(bossFrac * 100)}%${bossFrac > st.best ? '（今週の最高）' : ''}`,
-      });
-      BOSS_TIERS.forEach((t, i) => {
-        if (bossFrac + 1e-9 < t.at || next.claimed.includes(i)) return;
-        next.claimed.push(i);
-        data.player.coins += t.coins;
-        let extra = '';
-        if (t.fossil) {
-          const defId = t.fossil === 'boss' ? boss.defId : rollBossFossil(boss, t.fossil.rarity, Math.random);
-          data.stock.push({ defId, rarity: getRevos(defId).rarity, biome: boss.biome });
-          extra = ` ＋ ${label(defId)}の化石`;
-        }
-        rows.push({ label: `${t.name}の報酬`, value: `◈ ${t.coins}${extra}`, kind: t.fossil ? 'new' : 'coin' });
-      });
-      const nextTier = BOSS_TIERS.find((_, i) => !next.claimed.includes(i));
-      if (nextTier) {
-        rows.push({ label: '次の段', value: `${nextTier.name} — ${nextTier.at >= 1 ? '討伐' : `${Math.round(nextTier.at * 100)}%`}` });
-      }
-      data.events.boss = next;
-    }
-
-    if (winner === 0) {
-      data.stats.wins++;
-      data.stats.streak++;
-      countToday(data, 'win');
-      data.stats.bestStreak = Math.max(data.stats.bestStreak, data.stats.streak);
-      const turns = player?.sim.turnCount ?? 0;
-      // 0 は「未達成」。初回は無条件に入れないと、いつまでも 0 のまま。
-      // 場の決まりが違う戦いは比べられないので、通常戦と物語だけで数える
-      if (!sp && turns > 0 && (data.stats.fastestWin === 0 || turns < data.stats.fastestWin)) {
-        data.stats.fastestWin = turns;
-      }
-      let coins = 0;
-      if (sp?.kind === 'daily') {
-        // 今日の戦場。その日の初勝利だけが化石を落とす
-        const st = dailyState(data, sp.date);
-        if (!st.won) {
-          data.events.daily = { date: sp.date, won: true };
-          const rw = dailyReward(data.stageProgress);
-          const rule = dailyRuleFor(sp.date);
-          const defId = rollDailyFossil(rule, rw.rarity, Math.random);
-          data.stock.push({ defId, rarity: getRevos(defId).rarity, biome: rule.biome });
-          coins = rw.coins;
-          rows.push({ label: '今日の初勝利', value: `${label(defId)}の化石（ストックへ）`, kind: 'new' });
-        } else {
-          coins = DAILY_REPLAY_COINS;
-          rows.push({ label: '再戦', value: '今日の初勝利は受け取り済み' });
-        }
-      } else if (sp?.kind === 'boss') {
-        // 段の報酬は上で渡した
-      } else if (sp?.kind === 'colosseum') {
-        coins = colosseumCoins(data.colosseum.rate, true);
-      } else if (ev) {
-        // イベントは進行度を進めない。編成を試す場としていつでも戻れるようにする
-        const first = !data.events.cleared.includes(ev.id);
-        coins = first ? ev.coins : Math.round(ev.coins / 4);
-        if (first) {
-          data.events.cleared.push(ev.id);
-          const { isNew, unit } = addFossil(data, ev.reward.defId, ev.reward.clean);
-          if (isNew) {
-            // 加入レベルのほうが高いことがある。報酬で下げない
-            unit.level = Math.max(unit.level, ev.reward.level);
-            rows.push({ label: '記録を確保', value: `${label(ev.reward.defId)} Lv${unit.level}`, kind: 'new' });
-          } else {
-            rows.push({ label: '記録を確保', value: `${label(ev.reward.defId)} スキルLv ${unit.skillLevel}`, kind: 'new' });
-          }
-        }
-      } else {
-        // 到達済みの段へ戻れるようにしたので、勝っても進むとは限らない。
-        // 進むのは未踏の段（＝いまの進行度の1つ先）を抜いたときだけ
-        const advanced = activeStage > data.stageProgress;
-        if (advanced) data.stageProgress = Math.min(STAGE_COUNT, activeStage);
-        coins = stageCoins(activeStage, !advanced);
-        if (!advanced) rows.push({ label: '再挑戦', value: `ステージ ${activeStage}` });
-      }
-      if (coins > 0) {
-        data.player.coins += coins;
-        rows.push({ label: '報酬', value: `◈ ${coins}`, kind: 'coin' });
-      }
-    } else if (sp?.kind === 'boss') {
-      // 巨獣は倒しきれないのが普通。連勝は切らない
-      rows.push({ label: '結果', value: winner === 1 ? '全滅' : '時間切れ' });
-    } else {
-      data.stats.streak = 0;
-      rows.push({ label: '結果', value: winner === 1 ? '敗北' : '引き分け' });
-      rows.push({
-        label: '助言',
-        value: sp?.kind === 'daily' ? `勝ち筋：${dailyRuleFor(sp.date).hint}` : '編成を見直そう',
-      });
-    }
-    /*
-     * コロシアムのレート。
-     *
-     * 引き分け（時間切れ）は負け扱いにしない——こちらが崩せなかったのと
-     * 同じだけ相手も崩せていないので、どちらかに点を付ける理由がない。
-     */
-    if (sp?.kind === 'colosseum') {
-      const c = data.colosseum;
-      const before = c.rate;
-      if (winner === 0 || winner === 1) {
-        const won = winner === 0;
-        c.rate = Math.max(COLOSSEUM_FLOOR, c.rate + rateDelta(c.rate, sp.rival.rate, won));
-        c.best = Math.max(c.best, c.rate);
-        if (won) { c.wins++; c.streak++; c.bestStreak = Math.max(c.bestStreak, c.streak); }
-        else { c.losses++; c.streak = 0; }
-      }
-      const tier = tierOf(c.rate);
-      const moved = c.rate - before;
-      rows.push({
-        label: 'レート',
-        value: `${before} → ${c.rate}${moved === 0 ? '' : `（${moved > 0 ? '＋' : ''}${moved}）`}`,
-        kind: moved > 0 ? 'new' : 'exp',
-      });
-      if (tierOf(before).name !== tier.name) {
-        rows.push({ label: moved > 0 ? '昇級' : '降級', value: tier.name, kind: 'rank' });
-      } else {
-        rows.push({ label: '階級', value: tier.name });
-      }
-      if (c.streak > 1) rows.push({ label: '連勝', value: `${c.streak} 連勝` });
-      if (winner === 1) {
-        const lose = colosseumCoins(c.rate, false);
-        data.player.coins += lose;
-        rows.push({ label: '参加賞', value: `◈ ${lose}`, kind: 'coin' });
-      }
-    }
-
-    addPlayerExp(data, winner === 0 ? 120 : 40);
-
-    /*
-     * EXP は勝敗に関わらず入る。
-     *
-     * 以前は勝ったときだけだった。負けた編成は何も得ないまま同じ相手に
-     * 挑み続けることになり、一度差が開くと二度と埋まらない——「勝てない
-     * から育たない、育たないから勝てない」で詰む。負けでも通常の4割弱を
-     * 渡す。3回負ければ1つぶん近づく、という程度には動く。
-     *
-     * 配分も前列0.5/後列0.25をやめた。同じ戦いに出た3体なので同額。
-     * 半分しか入らない後列は、いつまでも前列の半分のレベルで固定され、
-     * 編成を組み替えた瞬間に壊れる。
-     *
-     * 額は 900 → 1800 に上げた。段が30で固定になり、相手のレベルも
-     * 段ごとに決まったので、こちらの伸びが遅いと「段は進むのに自分の
-     * 数字が動かない」状態になる。必要EXPは level^1.55 で伸びるので、
-     * 1段あたり1〜2戦で1つ上がり、30段を抜ける頃に上限の Lv30 へ届く。
-     */
-    const setup = buildTeamSetup(data.roster, data.party.order);
-    const maxLv = Math.max(...data.roster.map((r) => r.level), 1);
-    const base = winner === 0 || bossFrac >= 0.55 ? 1800 : 680;
-    setup?.members.forEach((m) => {
-      const unit = data.roster.find((r) => r.uid === m.uid);
-      if (!unit) return;
-      // 未育成にはキャッチアップ補正をかけないと
-      // 「最初に育てた3体しか使えない」状態に固定される
-      const catchUp = unit.level < maxLv - 2 ? 2.0 : 1;
-      const gain = Math.round(base * catchUp);
-      const { leveled } = addExp(unit, gain);
-      rows.push({
-        label: label(unit.defId),
-        value: leveled > 0 ? `+${gain} EXP → Lv${unit.level}` : `+${gain} EXP`,
-        kind: 'exp',
-      });
-    });
-    if (winner === 0 && !ev && !sp) rows.push({ label: '進行度', value: `ステージ ${data.stageProgress} / ${STAGE_COUNT}` });
-    writeSave(data);
-    const secs = Math.round(player?.sim.clock ?? 0);
-    const isBoss = sp?.kind === 'boss';
-    showResult({
-      eyebrow: isBoss ? '巨獣討伐'
-        : sp?.kind === 'colosseum' ? 'コロシアム'
-          : sp ? '今日の戦場' : '戦闘終了',
-      title: isBoss
-        ? (bossFrac >= 1 ? '討 伐' : winner === 1 ? '全 滅' : '時 間 切 れ')
-        : winner === 0 ? '勝 利' : winner === 1 ? '敗 北' : '引 き 分 け',
-      subtitle: isBoss && sp?.kind === 'boss'
-        ? `${bossFor(sp.date).title} — 与ダメージ ${Math.floor(bossFrac * 100)}%`
-        : sp?.kind === 'colosseum'
-          ? `${sp.rival.name}（レート ${sp.rival.rate}） — ${secs} 秒で決着`
-          : sp?.kind === 'daily'
-            ? `${dailyRuleFor(sp.date).name} — ${secs} 秒で決着`
-            : ev
-            ? `${ev.name} — ${secs} 秒で決着`
-            : `ステージ ${activeStage} — ${secs} 秒で決着`,
-      good: isBoss ? bossFrac >= BOSS_TIERS[0].at : winner === 0,
-      cast: setup?.members.map((m) => m.defId) ?? [],
-      rows,
-    });
-  };
-
-  // 記録は拠点の丸列と設定の両方から開く。閉じたら開いた場所へ返す
-  let profileBack: () => void = goHome;
-  profileScreen.onBack = () => profileBack();
-  // 精錬の一覧から戻る先は発掘の面。拠点まで戻すと、
-  // もう1つ削りに行くのに毎回タブを踏み直すことになる
-  stockScreen.onBack = () => { digSelectScreen.setData(data); ui.show('digSelect'); };
-  stockScreen.onClean = (entry) => {
-    const [s] = data.stock.splice(entry.index, 1);
-    if (!s) { ui.toast('その化石はもう無い', 'warn'); stockScreen.setData(data); return; }
-    writeSave(data);
-    void startClean(s.defId, s.rarity);
-  };
-  /*
-   * おまかせ精錬。
-   *
-   * 削りの画面には入らず、その場で仕上げて、手で削り終えたときと同じ
-   * 出口（cleanScreen.onFinish）へ渡す——刻印の抽選も、重ねるか迎えるかの
-   * 選択も、結果の見せ方も1か所にしておく。
-   */
-  stockScreen.onAuto = (entry) => {
-    if (!autoCleanUnlocked(data)) { ui.toast(`ステージ ${AUTO_UNLOCK_STAGE} 到達で開く`, 'warn'); return; }
-    const [s] = data.stock.splice(entry.index, 1);
-    if (!s) { ui.toast('その化石はもう無い', 'warn'); stockScreen.setData(data); return; }
-    const level = autoCleanLevel(autoCleanUses(data));
-    const score = autoCleanScore(level, new Rng((Date.now() ^ 0x9e37) >>> 0));
-    // 任せた回数は仕上げる前に数える。腕が上がるのは「やった」ことの結果
-    data.player.autoCleanUses = autoCleanUses(data) + 1;
-    audio.reward(s.rarity);
-    cleanScreen.onFinish?.(score, s.defId);
-  };
-
-  digSelectScreen.onBack = () => goHome();
-  digSelectScreen.onGo = (biome) => { void startRun(biome); };
-  digSelectScreen.onClean = () => { stockScreen.setData(data); ui.show('stock'); };
-
-  missionScreen.onBack = () => goHome();
-  missionScreen.onClaim = () => { writeSave(data); homeScreen.setData(data); };
-
-  newsScreen.onBack = () => goHome();
-  newsScreen.onRead = () => { writeSave(data); homeScreen.setData(data); };
-
-  shopScreen.onBack = () => goHome();
-  shopScreen.onBuy = () => { writeSave(data); homeScreen.setData(data); };
-
-  mailScreen.onBack = () => goHome();
-  mailScreen.onClaim = () => {
-    writeSave(data);
-    homeScreen.setData(data);
-  };
-
-  selectScreen.onBack = () => goHome();
-  selectScreen.onNormal = (stage) => { void startBattle(null, stage); };
-  selectScreen.onEvent = (ev) => { void startBattle(ev); };
-  selectScreen.onDaily = () => { void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() }); };
-  selectScreen.onBoss = () => { void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() }); };
-  selectScreen.onColosseum = () => { colosseumScreen.setData(data); ui.show('colosseum'); };
-  colosseumScreen.onBack = () => { selectScreen.setData(data); ui.show('battleSelect'); };
-  colosseumScreen.onGo = () => { void startBattle(null, data.stageProgress + 1, nextColosseumSpecial()); };
-  colosseumScreen.onRanking = () => { rankingScreen.setData(data); ui.show('ranking'); };
-  rankingScreen.onBack = () => { colosseumScreen.setData(data); ui.show('colosseum'); };
-
-  /**
-   * デバッグモードを開く。
-   *
-   * 開いた事実を保存して、以後は拠点のタイルからも行けるようにする。
-   * 長押しを毎回やり直させると、結局さわらなくなる。
-   */
-  function openDebug(): void {
-    if (data.settings.debug !== true) {
-      data.settings.debug = true;
-      writeSave(data);
-      ui.toast('デバッグモードを開いた', 'warn');
-    }
-    debugScreen.setData(data);
-    ui.show('debug');
-  }
-
-  title.onDebug = () => openDebug();
-  debugScreen.onBack = () => goHome();
-  // 触った結果は即保存する。検証中にリロードして消えるのがいちばん困る
-  debugScreen.onChanged = () => writeSave(data);
-
-  partyScreen.onBack = () => goUnit();
-  partyScreen.onApply = (order) => {
-    data.party.order = order;
-    writeSave(data);
-    ui.toast('編成を保存した', 'info', 1600);
-    goUnit();
-  };
-
-  dexScreen.onBack = () => goUnit();
-
-  resultScreen.onNext = () => goHome();
-  resultScreen.onAgain = () => {
-    const t = pendingResult?.title ?? '';
-    if (t === '精錬完了') {
-      if (data.stock.length > 0) { stockScreen.setData(data); ui.show('stock'); return; }
-      void startBattle();
-    } else {
-      /*
-       * 日替わり・週替わりは、もう一度押した時点の日付で挑み直す。
-       * コロシアムはレートが動いているので、相手も組み直して挑む——
-       * 同じ相手にもう一度、ではなく「次の相手」になる
-       */
-      void startBattle(
-        lastEvent, lastStage,
-        lastSpecial === null ? null
-          : lastSpecial.kind === 'colosseum' ? nextColosseumSpecial()
-            : { kind: lastSpecial.kind, date: todayKey() },
-      );
-    }
-  };
 
   // ---------------------------------------------------------------- タイトル背景
 
@@ -1163,41 +223,10 @@ async function main(): Promise<void> {
 
   // 開発用の直接遷移
   const jump = new URLSearchParams(location.search).get('screen');
-  if (jump) {
-    grantStarters(data);
-    if (jump === 'clean') void startClean('yutyrannus', 2);
-    else if (jump === 'battle') void startBattle();
-    else if (jump === 'home') goHome();
-    else if (jump === 'party') { partyScreen.setData(data); ui.show('party'); }
-    else if (jump === 'run') goRun();
-    else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
-    else if (jump === 'event') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'event' }); }
-    else if (jump === 'daily') void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() });
-    else if (jump === 'boss') void startBattle(null, data.stageProgress + 1, { kind: 'boss', date: todayKey() });
-    else if (jump === 'colosseum') { colosseumScreen.setData(data); ui.show('colosseum'); }
-    else if (jump === 'ranking') { rankingScreen.setData(data); ui.show('ranking'); }
-    else if (jump === 'select') { selectScreen.setData(data); ui.show('battleSelect'); }
-    else if (jump === 'mail') { deliverMail(false); mailScreen.setData(data); ui.show('mail'); }
-    else if (jump === 'digSelect') { digSelectScreen.setData(data); ui.show('digSelect'); }
-    else if (jump === 'mission') { missionScreen.setData(data); ui.show('mission'); }
-    else if (jump === 'news') { newsScreen.setData(data); ui.show('news'); }
-    else if (jump === 'shop') { shopScreen.setData(data); ui.show('shop'); }
-    else if (jump === 'unit') goUnit();
-    else if (jump === 'settings') goSettings();
-    else if (jump === 'roster') { rosterScreen.setData(data); ui.show('roster'); }
-    else if (jump === 'transfer') { transferScreen.setData(data); ui.show('transfer'); }
-    else if (jump === 'cleanChoice') {
-      // 削り上げた直後の状態を、精錬を回さずに作る。刻印は本番と同じ抽選を通す
-      cleanScreen.onFinish?.(
-        { clean: 88, rank: 'A', rockRatio: 0.94, timeRatio: 0.42, boneDamage: 1, cap: 97 },
-        'yutyrannus',
-      );
-    }
-    else if (jump === 'stock') { stockScreen.setData(data); ui.show('stock'); }
-    else if (jump === 'profile') { profileScreen.setData(data); ui.show('profile'); }
-    else if (jump === 'debug') openDebug();
-    else if (jump === 'dig') void startRun('canyon');
-  }
+  if (jump === 'home') goHome();
+  else if (jump === 'run') goRun();
+  else if (jump === 'news') { newsScreen.setData(data); ui.show('news'); }
+  else if (jump === 'settings') goSettings();
 
   // ---------------------------------------------------------------- 環境
 
@@ -1218,9 +247,6 @@ async function main(): Promise<void> {
     resizeTimer = setTimeout(() => {
       renderer.resize();
       const a = renderer.aspect;
-      dig.resize(a);
-      battle.resize(a);
-      clean.resize(a);
       home.resize(a);
       titleCam.aspect = a;
       titleCam.updateProjectionMatrix();
@@ -1235,10 +261,7 @@ async function main(): Promise<void> {
   document.addEventListener('visibilitychange', () => {
     paused = document.hidden;
     if (paused) audio.stopMusic();
-    else {
-      const s = ui.currentName;
-      audio.startMusic(s === 'battle' ? 'battle' : s === 'dig' ? 'dig' : 'calm');
-    }
+    else audio.startMusic(ui.currentName === 'runBattle' ? 'battle' : 'calm');
   });
 
   // ブラウザの戻る／Androidのバックジェスチャをゲーム内の戻るとして受ける
@@ -1246,21 +269,14 @@ async function main(): Promise<void> {
   addEventListener('popstate', () => {
     history.pushState({ guard: true }, '');
     const s = ui.currentName;
-    if (s === 'home' || s === 'title') return;
-    if (s === 'dig') { dig.setMode('explore'); goHome(); }
-    else if (s === 'battle') return; // 戦闘中は抜けさせない
-    else goHome();
+    if (s === 'home' || s === 'title' || s === 'runBattle') return;
+    goHome();
   });
 
-  const debug = document.createElement('div');
-  debug.className = 'debug-hud';
-  uiEl.appendChild(debug);
   const showDebug = new URLSearchParams(location.search).has('debug');
   if (showDebug) {
-    (window as unknown as { __game: unknown }).__game = { dig, clean, battle, home, ui, get data() { return data; } };
+    (window as unknown as { __game: unknown }).__game = { home, ui, get data() { return data; } };
   }
-  debug.hidden = !showDebug;
-  let debugTimer = 0;
 
   // ---------------------------------------------------------------- ループ
 
@@ -1271,57 +287,17 @@ async function main(): Promise<void> {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (paused) return;
-
-    // プレイ時間。タブを離れている間は paused で止まるので、
-    // 「開きっぱなし」ではなく実際に見ていた時間になる
     data.stats.playSeconds += dt;
-
-    input.beginFrame();
-    switch (ui.currentName) {
-      case 'dig':
-        // 持ち物を開いている間はフィールド操作を止める。
-        // 3D は動かし続けるので、自分がどこに立っているかは見えたまま
-        digScreen.pollInventoryKey(input.justPressed('inventory'));
-        dig.update(dt, input, !digScreen.inventoryOpen);
-        if (dig.consumeShadowDirty()) renderer.invalidateShadows();
-        break;
-      case 'battle':
-        player?.update(dt);
-        battle.update(dt);
-        break;
-      case 'clean':
-        // 更新は CleanScreen.update から駆動する（入力と時間が結び付くため）
-        break;
-      case 'home':
-      case 'party':
-      case 'dex':
-      case 'result':
-        home.update(dt);
-        break;
-      default:
-        titleCam.position.x = Math.sin(now * 0.00012) * 9;
-        titleCam.position.z = Math.cos(now * 0.00012) * 9;
-        titleCam.lookAt(0, 1.2, 0);
+    if (ui.currentName === 'title') {
+      titleCam.position.x = Math.sin(now * 0.00012) * 9;
+      titleCam.position.z = Math.cos(now * 0.00012) * 9;
+      titleCam.lookAt(0, 1.2, 0);
+    } else {
+      home.update(dt);
     }
-    // ホロ表現の時間はシーンに属さない。どの画面でも同じ速さで流す
     advanceHoloTime(dt);
     ui.update(dt);
     renderer.render(dt);
-    input.endFrame();
-
-    if (showDebug) {
-      debugTimer += dt;
-      if (debugTimer > 0.25) {
-        debugTimer = 0;
-        const i = renderer.info;
-        const cv = renderer.canvas;
-        debug.textContent =
-          `${(1 / Math.max(dt, 1e-4)).toFixed(0)} fps  ${i.tier} x${i.scale.toFixed(2)}\n` +
-          `calls ${i.calls}  tris ${(i.triangles / 1000).toFixed(0)}k\n` +
-          `geo ${i.geometries}  prog ${i.programs}\n` +
-          `css ${cv.clientWidth}x${cv.clientHeight} buf ${cv.width}x${cv.height}`;
-      }
-    }
   };
   requestAnimationFrame(loop);
 
