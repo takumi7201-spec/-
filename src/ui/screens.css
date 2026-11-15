@@ -3391,22 +3391,35 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 
 /* ------------------------------------------------------------------ 広がるカード */
 /* 札から下の欄へ広がる。位置と大きさは expandCard.ts がばねで動かす */
+.xcard-scrim {
+  position: absolute; inset: 0; z-index: 20;
+  /* 画面の地は既定で押せない（.screen が pointer-events: none）。背景とカードは押せるように戻す */
+  pointer-events: auto;
+  background: rgba(40, 32, 20, 0.42); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.xcard-scrim[hidden] { display: none; }
+/* 乗せて見ているだけのときは暗くしない。押せないようにもする */
+.xcard-scrim.is-static { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; }
 .xcard {
-  position: absolute; z-index: 3; transform-origin: 0 0; will-change: transform, opacity;
+  position: absolute; z-index: 21; transform-origin: 0 0; will-change: transform, opacity;
+  pointer-events: auto;
+  overflow-y: auto; overscroll-behavior: contain;
   border-radius: 16px; background: var(--paper-card); color: var(--ink);
   box-shadow: var(--lift-2), inset 0 0 0 1.5px rgba(72, 58, 36, 0.08);
 }
 .xcard[hidden] { display: none; }
 /* 乗せて見ているだけのときは押せない。下の札の出入りを邪魔しない */
-.xcard.is-static { pointer-events: none; }
+.xcard.is-static, .xcard.is-closing, .xcard-scrim.is-closing { pointer-events: none; }
 .xcard-inner { padding: 12px 14px 14px; }
 .xs { display: flex; flex-direction: column; gap: 8px; }
 .xs-head { display: flex; align-items: center; gap: 9px; }
-.xs-icon { width: 40px; height: 40px; flex: none; }
+.xs-icon { width: 48px; height: 48px; flex: none; }
 .xs-title { display: flex; flex-direction: column; min-width: 0; }
-.xs-title b { font-size: 15px; font-weight: 900; }
+.xs-title b { font-size: 17px; font-weight: 900; }
 .xs-sub { font-size: 10px; color: var(--ink-soft); line-height: 1.5; }
-.xs-actions { margin-left: auto; display: flex; gap: 6px; flex: none; }
+.xs-close { margin-left: auto; flex: none; width: 34px; height: 34px; padding: 0; border-radius: 50%; }
+.xs-actions { display: flex; gap: 8px; margin-top: 4px; }
+.xs-actions > .btn { flex: 1; height: 46px; border-radius: 14px; font-size: 14px; }
 .xs-label { font-size: 10px; letter-spacing: 0.18em; margin-top: 2px; }
 .xs-table {
   display: grid; align-items: center; gap: 5px 10px;

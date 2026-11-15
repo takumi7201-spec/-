@@ -42,6 +42,8 @@ export class RunScreen extends Screen {
   private xcard!: ExpandCard;
   /** マウスを乗せている札。乗せて見るだけで、押せる操作は出さない */
   private hover: Pick = null;
+  /** 押して開いたポップアップが出ているか。閉じて選んだままなら「置き先を選ぶ」状態 */
+  private popup = false;
   private hoverTimer = 0;
   private boardSlots: HTMLElement[] = [];
   private shopSlots: (HTMLElement | null)[] = [];
@@ -81,7 +83,9 @@ export class RunScreen extends Screen {
       button(spaced('戦う'), () => this.fight(), { class: 'btn--primary run-fight' }),
     );
     this.el.append(head, body, deck);
-    this.xcard = new ExpandCard(body);
+    this.xcard = new ExpandCard(this.el);
+    // 背景を押したら閉じて、選んでいたものも外す
+    this.xcard.onDismiss = () => { audio.uiBack(); this.pick = null; this.popup = false; this.render(); };
   }
 
   enter(): void { this.render(); }
@@ -195,24 +199,28 @@ export class RunScreen extends Screen {
    * どちらも無ければカードを元の札へ縮めて、置き場所には手引きを出す
    */
   private renderInfo(): void {
-    const at = this.pick ?? this.hover;
+    const r = this.run;
+    // 押して開いたもの（操作つき）が先。無ければ乗せている札（見るだけ）
+    const at = this.pick && this.popup ? this.pick : !this.pick ? this.hover : null;
     const u = this.unitAt(at);
     const from = this.slotOf(at);
-    if (!at || !u || !from) {
+    clear(this.infoEl);
+    if (at && u && from) {
+      this.lastShown = at;
+      const modal = at === this.pick;
+      this.xcard.show(`${at.from}:${at.i}:${u.defId}:${u.copies}:${modal}`, from, this.sheet(u, at, modal), modal);
+    } else {
       this.xcard.hide(this.slotOf(this.lastShown));
       this.lastShown = null;
-      clear(this.infoEl);
-      const r = this.run;
-      this.infoEl.append(h('div', { class: 'run-hint', text:
-        r.board.every((x) => !x)
-          ? '店の札を押して、空いた枠へ置く。同じユニットを3体重ねると★2になる。'
-          : '札を押す（マウスなら乗せる）と中身が広がる。盤面の札を選んで別の枠を押すと入れ替わる。' }));
-      return;
     }
-    clear(this.infoEl);
-    this.lastShown = at;
-    const interactive = this.pick !== null;
-    this.xcard.show(`${at.from}:${at.i}:${u.defId}:${u.copies}`, from, this.sheet(u, at, interactive), this.infoEl, interactive);
+    // 下の欄は手引き。置き先を選んでいる間は、何をすればいいかを言う
+    const hint = this.pick && !this.popup
+      ? this.pick.from === 'shop' ? '置く枠を押す（同じユニットの枠なら重なる）。もう一度店の札を押すとやめる。'
+        : '動かす先の枠を押す。同じ枠を押すとやめる。'
+      : r.board.every((x) => !x)
+        ? '店の札を押すと中身が出る。「買う」で盤面へ。同じユニットを3体重ねると★2になる。'
+        : '札を押す（マウスなら乗せる）と中身が出る。';
+    this.infoEl.append(h('div', { class: 'run-hint', text: hint }));
   }
   private lastShown: Pick = null;
 
@@ -260,11 +268,18 @@ export class RunScreen extends Screen {
 
     const actions = h('div', { class: 'xs-actions' });
     if (interactive && at.from === 'board') {
-      actions.appendChild(button(`売る +${star}`, () => this.doSell(at.i), { class: 'btn--sm btn--opt' }));
+      actions.append(
+        button(`売る +${star}`, () => this.doSell(at.i), { class: 'btn--opt' }),
+        button('動かす', () => this.placeMode(), { class: 'btn--opt' }),
+      );
     }
     if (interactive && at.from === 'shop') {
-      actions.appendChild(button(onBoard ? '重ねる' : '買う', () => this.tapShop(at.i), { class: 'btn--sm btn--primary' }));
+      actions.append(
+        button('置く枠を選ぶ', () => this.placeMode(), { class: 'btn--opt' }),
+        button(onBoard ? '重ねる' : `買う`, () => this.buyAuto(at.i), { class: 'btn--primary' }),
+      );
     }
+    const close = interactive ? button('✕', () => { audio.uiBack(); this.pick = null; this.popup = false; this.render(); }, { class: 'btn--sm btn--opt xs-close' }) : null;
 
     return h('div', { class: 'xs' },
       h('div', { class: 'xs-head' },
@@ -273,11 +288,12 @@ export class RunScreen extends Screen {
           h('b', { text: def.name }),
           h('span', { class: 'xs-sub', text: `段${d.tier} · ${'★'.repeat(star)}${u.copies > 1 ? `（${u.copies}体）` : ''}${kit ? ` · ${KIT_TRAITS[kit].name}` : ''}${need ? ` · ${need}` : ''}` }),
         ),
-        actions,
+        close,
       ),
       h('div', { class: 'label xs-label', text: '強化後の数値' }),
       table,
       lines,
+      interactive ? actions : null,
     );
   }
 
@@ -291,45 +307,55 @@ export class RunScreen extends Screen {
 
   private tapBoard(i: number): void {
     const r = this.run;
-    if (this.pick?.from === 'shop') {
-      const ok = buy(r, this.pick.i, i);
-      if (!ok) {
-        audio.uiError();
-        this.ui.toast(r.gold < BUY_COST ? 'コインが足りない' : 'その枠には置けない', 'warn');
-        return;
+    // 置き先を選んでいる最中（ポップアップは閉じて、選んだまま）
+    if (this.pick && !this.popup) {
+      if (this.pick.from === 'shop') {
+        const ok = buy(r, this.pick.i, i);
+        if (!ok) {
+          audio.uiError();
+          this.ui.toast(r.gold < BUY_COST ? 'コインが足りない' : 'その枠には置けない', 'warn');
+          return;
+        }
+        audio.uiConfirm();
+        this.onChange?.();
+      } else if (this.pick.i !== i) {
+        move(r, this.pick.i, i); audio.uiTap(); this.onChange?.();
       }
-      audio.uiConfirm();
-      this.pick = null;
-      this.onChange?.();
-      this.render();
-      return;
-    }
-    if (this.pick?.from === 'board') {
-      if (this.pick.i !== i) { move(r, this.pick.i, i); audio.uiTap(); this.onChange?.(); }
       this.pick = null;
       this.render();
       return;
     }
-    if (r.board[i]) { audio.uiTap(); this.pick = { from: 'board', i }; this.render(); }
+    if (r.board[i]) { audio.uiTap(); this.pick = { from: 'board', i }; this.popup = true; this.render(); }
   }
 
   private tapShop(i: number): void {
     audio.uiTap();
+    // 置き先を選んでいる最中に同じ札を押したらやめる
+    if (this.pick?.from === 'shop' && this.pick.i === i && !this.popup) { this.pick = null; this.render(); return; }
+    this.pick = { from: 'shop', i };
+    this.popup = true;
+    this.render();
+  }
+
+  /** ポップアップを閉じ、選んだまま置き先（動かす先）を選ばせる */
+  private placeMode(): void {
+    audio.uiTap();
+    this.popup = false;
+    this.render();
+  }
+
+  /** 空いている所へ買う。重ねられるならそこへ */
+  private buyAuto(i: number): void {
     const r = this.run;
-    if (this.pick?.from === 'shop' && this.pick.i === i) {
-      // 2度押しは「空いている所へ買う」。重ねられるならそこへ
-      const ok = buy(r, i);
-      if (!ok) {
-        audio.uiError();
-        this.ui.toast(r.gold < BUY_COST ? 'コインが足りない' : '盤面に空きがない', 'warn');
-        return;
-      }
-      audio.uiConfirm();
-      this.pick = null;
-      this.onChange?.();
-    } else {
-      this.pick = { from: 'shop', i };
+    if (!buy(r, i)) {
+      audio.uiError();
+      this.ui.toast(r.gold < BUY_COST ? 'コインが足りない' : '盤面に空きがない', 'warn');
+      return;
     }
+    audio.uiConfirm();
+    this.pick = null;
+    this.popup = false;
+    this.onChange?.();
     this.render();
   }
 
@@ -337,6 +363,7 @@ export class RunScreen extends Screen {
     sell(this.run, i);
     audio.uiConfirm();
     this.pick = null;
+    this.popup = false;
     this.onChange?.();
     this.render();
   }
