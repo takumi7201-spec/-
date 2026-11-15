@@ -612,11 +612,11 @@ export class BattleSim {
     switch (el) {
       case 'flame': f.mods.push({ kind: 'dealt', value: two ? 0.20 : 0.09, until: 15, turns: 0, source: 'synergy' }); break;
       case 'aqua': {
-        const total = Math.round(f.maxHp * (two ? 0.36 : 0.20));
+        const total = Math.round(f.maxHp * (two ? 0.30 : 0.16));
         f.statuses.push({ kind: 'regen', turns: 99, value: Math.max(1, Math.round(total / 10)), pool: total, until: 10, source: f.uid + '|synergy' });
         break;
       }
-      case 'terra': f.shield = { amount: Math.round(f.def * (two ? 2.3 : 1.1)), turns: 6 }; break;
+      case 'terra': f.shield = { amount: Math.round(f.def * (two ? 1.9 : 0.9)), turns: 6 }; break;
       case 'gale': f.mods.push({ kind: 'spd', value: two ? 0.14 : 0.045, turns: 9999, source: 'synergy' }); break;
       case 'null': f.od = Math.min(100, f.od + (two ? 40 : 6)); break;
     }
@@ -1831,7 +1831,7 @@ export class BattleSim {
     buff *= this.rules.elementDealt?.[atk.element] ?? 1;
     // 試作 kit「狩猟」: 持ち主は後衛か手負いに、2段目は全員が後衛に重く入る
     if (this.kitTier(atk, 'hunt') && (isBackliner(def.role) || def.hp < def.maxHp * 0.5)) buff *= 1.15;
-    if (this.kitTeam(atk.side, 'hunt') === 2 && isBackliner(def.role)) buff *= 1.15;
+    if (this.kitTeam(atk.side, 'hunt') === 2 && isBackliner(def.role)) buff *= 1.10;
     // 試作「仕留め」: 体力が半分を切った相手に重く入る
     const slay = this.synTier(atk, 'slayer');
     if (slay && def.hp < def.maxHp * 0.5) buff *= slay === 2 ? 1.35 : 1.18;
@@ -2105,7 +2105,7 @@ export class BattleSim {
     // 「大喙」: 通常攻撃が重いぶん、必殺技の出番が遅い
     if (f.passive === 'greatbeak') mul *= 0.8;
     // 試作 kit「共鳴」: 持ち主は必殺が早い
-    if (this.kitTier(f, 'echo')) mul *= 1.15;
+    if (this.kitTier(f, 'echo')) mul *= 1.10;
     // 試作「妨害」: 必殺の溜まりが早い
     const hex = this.synTier(f, 'hex');
     if (hex) mul *= hex === 2 ? 1.22 : 1.10;

@@ -40,10 +40,10 @@ const JA: Record<string, string> = {
   front: '前衛', brawler: '闘士', swift: '迅速', slayer: '仕留', support: '支援', hex: '妨害',
 };
 const byId = new Map(REVOS.map((r) => [r.id, r]));
-/** 数の多い属性（土・水は11体）は敷居を上げる。`BIG=4,5` で指定、`BIG=` で無効 */
-const BIG = (process.env.BIG ?? '4,5').split(',').map(Number) as [number, number];
+/** 数の多い属性（土・水は11体）の敷居を上げて測るときは `BIG=4,5`。既定は上げない */
+const BIG = (process.env.BIG || '4,5').split(',').map(Number) as [number, number];
 const ELEMENT_STEPS: Record<string, [number, number]> = {};
-if (process.env.BIG !== '') for (const e of ELEMENTS) if (REAL.filter((r) => r.element === e).length >= 10) ELEMENT_STEPS[e] = BIG;
+if (process.env.BIG) for (const e of ELEMENTS) if (REAL.filter((r) => r.element === e).length >= 10) ELEMENT_STEPS[e] = BIG;
 const DUAL: BattleRules = { synergy: KIT ? 'kit' : 'dual', synergySteps: ESTEPS, classSteps: CSTEPS, elementSteps: ELEMENT_STEPS };
 const esteps = (e: string): [number, number] => ELEMENT_STEPS[e] ?? ESTEPS;
 const keyOf = (id: string, t: string): string => (ELEMENTS.includes(t) ? byId.get(id)!.element : second(id));
@@ -157,7 +157,7 @@ async function main(): Promise<void> {
   if (process.argv[5] === 'lift') { pool.close(); return; }
   // ---- 3. 山登り ----
   console.log('\n=== 3. 編成づくり（強い編成の列を相手に、山登りで最善を探す）===');
-  const R = Math.round(10 * SCALE), STEPS = Math.round(30 * SCALE), CAND = 8;
+  const R = Number(process.env.RUNS ?? Math.round(10 * SCALE)), STEPS = Math.round(30 * SCALE), CAND = 8;
   for (const rules of [null, DUAL]) {
     // 相手の列: 無作為 240 編成をその環境で測り、上位 24 + 無作為 16
     const pool0 = Array.from({ length: 240 }, () => randomComp());
