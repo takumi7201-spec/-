@@ -9,6 +9,7 @@ import { NewsScreen } from './ui/screens/NewsScreen';
 import { SettingsScreen } from './ui/screens/SettingsScreen';
 import { RunScreen } from './ui/screens/RunScreen';
 import { RunBattleScreen } from './ui/screens/RunBattleScreen';
+import { RunLobbyScreen } from './ui/screens/RunLobbyScreen';
 import { HomeScene } from './scenes/HomeScene';
 import { BattleScene } from './scenes/BattleScene';
 import { tabBar } from './ui/chrome';
@@ -68,7 +69,8 @@ async function main(): Promise<void> {
   const settingsScreen = new SettingsScreen();
   const runScreen = new RunScreen();
   const runBattleScreen = new RunBattleScreen();
-  for (const s of [title, homeScreen, newsScreen, settingsScreen, runScreen, runBattleScreen]) ui.register(s);
+  const lobbyScreen = new RunLobbyScreen();
+  for (const s of [title, homeScreen, newsScreen, settingsScreen, runScreen, runBattleScreen, lobbyScreen]) ui.register(s);
   runBattleScreen.scene3d = stage;
 
   // ---------------------------------------------------------------- 遷移
@@ -105,7 +107,34 @@ async function main(): Promise<void> {
     ui.show('run');
   }
 
-  runScreen.onBack = () => goHome();
+  /** ランの入口（下タブの「ラン」） */
+  function goLobby(): void {
+    renderer.setScene(home.scene, home.camera);
+    lobbyScreen.setData(data);
+    ui.show('runLobby');
+  }
+
+  /** ランを閉じる。勝ち数ぶんのコインを渡し、記録を更新する */
+  function endRun(): void {
+    const run = data.run;
+    if (!run) return;
+    const coins = run.wins * 40 + (run.wins >= RUN_WINS ? 300 : 0);
+    data.player.coins += coins;
+    const rec = { best: 0, clears: 0, runs: 0, ...data.runRecord };
+    rec.best = Math.max(rec.best, run.wins);
+    if (run.wins >= RUN_WINS) rec.clears++;
+    data.runRecord = rec;
+    ui.toast(run.wins >= RUN_WINS
+      ? `ラン達成！ ${RUN_WINS}勝 · コイン +${coins}`
+      : `ラン終了 · ${run.wins}勝 · コイン +${coins}`, 'info', 3500);
+    data.run = null;
+    writeSave(data);
+  }
+
+  lobbyScreen.onPlay = () => goRun();
+  lobbyScreen.onAbandon = () => { endRun(); goLobby(); };
+
+  runScreen.onBack = () => goLobby();
   runScreen.onChange = () => writeSave(data);
   runScreen.onFight = () => {
     const run = data.run;
@@ -127,18 +156,8 @@ async function main(): Promise<void> {
     finishBattle(run, runFight.res);
     runFight = null;
     if (isOver(run)) {
-      const coins = run.wins * 40 + (run.wins >= RUN_WINS ? 300 : 0);
-      data.player.coins += coins;
-      const rec = { best: 0, clears: 0, runs: 0, ...data.runRecord };
-      rec.best = Math.max(rec.best, run.wins);
-      if (run.wins >= RUN_WINS) rec.clears++;
-      data.runRecord = rec;
-      ui.toast(run.wins >= RUN_WINS
-        ? `ラン達成！ ${RUN_WINS}勝 · コイン +${coins}`
-        : `ラン終了 · ${run.wins}勝 · コイン +${coins}`, 'info', 3500);
-      data.run = null;
-      writeSave(data);
-      goHome();
+      endRun();
+      goLobby();
       return;
     }
     writeSave(data);
@@ -168,7 +187,7 @@ async function main(): Promise<void> {
   /** 下タブ。拠点・ラン・設定の3つ */
   const tabGo = (where: 'home' | 'battle' | 'settings'): void => {
     if (where === 'home') goHome();
-    else if (where === 'battle') goRun();
+    else if (where === 'battle') goLobby();
     else goSettings();
   };
   ui.mountTabs(tabBar([
@@ -179,7 +198,7 @@ async function main(): Promise<void> {
 
   // 横に払って隣の枠へ。枠の入口にいるときだけ動かす
   const TAB_ORDER = ['home', 'battle', 'settings'] as const;
-  const TAB_ROOTS = new Set(['home', 'run', 'settings']);
+  const TAB_ROOTS = new Set(['home', 'runLobby', 'settings']);
   ui.onSwipeNav = (dir, tab, screen) => {
     if (!TAB_ROOTS.has(screen)) return;
     const i = TAB_ORDER.indexOf(tab as typeof TAB_ORDER[number]);
@@ -235,6 +254,7 @@ async function main(): Promise<void> {
   const jump = new URLSearchParams(location.search).get('screen');
   if (jump === 'home') goHome();
   else if (jump === 'run') goRun();
+  else if (jump === 'lobby') goLobby();
   else if (jump === 'news') { newsScreen.setData(data); ui.show('news'); }
   else if (jump === 'settings') goSettings();
 
@@ -281,6 +301,7 @@ async function main(): Promise<void> {
     history.pushState({ guard: true }, '');
     const s = ui.currentName;
     if (s === 'home' || s === 'title' || s === 'runBattle') return;
+    if (s === 'run') { goLobby(); return; }
     goHome();
   });
 

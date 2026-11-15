@@ -33,6 +33,9 @@ export class ExpandCard {
     this.scrim.addEventListener('click', () => { if (this.modal) this.onDismiss?.(); });
     this.inner = h('div', { class: 'xcard-inner' });
     this.el = h('div', { class: 'xcard', hidden: true, role: 'dialog' }, this.inner);
+    // ポップアップの中の指は、面の払いとして拾わない
+    this.el.dataset.noSwipe = '';
+    this.scrim.dataset.noSwipe = '';
     host.append(this.scrim, this.el);
     this.spring = new Spring(0, (p) => this.paint(p), (p) => {
       if (p <= 0.001) {

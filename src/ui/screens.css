@@ -3480,3 +3480,34 @@ body[data-layout='wide'] .run-body { left: 18vw; right: 18vw; }
 }
 .run-slot.is-dragging { opacity: 0.35; }
 .run-board .run-slot.is-over { box-shadow: inset 0 0 0 3px var(--hl-amber), var(--lift-2); transform: scale(1.03); }
+
+/* ------------------------------------------------------------------ ランの入口 */
+.screen--runLobby::before { content: ''; position: absolute; inset: 0; background: var(--ground); pointer-events: none; }
+.screen--runLobby > * { z-index: 1; }
+.lobby-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px);
+  bottom: calc(var(--deck-bottom) + 8px);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding: 4px 0 12px;
+  pointer-events: auto;
+}
+body[data-layout='wide'] .lobby-body { left: 26vw; right: 26vw; }
+.lobby-card {
+  display: flex; flex-direction: column; gap: 10px; padding: 16px;
+  border-radius: 16px; background: rgba(255, 253, 248, 0.95); box-shadow: 0 6px 16px rgba(72, 58, 36, 0.14);
+}
+.lobby-eyebrow { font-size: 12px; font-weight: 900; letter-spacing: 0.16em; color: var(--ink-soft); }
+.lobby-round { font-size: 15px; font-weight: 900; color: var(--ink); }
+.lobby-round b { font-size: 34px; }
+.lobby-stats { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 800; color: var(--ink); }
+.lobby-stats > span { display: flex; align-items: center; gap: 6px; }
+.lobby-faces { display: flex; flex-wrap: wrap; gap: 6px; }
+.lobby-face { width: 44px; height: 44px; padding: 4px; border-radius: 10px; background: rgba(72, 58, 36, 0.06); }
+.lobby-note { font-size: 13px; color: var(--ink-soft); }
+.lobby-lead { font-size: 15px; font-weight: 800; color: var(--ink); line-height: 1.6; }
+.lobby-rules { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.6; color: var(--ink); }
+.lobby-go { height: 56px; border-radius: 16px; font-size: 17px; letter-spacing: 0.16em; margin-top: 4px; }
+.lobby-quit { align-self: center; color: #a2453a !important; background: transparent !important; box-shadow: none !important; text-decoration: underline; font-weight: 800; }
+.lobby-recs { display: flex; gap: 18px; font-size: 14px; font-weight: 800; color: var(--ink-soft); }
+.lobby-recs b { font-size: 18px; color: var(--ink); }

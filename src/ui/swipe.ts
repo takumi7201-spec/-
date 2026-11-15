@@ -46,6 +46,8 @@ export function attachSwipe(el: HTMLElement, handlers: SwipeHandlers): void {
     const pe = e as PointerEvent;
     // 2本目の指は見ない。拡大・回転の途中で面が飛ぶのを防ぐ
     if (id !== null) return;
+    // ドラッグで動かす札の上で始まった指は見ない。札を横へ運ぶ動きが、面の払いと取り違えられる
+    if ((pe.target as Element | null)?.closest?.('[data-no-swipe]')) return;
     id = pe.pointerId;
     x0 = pe.clientX; y0 = pe.clientY; t0 = performance.now();
     lx = x0; ly = y0;

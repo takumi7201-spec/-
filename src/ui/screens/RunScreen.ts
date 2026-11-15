@@ -51,7 +51,8 @@ export class RunScreen extends Screen {
   onFight?: () => void;
   onChange?: () => void;
 
-  constructor() { super('run', 'battle'); }
+  // 遊んでいる間は専用のページ。下タブは出さず、横の払いでも他の面へ行かない
+  constructor() { super('run'); }
 
   setRun(r: RunState): void { this.run = r; this.pick = null; this.render(); }
 
@@ -178,6 +179,7 @@ export class RunScreen extends Screen {
    * 動かさずに離したときは、ふつうのタップとして扱う（中身のポップアップ）。
    */
   private draggable(el: HTMLElement, at: NonNullable<Pick>): void {
+    el.dataset.noSwipe = '';
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       const sx = e.clientX, sy = e.clientY;
