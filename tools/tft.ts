@@ -12,7 +12,7 @@
  */
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
-import { BattleSim } from '../src/game/battle/simulate.ts';
+import { BattleSim, KIT_TRAIT, kitSteps } from '../src/game/battle/simulate.ts';
 import { REVOS } from '../src/game/data/revos.ts';
 import type { TeamSetup, BattleRules } from '../src/game/battle/types.ts';
 
@@ -20,7 +20,9 @@ interface Job { a: string[]; b: string[]; seed: number; rules: BattleRules | nul
 
 const TEAM = Number(process.argv[2] ?? 5);
 const SCALE = Number(process.argv[3] ?? 1);
-const CSTEPS = (process.argv[4] ?? '2,4').split(',').map(Number) as [number, number];
+/** 2本目の軸。'kit' なら効果特性、それ以外は職（敷居を '2,4' の形で） */
+const KIT = process.argv[4] === 'kit';
+const CSTEPS = (KIT ? '2,4' : (process.argv[4] ?? '2,4')).split(',').map(Number) as [number, number];
 const ESTEPS: [number, number] = [3, 5];
 const REAL = REVOS.filter((r) => !r.id.startsWith('exp-'));
 const CLASS: Record<string, string> = {
@@ -29,14 +31,17 @@ const CLASS: Record<string, string> = {
   Healer: 'support', Buffer: 'support', Debuffer: 'hex', Special: 'hex',
 };
 const ELEMENTS = ['flame', 'aqua', 'terra', 'gale', 'null'];
-const CLASSES = ['front', 'brawler', 'swift', 'slayer', 'support', 'hex'];
+const CLASSES = KIT ? [...new Set(Object.values(KIT_TRAIT))] : ['front', 'brawler', 'swift', 'slayer', 'support', 'hex'];
+const second = (id: string): string => (KIT ? KIT_TRAIT[id] ?? '' : CLASS[byId.get(id)!.role]);
+const steps2 = (k: string): [number, number] => (KIT ? kitSteps(k) : CSTEPS);
 const JA: Record<string, string> = {
   flame: '火', aqua: '水', terra: '土', gale: '風', null: '無',
+  burn: '灼熱', venom: '蝕毒', weaken: '弱体', guard: '守護', mend: '癒し', echo: '共鳴', rush: '疾風', hunt: '狩猟', pack: '群れ', might: '剛力',
   front: '前衛', brawler: '闘士', swift: '迅速', slayer: '仕留', support: '支援', hex: '妨害',
 };
 const byId = new Map(REVOS.map((r) => [r.id, r]));
-const DUAL: BattleRules = { synergy: 'dual', synergySteps: ESTEPS, classSteps: CSTEPS };
-const keyOf = (id: string, t: string): string => (ELEMENTS.includes(t) ? byId.get(id)!.element : CLASS[byId.get(id)!.role]);
+const DUAL: BattleRules = { synergy: KIT ? 'kit' : 'dual', synergySteps: ESTEPS, classSteps: CSTEPS };
+const keyOf = (id: string, t: string): string => (ELEMENTS.includes(t) ? byId.get(id)!.element : second(id));
 
 function mkTeam(ids: string[], tag: string): TeamSetup {
   return {
@@ -84,11 +89,12 @@ function traits(ids: string[]): string[] {
   for (const id of ids) {
     const d = byId.get(id)!;
     el.set(d.element, (el.get(d.element) ?? 0) + 1);
-    cl.set(CLASS[d.role], (cl.get(CLASS[d.role]) ?? 0) + 1);
+    const k2 = second(id);
+    if (k2) cl.set(k2, (cl.get(k2) ?? 0) + 1);
   }
   const out: string[] = [];
   for (const [k, n] of el) if (n >= ESTEPS[0]) out.push(`${k}:${n >= ESTEPS[1] ? 2 : 1}`);
-  for (const [k, n] of cl) if (n >= CSTEPS[0]) out.push(`${k}:${n >= CSTEPS[1] ? 2 : 1}`);
+  for (const [k, n] of cl) { const st = steps2(k); if (n >= st[0]) out.push(`${k}:${n >= st[1] ? 2 : 1}`); }
   return out.sort();
 }
 const showT = (t: string[]): string => (t.length ? t.map((x) => `${JA[x.split(':')[0]]}${x.endsWith(':2') ? '²' : ''}`).join(' ') : '—');
@@ -98,7 +104,7 @@ const pt = (x: number): string => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}`;
 async function main(): Promise<void> {
   const pool = new Pool(4);
   const t0 = Date.now();
-  console.log(`枠 ${TEAM}  属性の敷居 ${ESTEPS.join('/')}  職の敷居 ${CSTEPS.join('/')}`);
+  console.log(`枠 ${TEAM}  属性の敷居 ${ESTEPS.join('/')}  2本目 ${KIT ? '効果特性（4体以上の特性は 2/4、他は 2/3）' : `職 ${CSTEPS.join('/')}`}`);
 
   async function evalVs(comps: string[][], gaunt: string[][], rules: BattleRules | null, seed0 = 777): Promise<number[]> {
     const js: Job[] = [];
@@ -126,7 +132,7 @@ async function main(): Promise<void> {
   const M = Math.round(60 * SCALE);
   const line: string[] = [];
   for (const t of [...ELEMENTS, ...CLASSES]) {
-    const steps = ELEMENTS.includes(t) ? ESTEPS : CSTEPS;
+    const steps = ELEMENTS.includes(t) ? ESTEPS : steps2(t);
     const cells: string[] = [];
     for (const [tier, n] of [[1, steps[0]], [2, steps[1]]] as const) {
       if (n > TEAM) { cells.push('   —  '); continue; }

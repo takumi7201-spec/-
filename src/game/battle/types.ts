@@ -114,7 +114,7 @@ export interface BattleRules {
    *   flat   … 比較用。どの属性も与ダメ倍率を足すだけ
    * 未指定なら無効。本編の戦闘には入れていない（tools/synergy.ts で測るだけ）
    */
-  synergy?: 'effect' | 'flat' | 'dual';
+  synergy?: 'effect' | 'flat' | 'dual' | 'kit';
   /** 試作 dual: 役職の段の敷居。既定 [2, 4] */
   classSteps?: [number, number];
   /** 試作 dual: この特性だけを効かせる（特性ごとの伸びを切り分けて測る） */
