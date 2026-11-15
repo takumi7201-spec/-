@@ -1,6 +1,6 @@
 import { Screen } from '../UIRoot';
 import { h, button, clear } from '../dom';
-import { getRevos, revosShortName } from '../../game/data/revos';
+import { revosShortName } from '../../game/data/revos';
 import { KIT_TRAIT, KIT_TRAITS } from '../../game/data/traits';
 import { runDef } from '../../game/run/units';
 import {
@@ -8,13 +8,12 @@ import {
 } from '../../game/run/run';
 import { teamHp } from '../../game/run/battle';
 import {
-  unitValues, unitCooldown, abilityText, traitsText, shopUnit, starOf, fmt,
-  EFFECT_GLYPH, EFFECT_NAMES, EFFECT_HELP,
+  unitValues, unitCooldown, shopUnit, starOf, fmt, EFFECT_GLYPH,
 } from '../../game/run/describe';
-import { BOARD_SIZE, rowOf, type RunUnit } from '../../game/run/types';
+import { BOARD_SIZE, rowOf, neighbors, type RunUnit } from '../../game/run/types';
 import { revosIcon } from '../revosIcon';
 import { ExpandCard } from '../expandCard';
-import { effectValue } from '../../game/run/battle';
+import { unitSheet } from '../unitSheet';
 import { screenHead, plate, spaced, coinMark } from '../chrome';
 import { audio } from '../../core/Audio';
 
@@ -206,6 +205,9 @@ export class RunScreen extends Screen {
           over?.classList.remove('is-over');
           over = under;
           over?.classList.add('is-over');
+          // 置こうとしている枠の隣（上下左右）を光らせる。隣に効く能力がどこへ届くかが置く前に分かる
+          for (const b of this.boardSlots) b.classList.remove('is-reach');
+          if (over) for (const n of neighbors(Number(over.dataset.slot))) this.boardSlots[n]?.classList.add('is-reach');
         }
       };
       const up = (): void => {
@@ -216,6 +218,7 @@ export class RunScreen extends Screen {
         ghost.remove();
         el.classList.remove('is-dragging');
         over?.classList.remove('is-over');
+        for (const b of this.boardSlots) b.classList.remove('is-reach');
         // 直後に来るクリックは、ドラッグの終わりなので捨てる
         this.swallowClick = true;
         setTimeout(() => { this.swallowClick = false; }, 0);
@@ -291,46 +294,9 @@ export class RunScreen extends Screen {
 
   /** 広げたカードの中身。いまの数値と、★2・★3 に重ねたときの数値を並べる */
   private sheet(u: RunUnit, at: NonNullable<Pick>, interactive: boolean): HTMLElement {
-    const d = runDef(u.defId);
-    const def = getRevos(u.defId);
-    const kit = KIT_TRAIT[u.defId];
     const star = starOf(u);
-
     // 店の札なら、盤面の同じユニットに重ねたあとの姿で数える
     const onBoard = at.from === 'shop' ? this.run.board.find((b) => b?.defId === u.defId && starOf(b) < 3) : null;
-    const base: RunUnit = onBoard ? { ...onBoard, copies: onBoard.copies + 1 } : u;
-    const steps = [
-      { label: '今', unit: u },
-      ...(starOf(base) > star ? [{ label: '重ねた後', unit: base }] : []),
-      ...[2, 3].filter((s) => s > starOf(base)).map((s) => ({ label: `★${s}`, unit: { ...base, copies: s === 2 ? 3 : 9 } })),
-    ];
-    const kinds = unitValues({ ...base, copies: 9 }).map((v) => v.kind);
-
-    const table = h('div', { class: 'xs-table', style: `grid-template-columns: auto repeat(${steps.length}, 1fr)` });
-    table.append(h('span', { class: 'xs-th' }), ...steps.map((st, i) => h('span', { class: `xs-th ${i > 0 ? 'is-up' : ''}`, text: st.label })));
-    for (const k of kinds) {
-      table.append(h('span', { class: `run-val run-val--${k}` }, h('i', { text: EFFECT_GLYPH[k] }), EFFECT_NAMES[k]));
-      let prev = -1;
-      for (const st of steps) {
-        const v = effectValue(d, st.unit, k);
-        table.append(h('span', { class: `xs-td num ${prev >= 0 && v > prev ? 'is-up' : ''}`, text: fmt(v) }));
-        prev = v;
-      }
-    }
-    table.append(h('span', { class: 'xs-tk', text: 'クールダウン' }),
-      ...steps.map((st) => h('span', { class: 'xs-td num', text: `${fmt(unitCooldown(st.unit))}s` })));
-
-    const need = star >= 3 ? '' : `あと${(star === 1 ? 3 : 9) - u.copies}体で★${star + 1}`;
-    const grown = Object.entries(u.perm).filter(([, v]) => v);
-
-    const lines = h('div', { class: 'xs-lines' });
-    for (const k of kinds) lines.appendChild(h('div', { class: 'xs-help', text: `${EFFECT_NAMES[k]}：${EFFECT_HELP[k]}` }));
-    for (const t of traitsText(u.defId)) lines.appendChild(h('div', { class: 'xs-trait', text: `◆ ${t}` }));
-    for (const ab of d.abilities) lines.appendChild(h('div', { class: 'xs-ab', text: `▸ ${abilityText(u.defId, ab)}` }));
-    if (grown.length) {
-      lines.appendChild(h('div', { class: 'xs-grown', text: `育ち（永続）：${grown.map(([k, v]) => `${k === 'cd' ? 'クールダウン' : k === 'charge' ? '溜まり' : EFFECT_NAMES[k as keyof typeof EFFECT_NAMES]} ${(v as number) > 0 ? '+' : ''}${fmt(v as number)}`).join('、')}` }));
-    }
-
     const actions = h('div', { class: 'xs-actions' });
     if (interactive && at.from === 'board') {
       actions.append(
@@ -341,25 +307,18 @@ export class RunScreen extends Screen {
     if (interactive && at.from === 'shop') {
       actions.append(
         button('置く枠を選ぶ', () => this.placeMode(), { class: 'btn--opt' }),
-        button(onBoard ? '重ねる' : `買う`, () => this.buyAuto(at.i), { class: 'btn--primary' }),
+        button(onBoard ? '重ねる' : '買う', () => this.buyAuto(at.i), { class: 'btn--primary' }),
       );
     }
     const close = interactive ? button('✕', () => { audio.uiBack(); this.pick = null; this.popup = false; this.render(); }, { class: 'btn--sm btn--opt xs-close' }) : null;
-
-    return h('div', { class: 'xs' },
-      h('div', { class: 'xs-head' },
-        revosIcon(u.defId, 'xs-icon'),
-        h('div', { class: 'xs-title' },
-          h('b', { text: def.name }),
-          h('span', { class: 'xs-sub', text: `段${d.tier} · ${'★'.repeat(star)}${u.copies > 1 ? `（${u.copies}体）` : ''}${kit ? ` · ${KIT_TRAITS[kit].name}` : ''}${need ? ` · ${need}` : ''}` }),
-        ),
-        close,
-      ),
-      h('div', { class: 'label xs-label', text: '強化後の数値' }),
-      table,
-      lines,
-      interactive ? actions : null,
-    );
+    return unitSheet(u, {
+      merged: onBoard ? { ...onBoard, copies: onBoard.copies + 1 } : null,
+      // 盤面の札はその枠で、店の札は重ねる先（あれば）の枠で範囲を描く
+      slot: at.from === 'board' ? at.i : onBoard ? this.run.board.indexOf(onBoard) : null,
+      board: this.run.board,
+      corner: close,
+      actions: interactive ? actions : null,
+    });
   }
 
   /** 店の札を選んでいる間、置ける枠を光らせる */

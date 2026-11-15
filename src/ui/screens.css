@@ -3511,3 +3511,43 @@ body[data-layout='wide'] .lobby-body { left: 26vw; right: 26vw; }
 .lobby-quit { align-self: center; color: #a2453a !important; background: transparent !important; box-shadow: none !important; text-decoration: underline; font-weight: 800; }
 .lobby-recs { display: flex; gap: 18px; font-size: 14px; font-weight: 800; color: var(--ink-soft); }
 .lobby-recs b { font-size: 18px; color: var(--ink); }
+
+/* ------------------------------------------------------------------ 図鑑（ラン） */
+.screen--dex .dex-filters { display: flex; flex-direction: column; gap: 6px; }
+.dex-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 4px; scrollbar-width: none; }
+.dex-chips::-webkit-scrollbar { display: none; }
+.dex-chips .dex-chip { flex: none; min-height: 34px; padding: 0 12px; }
+.dex-card {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 6px 10px; border: 0; border-radius: 14px;
+  background: var(--paper-card); color: var(--ink); box-shadow: 0 5px 14px rgba(72, 58, 36, 0.16);
+}
+.dex-top { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 4px; }
+.dex-kit { font-size: 10px; font-weight: 900; color: var(--ink-soft); }
+.dex-card .dex-icon { width: 52px; height: 52px; }
+.dex-card .run-name { font-size: 12px; }
+.dex-card .run-vals { justify-content: center; }
+
+/* ------------------------------------------------------------------ 効果の範囲 */
+.xs-range { display: flex; flex-direction: column; gap: 6px; }
+.xs-reach {
+  display: flex; align-items: center; gap: 12px; padding: 8px 10px;
+  border-radius: 10px; background: rgba(72, 58, 36, 0.05);
+}
+.xs-boards { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: none; }
+.xs-grid { display: grid; gap: 3px; }
+.xs-grid--foe { opacity: 0.85; }
+.xs-cell {
+  width: 22px; height: 18px; border-radius: 4px; display: grid; place-items: center;
+  font-size: 10px; font-weight: 900; color: #fff;
+  background: rgba(72, 58, 36, 0.12); box-shadow: inset 0 0 0 1px rgba(72, 58, 36, 0.12);
+}
+.xs-cell.is-filled { background: rgba(72, 58, 36, 0.24); }
+.xs-cell.is-self { background: var(--ink); color: #fff; }
+.xs-cell.is-ally { background: #4fb377; box-shadow: none; }
+.xs-cell.is-foe { background: #d9573f; box-shadow: none; }
+.xs-vs { font-size: 9px; font-weight: 900; color: #d9573f; line-height: 1; }
+.xs-reach-label { font-size: 13px; font-weight: 800; color: var(--ink); line-height: 1.5; }
+
+/* ドラッグ中、置こうとしている枠の隣を光らせる */
+.run-board .run-slot.is-reach.is-reach.is-reach { box-shadow: inset 0 0 0 3px rgba(79, 179, 119, 0.85), var(--lift-1); }

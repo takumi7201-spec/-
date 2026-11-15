@@ -10,6 +10,7 @@ import { SettingsScreen } from './ui/screens/SettingsScreen';
 import { RunScreen } from './ui/screens/RunScreen';
 import { RunBattleScreen } from './ui/screens/RunBattleScreen';
 import { RunLobbyScreen } from './ui/screens/RunLobbyScreen';
+import { DexScreen } from './ui/screens/DexScreen';
 import { HomeScene } from './scenes/HomeScene';
 import { BattleScene } from './scenes/BattleScene';
 import { tabBar } from './ui/chrome';
@@ -70,7 +71,8 @@ async function main(): Promise<void> {
   const runScreen = new RunScreen();
   const runBattleScreen = new RunBattleScreen();
   const lobbyScreen = new RunLobbyScreen();
-  for (const s of [title, homeScreen, newsScreen, settingsScreen, runScreen, runBattleScreen, lobbyScreen]) ui.register(s);
+  const dexScreen = new DexScreen();
+  for (const s of [title, homeScreen, newsScreen, settingsScreen, runScreen, runBattleScreen, lobbyScreen, dexScreen]) ui.register(s);
   runBattleScreen.scene3d = stage;
 
   // ---------------------------------------------------------------- 遷移
@@ -185,20 +187,22 @@ async function main(): Promise<void> {
   newsScreen.onRead = () => { writeSave(data); homeScreen.setData(data); };
 
   /** 下タブ。拠点・ラン・設定の3つ */
-  const tabGo = (where: 'home' | 'battle' | 'settings'): void => {
+  const tabGo = (where: 'home' | 'battle' | 'dex' | 'settings'): void => {
     if (where === 'home') goHome();
     else if (where === 'battle') goLobby();
+    else if (where === 'dex') { renderer.setScene(home.scene, home.camera); ui.show('dex'); }
     else goSettings();
   };
   ui.mountTabs(tabBar([
     { key: 'home', icon: '⌂', label: '拠点', onTap: () => tabGo('home') },
     { key: 'battle', icon: '⚔', label: 'ラン', onTap: () => tabGo('battle') },
+    { key: 'dex', icon: '◈', label: '図鑑', onTap: () => tabGo('dex') },
     { key: 'settings', icon: '⚙', label: '設定', onTap: () => tabGo('settings') },
   ]));
 
   // 横に払って隣の枠へ。枠の入口にいるときだけ動かす
-  const TAB_ORDER = ['home', 'battle', 'settings'] as const;
-  const TAB_ROOTS = new Set(['home', 'runLobby', 'settings']);
+  const TAB_ORDER = ['home', 'battle', 'dex', 'settings'] as const;
+  const TAB_ROOTS = new Set(['home', 'runLobby', 'dex', 'settings']);
   ui.onSwipeNav = (dir, tab, screen) => {
     if (!TAB_ROOTS.has(screen)) return;
     const i = TAB_ORDER.indexOf(tab as typeof TAB_ORDER[number]);
@@ -255,6 +259,7 @@ async function main(): Promise<void> {
   if (jump === 'home') goHome();
   else if (jump === 'run') goRun();
   else if (jump === 'lobby') goLobby();
+  else if (jump === 'dex') tabGo('dex');
   else if (jump === 'news') { newsScreen.setData(data); ui.show('news'); }
   else if (jump === 'settings') goSettings();
 
