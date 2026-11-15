@@ -79,6 +79,13 @@ export interface SaveData {
   /** 未精錬の化石ストック */
   stock: { defId: string; rarity: number; biome: BiomeId }[];
   dex: string[];
+  /**
+   * 進行中のラン。戦闘の合間に閉じても続きから戻れるよう、店の並びごと持つ。
+   * 古いセーブには無い
+   */
+  run?: import('../game/run/run').RunState | null;
+  /** ランの記録 */
+  runRecord?: { best: number; clears: number; runs: number };
   unlockedBiomes: BiomeId[];
   stageProgress: number;
   /** コロシアムのレートと戦績。古いセーブには無いので既定値で補う */

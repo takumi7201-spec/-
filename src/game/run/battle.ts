@@ -58,6 +58,19 @@ interface Team {
   poison: number;
 }
 
+/** 再生用の1刻みぶん。溜まりは 0〜1 の割合 */
+export interface RunFrame {
+  t: number;
+  hp: [number, number];
+  shield: [number, number];
+  burn: [number, number];
+  poison: [number, number];
+  /** 側ごと・枠ごとの溜まり（空き枠は -1） */
+  charge: [number[], number[]];
+  /** 側ごと・枠ごとの、いまの効果の数値（育ち・上乗せ込み） */
+  values: [Partial<Record<EffectKind, number>>[], Partial<Record<EffectKind, number>>[]];
+}
+
 export interface RunBattleResult {
   winner: Side | -1;
   seconds: number;
@@ -67,6 +80,9 @@ export interface RunBattleResult {
   events: RunEvent[];
   /** uid ごとの与えたもの（削り・盾・回復の合計）。測定用 */
   output: Map<string, number>;
+  /** opts.trace のときだけ。0.1秒ごとの様子 */
+  frames: RunFrame[];
+  maxHp: [number, number];
 }
 
 /** 効果の数値に★が掛かる割合。秒で効くもの（遅延・加速）は伸びを抑える */
@@ -89,7 +105,7 @@ export function cooldownOf(def: RunUnitDef, unit: RunUnit, temp: Partial<Record<
 
 export function runBattle(
   boardA: (RunUnit | null)[], boardB: (RunUnit | null)[], round: number,
-  opts: { events?: boolean; hp?: [number, number] } = {},
+  opts: { events?: boolean; trace?: boolean; hp?: [number, number] } = {},
 ): RunBattleResult {
   const mk = (board: (RunUnit | null)[], side: Side): Team => {
     const hp = opts.hp?.[side] ?? teamHp(round);
@@ -106,6 +122,24 @@ export function runBattle(
   const events: RunEvent[] = [];
   const growth: RunBattleResult['growth'] = [new Map(), new Map()];
   const output = new Map<string, number>();
+  const frames: RunFrame[] = [];
+  const snap = (): void => {
+    if (!opts.trace) return;
+    const per = (team: Team): { c: number[]; v: Partial<Record<EffectKind, number>>[] } => ({
+      c: team.units.map((l) => (l ? Math.max(0, Math.min(1, l.charge / cooldownOf(l.def, l.unit, l.temp))) : -1)),
+      v: team.units.map((l) => {
+        const o: Partial<Record<EffectKind, number>> = {};
+        if (l) for (const k of EFFECT_KINDS) { const x = effectValue(l.def, l.unit, k, l.temp); if (x > 0) o[k] = x; }
+        return o;
+      }),
+    });
+    const a = per(teams[0]), b = per(teams[1]);
+    frames.push({
+      t, hp: [teams[0].hp, teams[1].hp], shield: [teams[0].shield, teams[1].shield],
+      burn: [teams[0].burn, teams[1].burn], poison: [teams[0].poison, teams[1].poison],
+      charge: [a.c, b.c], values: [a.v, b.v],
+    });
+  };
   const log = opts.events ? (e: RunEvent): void => { events.push(e); } : (): void => {};
   let t = 0;
 
@@ -207,6 +241,7 @@ export function runBattle(
   // 始まり
   for (const team of teams) for (const l of team.units) if (l) trigger(team, l, 'start');
 
+  snap();
   let nextBurn = BURN_TICK, nextPoison = POISON_TICK, nextStorm = STORM_AT, storm = 1;
   let winner: Side | -1 = -1;
   let step = 0;
@@ -241,6 +276,7 @@ export function runBattle(
       for (const team of teams) strike(team, storm, true, 'storm');
       storm = Math.ceil(storm * 1.25 + 1);
     }
+    snap();
     const dead0 = teams[0].hp <= 0, dead1 = teams[1].hp <= 0;
     if (dead0 || dead1) { winner = dead0 && dead1 ? -1 : dead0 ? 1 : 0; break; }
   }
@@ -249,7 +285,10 @@ export function runBattle(
     winner = r0 === r1 ? -1 : r0 > r1 ? 0 : 1;
   }
   log({ t, type: 'end', winner });
-  return { winner, seconds: t, hp: [teams[0].hp, teams[1].hp], growth, events, output };
+  return {
+    winner, seconds: t, hp: [teams[0].hp, teams[1].hp], growth, events, output, frames,
+    maxHp: [teams[0].maxHp, teams[1].maxHp],
+  };
 }
 
 /** 育ちを個体に書き戻す */

@@ -3240,3 +3240,151 @@ body[data-layout='wide'] .ros-tools { left: 18vw; right: 18vw; }
 .enemy-card .card-status-icon { width: 16px; height: 16px; }
 /* 掛かりの札は動く絵。状態異常と同じ寸法で、同じ列に並べる */
 .card-status-icon--buff .card-status-img { image-rendering: pixelated; }
+
+/* ------------------------------------------------------------------ ラン（店） */
+.run-body {
+  position: absolute;
+  top: calc(var(--safe-t) + var(--head-h) + 6px);
+  bottom: calc(var(--deck-bottom) + 72px);
+  left: calc(var(--gutter) + var(--safe-l)); right: calc(var(--gutter) + var(--safe-r));
+  display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 4px 0 12px;
+}
+/* 読ませる画面なので、3D を地で覆う（編成と同じ） */
+.screen--run::before, .screen--runBattle::before {
+  content: ''; position: absolute; inset: 0; background: var(--ground); pointer-events: none;
+}
+.screen--run > *, .screen--runBattle > * { z-index: 1; }
+.deck--run { padding-top: 8px; }
+.deck--run .btn--primary { height: 56px; border-radius: 16px; font-size: 17px; letter-spacing: 0.16em; }
+.run-status {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  padding: 9px 12px; border-radius: 12px;
+  background: rgba(255, 253, 248, 0.8); box-shadow: 0 5px 14px rgba(72, 58, 36, 0.12);
+  font-size: 11px; font-weight: 700; color: var(--ink-soft);
+}
+.run-round b { font-size: 16px; color: var(--ink); }
+.run-stat { display: inline-flex; align-items: center; gap: 4px; }
+.run-hp b { color: var(--ink); font-size: 13px; }
+.run-pips { display: inline-flex; gap: 2px; }
+.run-pips i { width: 7px; height: 7px; border-radius: 50%; background: rgba(72, 58, 36, 0.15); }
+.run-pips--win i.on { background: var(--hl-amber); }
+.run-pips--life i { border-radius: 2px; transform: rotate(45deg); width: 6px; height: 6px; margin: 0 1px; }
+.run-pips--life i.on { background: #d5524a; }
+.run-label { margin-top: 2px; }
+.run-board, .run-shop { display: grid; gap: 4px; }
+.run-board { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.run-shop { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.run-slot {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 0; min-height: 124px; padding: 4px 3px 5px;
+  border: 0; border-radius: 10px; background: var(--paper-card); color: var(--ink);
+  box-shadow: var(--lift-1); text-align: center;
+}
+.run-slot.is-empty { background: rgba(255, 253, 248, 0.4); box-shadow: inset 0 0 0 1.5px rgba(72, 58, 36, 0.15); justify-content: center; }
+.run-slot.is-drop { box-shadow: inset 0 0 0 2px var(--pen-green), var(--lift-1); }
+.run-slot.is-sel { box-shadow: inset 0 0 0 2px var(--hl-amber), var(--lift-2); transform: translateY(-3px); }
+.run-slot--shop.is-stack::before {
+  content: '重ねる'; position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+  font-size: 8px; font-weight: 900; padding: 1px 4px; border-radius: 4px; background: var(--pen-green); color: #fff;
+}
+.run-slot--shop.is-sold { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(72, 58, 36, 0.1); }
+.run-empty { font-size: 20px; color: var(--ink-faint); }
+.run-top { display: flex; width: 100%; justify-content: space-between; align-items: center; }
+.run-tier {
+  font-size: 8px; font-weight: 900; width: 12px; height: 12px; border-radius: 3px;
+  display: grid; place-items: center; background: rgba(72, 58, 36, 0.12); color: var(--ink-soft);
+}
+.run-tier.tier-3 { background: #cfe3f1; } .run-tier.tier-4 { background: #e3d3f4; } .run-tier.tier-5 { background: #f6deaa; }
+.run-star { font-size: 8px; color: var(--hl-amber); letter-spacing: -1px; }
+.run-art { height: 34px; display: grid; place-items: center; }
+.run-icon { width: 34px; height: 34px; }
+.run-name { font-size: 9px; font-weight: 800; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-cd { font-size: 9px; color: var(--ink-faint); }
+.run-vals { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
+.run-val {
+  display: inline-flex; align-items: center; gap: 1px;
+  font-size: 9px; font-weight: 900; padding: 0 3px; border-radius: 4px; line-height: 14px;
+  background: rgba(72, 58, 36, 0.08); color: var(--ink);
+}
+.run-val i { font-style: normal; font-size: 8px; opacity: 0.75; }
+.run-val--dmg { background: #f3d6c9; } .run-val--burn { background: #f6c08f; } .run-val--poison { background: #d4e8b6; }
+.run-val--shield { background: #cfdcef; } .run-val--heal { background: #c9ecd9; }
+.run-val--slow { background: #e0d6f0; } .run-val--haste { background: #f4ecb8; } .run-val--strip { background: #e9d2d2; }
+.run-val.is-grown { box-shadow: inset 0 0 0 1.5px var(--pen-green); }
+.run-kit { font-size: 8px; font-weight: 800; color: var(--ink-faint); margin-top: auto; }
+.run-cost { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 900; }
+.run-coin { width: 10px; height: 10px; }
+.run-info {
+  margin-top: 4px; padding: 10px 12px 12px; border-radius: 13px; min-height: 64px;
+  background: rgba(255, 253, 248, 0.85); box-shadow: 0 5px 14px rgba(72, 58, 36, 0.12);
+}
+.run-hint { font-size: 11px; line-height: 1.6; color: var(--ink-soft); }
+.run-info-head { display: flex; align-items: center; gap: 8px; }
+.run-info-icon { width: 34px; height: 34px; flex: none; }
+.run-info-title { display: flex; flex-direction: column; min-width: 0; }
+.run-info-title b { font-size: 14px; }
+.run-info-sub { font-size: 10px; color: var(--ink-soft); }
+.run-info-actions { margin-left: auto; display: flex; gap: 6px; flex: none; }
+.run-info-lines { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.run-info-line { display: flex; gap: 6px; align-items: flex-start; font-size: 11px; line-height: 1.55; }
+.run-info-line .run-val { flex: none; }
+.run-info-ab { color: var(--ink); font-weight: 700; }
+.run-info-trait { color: var(--ink-soft); }
+.deck--run { display: flex; gap: 8px; }
+.deck--run .run-reroll { flex: none; display: inline-flex; align-items: center; gap: 3px; }
+.deck--run .run-fight { flex: 1; }
+
+/* ------------------------------------------------------------------ ラン（戦闘） */
+.screen--runBattle { display: flex; flex-direction: column; }
+.rb-head { display: flex; align-items: center; gap: 8px; padding: calc(var(--safe-t) + 14px) 16px 6px; }
+.rb-time { font-size: 13px; font-weight: 900; margin-right: auto; }
+.rb-stage { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 16px calc(var(--safe-b, 0px) + 20px); min-height: 0; }
+.rb-mid { flex: 1; min-height: 8px; }
+.rb-panel { position: relative; padding: 8px 12px 10px; border-radius: 12px; background: rgba(255, 253, 248, 0.85); box-shadow: 0 5px 14px rgba(72, 58, 36, 0.12); }
+.rb-panel-top { display: flex; align-items: center; gap: 6px; min-height: 18px; }
+.rb-who { font-size: 11px; font-weight: 900; margin-right: auto; }
+.rb-chip { font-size: 10px; font-weight: 900; padding: 0 5px; border-radius: 5px; line-height: 16px; }
+.rb-chip:empty { display: none; }
+.rb-chip--shield { background: #cfdcef; } .rb-chip--burn { background: #f6c08f; } .rb-chip--poison { background: #d4e8b6; }
+.rb-hp { position: relative; height: 14px; margin-top: 5px; border-radius: 7px; background: rgba(72, 58, 36, 0.12); overflow: hidden; }
+.rb-hp-fill { position: absolute; inset: 0 auto 0 0; background: #6cc28b; transition: width 0.12s linear; }
+.rb-panel--foe .rb-hp-fill { background: #e0745f; }
+.rb-hp-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
+.rb-floats { position: absolute; inset: -6px 0 auto 0; height: 0; pointer-events: none; }
+.rb-float { position: absolute; top: 0; font-size: 14px; font-weight: 900; animation: rb-float 0.9s ease-out forwards; text-shadow: 0 1px 0 #fff; }
+.rb-float--dmg, .rb-float--storm { color: #c0392b; } .rb-float--burn { color: #d9771e; } .rb-float--poison { color: #5b8c2a; }
+.rb-float--shield { color: #3d6fb0; } .rb-float--heal { color: #2b9a5c; }
+@keyframes rb-float { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-26px); opacity: 0; } }
+.rb-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.rb-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 4px 3px 5px; min-height: 100px; border-radius: 10px;
+  background: var(--paper-card); box-shadow: var(--lift-1);
+}
+.rb-card.is-empty { background: rgba(255, 253, 248, 0.35); box-shadow: none; }
+.rb-card.is-fire { animation: rb-fire 0.35s ease-out; }
+.rb-row--me .rb-card.is-fire { --dir: -1; } .rb-row--foe .rb-card.is-fire { --dir: 1; }
+@keyframes rb-fire { 40% { transform: translateY(calc(var(--dir) * 8px)) scale(1.06); } }
+.rb-star { font-size: 8px; color: var(--hl-amber); align-self: flex-end; }
+.rb-icon { width: 32px; height: 32px; }
+.rb-name { font-size: 9px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rb-vals { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
+.rb-bar { margin-top: auto; width: 100%; height: 4px; border-radius: 2px; background: rgba(72, 58, 36, 0.12); overflow: hidden; }
+.rb-bar-fill { display: block; height: 100%; background: var(--hl-amber); }
+.rb-grow {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font-size: 9px; font-weight: 900; padding: 1px 4px; border-radius: 4px;
+  background: var(--pen-green); color: #fff; animation: rb-float 1.1s ease-out forwards;
+}
+.rb-overlay { position: absolute; inset: 0; z-index: 5; display: none; place-items: center; background: rgba(40, 32, 20, 0.35); padding: 16px; }
+.rb-overlay.is-on { display: grid; }
+.rb-result {
+  width: min(360px, 100%); display: flex; flex-direction: column; gap: 10px;
+  padding: 18px 16px 16px; border-radius: 16px; background: var(--paper-card); box-shadow: var(--lift-2);
+}
+.rb-result-title { font-size: 26px; font-weight: 900; text-align: center; }
+.rb-result--win .rb-result-title { color: #b8860b; } .rb-result--lose .rb-result-title { color: #a2453a; }
+.rb-result-sub { text-align: center; font-size: 11px; color: var(--ink-soft); margin-top: -6px; }
+.rb-growth { display: flex; flex-direction: column; gap: 4px; max-height: 40vh; overflow-y: auto; }
+.rb-growth-line { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; }
+.rb-growth-icon { width: 22px; height: 22px; flex: none; }

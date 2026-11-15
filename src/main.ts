@@ -66,6 +66,11 @@ import {
   type SaveData, type OwnedRevos,
 } from './core/Save';
 import type { BiomeId } from './voxel/palette';
+import { RunScreen } from './ui/screens/RunScreen';
+import { RunBattleScreen } from './ui/screens/RunBattleScreen';
+import { RUN_UNITS, runDef } from './game/run/units';
+import { newRun, buildOpponent, finishBattle, isOver, RUN_WINS, type RunState } from './game/run/run';
+import { runBattle, type RunBattleResult } from './game/run/battle';
 
 const boot = document.getElementById('boot')!;
 const bootBar = document.getElementById('boot-bar-fill')!;
@@ -224,7 +229,9 @@ async function main(): Promise<void> {
   const profileScreen = new ProfileScreen();
   const resultScreen = new ResultScreen();
   const detailScreen = new DetailScreen();
-  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, cleanChoiceScreen, stockScreen, colosseumScreen, rankingScreen, profileScreen, debugScreen, detailScreen, resultScreen]) {
+  const runScreen = new RunScreen();
+  const runBattleScreen = new RunBattleScreen();
+  for (const s of [title, homeScreen, digScreen, cleanScreen, battleScreen, partyScreen, dexScreen, selectScreen, mailScreen, digSelectScreen, missionScreen, newsScreen, shopScreen, unitScreen, rosterScreen, transferScreen, settingsScreen, cleanChoiceScreen, stockScreen, colosseumScreen, rankingScreen, profileScreen, debugScreen, detailScreen, resultScreen, runScreen, runBattleScreen]) {
     ui.register(s);
   }
 
@@ -257,6 +264,71 @@ async function main(): Promise<void> {
       }
     }
   }
+
+  // ---------------------------------------------------------------- ラン
+
+  /**
+   * 店に並ぶユニット。段1は誰でも、段2から上は図鑑で見つけたものだけ——
+   * 発掘が、ランで使える駒を増やす役目になる
+   */
+  function runPool(): string[] {
+    const known = new Set([...data.dex, ...data.roster.map((r) => r.defId)]);
+    return RUN_UNITS.filter((u) => u.tier === 1 || known.has(u.id)).map((u) => u.id);
+  }
+  /** 相手は全ユニットから組む（よそのプレイヤーの盤面という扱い） */
+  const RUN_ALL = RUN_UNITS.map((u) => u.id);
+  let runFight: { res: RunBattleResult; foe: RunState['board'] } | null = null;
+
+  function goRun(): void {
+    if (!data.run) {
+      data.run = newRun(runPool(), (Date.now() >>> 0) ^ 0x5eed);
+      data.runRecord = { best: 0, clears: 0, runs: 0, ...data.runRecord };
+      data.runRecord.runs++;
+      writeSave(data);
+    } else {
+      // 図鑑が増えていれば、続きの店にも並ぶようにする
+      data.run.pool = runPool();
+    }
+    runScreen.setRun(data.run);
+    ui.show('run');
+  }
+
+  runScreen.onBack = () => goHome();
+  runScreen.onChange = () => writeSave(data);
+  runScreen.onFight = () => {
+    const run = data.run;
+    if (!run) return;
+    const foe = buildOpponent(RUN_ALL, run.round, (run.rng ^ (run.round * 2654435761)) >>> 0);
+    const res = runBattle(run.board, foe, run.round, { events: true, trace: true });
+    runFight = { res, foe };
+    ui.show('runBattle');
+    runBattleScreen.play(res, [run.board, foe], run.round);
+  };
+  runBattleScreen.onNext = () => {
+    const run = data.run;
+    if (!run || !runFight) { goHome(); return; }
+    finishBattle(run, runFight.res);
+    runFight = null;
+    if (isOver(run)) {
+      const coins = run.wins * 40 + (run.wins >= RUN_WINS ? 300 : 0);
+      data.player.coins += coins;
+      const rec = { best: 0, clears: 0, runs: 0, ...data.runRecord };
+      rec.best = Math.max(rec.best, run.wins);
+      if (run.wins >= RUN_WINS) rec.clears++;
+      data.runRecord = rec;
+      ui.toast(run.wins >= RUN_WINS
+        ? `ラン達成！ ${RUN_WINS}勝 · コイン +${coins}`
+        : `ラン終了 · ${run.wins}勝 · コイン +${coins}`, 'info', 3500);
+      data.run = null;
+      writeSave(data);
+      goHome();
+      return;
+    }
+    writeSave(data);
+    runScreen.setRun(run);
+    ui.show('run');
+  };
+  void runDef;
 
   function goHome(): void {
     // 開きっぱなしで 4 時を越えることがある。起動時にしか見ていないと、
@@ -469,7 +541,7 @@ async function main(): Promise<void> {
   const tabGo = (where: 'home' | 'dig' | 'battle' | 'unit' | 'settings'): void => {
     if (where === 'home') { goHome(); return; }
     if (where === 'dig') { digSelectScreen.setData(data); ui.show('digSelect'); return; }
-    if (where === 'battle') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'normal' }); return; }
+    if (where === 'battle') { goRun(); return; }
     if (where === 'unit') { goUnit(); return; }
     goSettings();
   };
@@ -1101,6 +1173,7 @@ async function main(): Promise<void> {
     else if (jump === 'battle') void startBattle();
     else if (jump === 'home') goHome();
     else if (jump === 'party') { partyScreen.setData(data); ui.show('party'); }
+    else if (jump === 'run') goRun();
     else if (jump === 'dex') { dexScreen.setData(data); ui.show('dex'); }
     else if (jump === 'event') { selectScreen.setData(data); ui.show('battleSelect', { mode: 'event' }); }
     else if (jump === 'daily') void startBattle(null, data.stageProgress + 1, { kind: 'daily', date: todayKey() });
