@@ -439,6 +439,53 @@ export class BattleSim {
       if (f.passive === 'vanguard') f.ready += 0.35;
     });
     this.syncHeadwind();
+    if (rules.synergy) this.applySynergy(rules.synergy);
+  }
+
+  /** 試作シナジーの段。側ごと・属性ごとに 0/1/2（2体で1段、4体で2段） */
+  readonly synergyTier: [Partial<Record<string, number>>, Partial<Record<string, number>>] = [{}, {}];
+
+  /**
+   * 試作: 属性シナジー。開戦時に1度だけ数える（分身は数えない）。
+   * 効くのはその属性の者だけ——TFT の「出自」と同じで、揃えた者が報われる。
+   */
+  private applySynergy(mode: 'effect' | 'flat'): void {
+    for (const side of [0, 1] as const) {
+      const team = this.fighters.filter((f) => f.side === side && !f.cloneOf);
+      const count = new Map<string, number>();
+      for (const f of team) count.set(f.element, (count.get(f.element) ?? 0) + 1);
+      for (const [el, n] of count) {
+        const [s1, s2] = this.rules.synergySteps ?? [2, 4];
+        const tier = n >= s2 ? 2 : n >= s1 ? 1 : 0;
+        if (tier === 0) continue;
+        this.synergyTier[side][el] = tier;
+        for (const f of team) {
+          if (f.element !== el) continue;
+          if (mode === 'flat') {
+            f.mods.push({ kind: 'dealt', value: tier === 2 ? 0.20 : 0.08, turns: 9999, source: 'synergy' });
+            continue;
+          }
+          switch (el) {
+            case 'flame': break; // 通常攻撃で火傷（performBasic）
+            case 'aqua': {
+              const total = Math.round(f.maxHp * (tier === 2 ? 0.30 : 0.15));
+              f.statuses.push({ kind: 'regen', turns: 99, value: Math.max(1, Math.round(total / 10)), pool: total, until: 10, source: f.uid + '|synergy' });
+              break;
+            }
+            case 'terra':
+              f.shield = { amount: Math.round(f.def * (tier === 2 ? 3.2 : 1.6)), turns: 6 };
+              break;
+            case 'gale':
+              f.ready += tier === 2 ? 0.5 : 0.25;
+              f.mods.push({ kind: 'spd', value: tier === 2 ? 0.10 : 0.05, turns: 9999, source: 'synergy' });
+              break;
+            case 'null':
+              f.od = Math.min(100, f.od + (tier === 2 ? 60 : 30));
+              break;
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -1035,6 +1082,11 @@ export class BattleSim {
       // 「帆の放熱」: 味方に1体でも居れば、火傷が付きやすくなる
       const sail = this.alive(actor.side).some((a) => a.passive === 'sailheat') ? 0.2 : 0;
       if (p === 'embers' && this.rng.chance(0.32 + sail)) this.applyBurn(target, ev, actor.uid);
+      // 試作シナジー: 火が揃っていれば、通常攻撃が火傷を残す
+      if (this.rules.synergy === 'effect' && actor.element === 'flame' && !actor.cloneOf) {
+        const tier = this.synergyTier[actor.side].flame ?? 0;
+        if (tier > 0 && this.rng.chance(tier === 2 ? 0.6 : 0.3)) this.applyBurn(target, ev, actor.uid);
+      }
       // 帆そのものも焼く。支援役だが、自分の一撃で火種を作れないと働き始められない
       if (p === 'sailheat' && this.rng.chance(0.45)) this.applyBurn(target, ev, actor.uid);
       if (p === 'venomgland' && this.rng.chance(0.45)) this.applyPoison(target, ev, actor.uid);

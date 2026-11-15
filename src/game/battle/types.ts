@@ -108,6 +108,15 @@ export interface BattleRules {
    * 通常戦の打ち切り（体力の割合で判定）とは違い、削りきれなかったことそのものが結果になる
    */
   timeLimit?: number;
+  /**
+   * 試作: 属性シナジー（TFT 風）。同じ属性が 2 / 4 体そろうと、その属性の者に効く。
+   *   effect … 属性ごとに違う効き方（火傷・再生・盾・先手・必殺）
+   *   flat   … 比較用。どの属性も与ダメ倍率を足すだけ
+   * 未指定なら無効。本編の戦闘には入れていない（tools/synergy.ts で測るだけ）
+   */
+  synergy?: 'effect' | 'flat';
+  /** 試作: 段の敷居（1段目・2段目の体数）。既定 [2, 4] */
+  synergySteps?: [number, number];
 }
 
 export interface TeamSetup {
